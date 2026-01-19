@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="AppIt.Api/AppIt.Api.csproj" />
+  <Project Path="AppIt.Core/AppIt.Core.csproj" />
+  <Project Path="AppIt.Data/AppIt.Data.csproj" Id="d11586e6-2992-4f58-b69d-85c40a95bc05" />
+</Solution>
