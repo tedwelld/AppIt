@@ -1,35 +1,102 @@
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
-using System.Threading.Tasks;
+using AppIt.Data;
+using AppIt.Data.EntityModels;
+using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace AppIt.Core.AppServices
 {
     public class RoleService : IRoleService
     {
-        public Task<ServiceResponse<RoleDto>> CreateRoleAsync(RoleDto roleDto)
+        private readonly AppItDbContext _db;
+
+        public RoleService(AppItDbContext db)
         {
-            return Task.FromResult(new ServiceResponse<RoleDto>(roleDto, "Role created (stub)"));
+            _db = db;
         }
 
-        public Task<ServiceResponse<bool>> DeleteRoleAsync(int id)
+        public async Task<ServiceResponse<RoleDto>> CreateAsync(CreateRoleDto dto)
         {
-            return Task.FromResult(new ServiceResponse<bool>(true, "Role deleted (stub)"));
+            var response = new ServiceResponse<RoleDto>();
+            try
+            {
+                var role = new Role { Name = dto.Name };
+                _db.Roles.Add(role);
+                await _db.SaveChangesAsync();
+
+                response.Data = MapToDto(role);
+                response.Success = true;
+                response.Message = "Role created successfully";
+            }
+            catch (Exception ex)
+            {
+                response.Success = false;
+                response.Message = $"Error creating role: {ex.Message} {ex.InnerException?.Message}";
+            }
+            return response;
         }
 
-        public Task<ServiceResponse<RoleDto>> GetRoleByIdAsync(int id)
+        public async Task<ServiceResponse<RoleDto>> UpdateAsync(int id, UpdateRoleDto dto)
         {
-            return Task.FromResult(new ServiceResponse<RoleDto>(new RoleDto(), "Role retrieved (stub)"));
+            var response = new ServiceResponse<RoleDto>();
+            var role = await _db.Roles.FindAsync(id);
+            if (role == null)
+                return new ServiceResponse<RoleDto>(null, "Role not found") { Success = false };
+
+            role.Name = dto.Name;
+            await _db.SaveChangesAsync();
+
+            response.Data = MapToDto(role);
+            response.Success = true;
+            response.Message = "Role updated successfully";
+            return response;
         }
 
-        public Task<ServiceResponse<List<RoleDto>>> GetRolesAsync()
+        public async Task<ServiceResponse<bool>> DeleteAsync(int id)
         {
-            return Task.FromResult(new ServiceResponse<List<RoleDto>>(new List<RoleDto>(), "Roles retrieved (stub)"));
+            var response = new ServiceResponse<bool>();
+            var role = await _db.Roles.FindAsync(id);
+            if (role == null)
+                return new ServiceResponse<bool>(false, "Role not found") { Success = false };
+
+            _db.Roles.Remove(role);
+            await _db.SaveChangesAsync();
+
+            response.Success = true;
+            response.Data = true;
+            response.Message = "Role deleted successfully";
+            return response;
         }
 
-        public Task<ServiceResponse<RoleDto>> UpdateRoleAsync(int id, RoleDto roleDto)
+        public async Task<ServiceResponse<List<RoleDto>>> GetAllAsync()
         {
-            return Task.FromResult(new ServiceResponse<RoleDto>(roleDto, "Role updated (stub)"));
+            var roles = await _db.Roles
+                .AsNoTracking()
+                .ToListAsync();
+
+            var dtos = roles.Select(MapToDto).ToList();
+
+            return new ServiceResponse<List<RoleDto>>(dtos, "Roles retrieved");
         }
+
+
+        public async Task<ServiceResponse<RoleDto>> GetByIdAsync(int id)
+        {
+            var role = await _db.Roles.FindAsync(id);
+            if (role == null)
+                return new ServiceResponse<RoleDto>(null, "Role not found") { Success = false };
+
+            return new ServiceResponse<RoleDto>(MapToDto(role), "Role retrieved");
+        }
+
+        private static RoleDto MapToDto(Role role) => new RoleDto
+        {
+            RoleId = role.RoleId,
+            Name = role.Name
+        };
     }
 }

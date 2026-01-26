@@ -1,34 +1,79 @@
 using AppIt.Core.DTOs;
-using AppIt.Core.Interfaces;
-using System.Threading.Tasks;
+using AppIt.Core.Interfaces.Services;
+using AppIt.Data;
+using AppIt.Data.EntityModels;
+using Microsoft.EntityFrameworkCore;
 
-namespace AppIt.Core.AppServices
+namespace AppIt.Core.Services
 {
     public class DepartmentService : IDepartmentService
     {
-        public Task<ServiceResponse<CreateDepartmentDto>> CreateDepartmentAsync(CreateDepartmentDto createDto)
+        private readonly AppItDbContext _context;
+
+        public DepartmentService(AppItDbContext context)
         {
-            return Task.FromResult(new ServiceResponse<CreateDepartmentDto>(createDto, "Department created (stub)"));
+            _context = context;
         }
 
-        public Task<ServiceResponse<bool>> DeleteDepartmentAsync(int id)
+        public async Task<DepartmentReadDto> CreateAsync(CreateDepartmentDto dto)
         {
-            return Task.FromResult(new ServiceResponse<bool>(true, "Department deleted (stub)"));
+            var department = new Department
+            {
+                Name = dto.Name,
+                Description = dto.Description,
+                UpdatedBy = dto.UpdatedBy,
+                DateUpdated = DateTime.UtcNow
+            };
+
+            _context.Departments.Add(department);
+            await _context.SaveChangesAsync();
+
+            return ToReadDto(department);
         }
 
-        public Task<ServiceResponse<GetDepartmentDto>> GetDepartmentsAsync(DepartmentFilterDto filterDto)
+        public async Task<DepartmentReadDto?> UpdateAsync(UpdateDepartmentDto dto)
         {
-            return Task.FromResult(new ServiceResponse<GetDepartmentDto>(new GetDepartmentDto(), "Departments retrieved (stub)"));
+            var department = await _context.Departments.FindAsync(dto.Id);
+            if (department == null) return null;
+
+            department.Name = dto.Name;
+            department.Description = dto.Description;
+            department.UpdatedBy = dto.UpdatedBy;
+            department.DateUpdated = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return ToReadDto(department);
         }
 
-        public Task<ServiceResponse<DepartmentDto>> GetDepartmentByIdAsync(int id)
+        public async Task<bool> DeleteAsync(int id)
         {
-            return Task.FromResult(new ServiceResponse<DepartmentDto>(new DepartmentDto(), "Department retrieved (stub)"));
+            var department = await _context.Departments.FindAsync(id);
+            if (department == null) return false;
+
+            _context.Departments.Remove(department);
+            await _context.SaveChangesAsync();
+            return true;
         }
 
-        public Task<ServiceResponse<UpdateDepartmentDto>> UpdateDepartmentAsync(int id, UpdateDepartmentDto updateDto)
+        public async Task<DepartmentReadDto?> GetByIdAsync(int id)
         {
-            return Task.FromResult(new ServiceResponse<UpdateDepartmentDto>(updateDto, "Department updated (stub)"));
+            var department = await _context.Departments.FindAsync(id);
+            return department == null ? null : ToReadDto(department);
         }
+
+        public async Task<IEnumerable<DepartmentReadDto>> GetAllAsync()
+        {
+            var departments = await _context.Departments.ToListAsync();
+            return departments.Select(ToReadDto);
+        }
+
+        private DepartmentReadDto ToReadDto(Department d) => new()
+        {
+            Id = d.Id,
+            Name = d.Name,
+            Description = d.Description,
+            UpdatedBy = d.UpdatedBy,
+            DateUpdated = d.DateUpdated
+        };
     }
 }

@@ -1,18 +1,15 @@
-﻿using System;
+﻿using AppIt.Core.DTOs;
 using System.Collections.Generic;
-using System.Text;
-using AppIt.Core.DTOs;
+using System.Threading.Tasks;
 
-namespace AppIt.Core.Interfaces
+namespace AppIt.Core.Interfaces.Services
 {
     public interface IDepartmentService
     {
-        Task<ServiceResponse<GetDepartmentDto>> GetDepartmentsAsync(DepartmentFilterDto filterDto);
-        Task<ServiceResponse<DepartmentDto>> GetDepartmentByIdAsync(int id);
-        Task<ServiceResponse<CreateDepartmentDto>> CreateDepartmentAsync(CreateDepartmentDto createDto);
-        Task<ServiceResponse<UpdateDepartmentDto>> UpdateDepartmentAsync(int id, UpdateDepartmentDto updateDto);
-        Task<ServiceResponse<bool>> DeleteDepartmentAsync(int id);
-
-
+        Task<DepartmentReadDto> CreateAsync(CreateDepartmentDto dto);
+        Task<DepartmentReadDto?> UpdateAsync(UpdateDepartmentDto dto);
+        Task<bool> DeleteAsync(int id);
+        Task<DepartmentReadDto?> GetByIdAsync(int id);
+        Task<IEnumerable<DepartmentReadDto>> GetAllAsync();
     }
 }

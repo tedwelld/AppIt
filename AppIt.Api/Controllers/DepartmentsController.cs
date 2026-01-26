@@ -1,28 +1,60 @@
-using AppIt.Core.Interfaces;
 using AppIt.Core.DTOs;
+using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AppIt.Api.Controllers;
-
-[ApiController]
-[Route("api/[controller]")]
-public class DepartmentsController : ControllerBase
+namespace AppIt.Api.Controllers
 {
-    private readonly IDepartmentService _service;
-    public DepartmentsController(IDepartmentService service) => _service = service;
+    [ApiController]
+    [Route("api/[controller]")]
+    public class DepartmentController : ControllerBase
+    {
+        private readonly IDepartmentService _service;
 
-    [HttpGet]
-    public async Task<IActionResult> Get([FromQuery] DepartmentFilterDto filter) => Ok(await _service.GetDepartmentsAsync(filter));
+        public DepartmentController(IDepartmentService service)
+        {
+            _service = service;
+        }
 
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(int id) => Ok(await _service.GetDepartmentByIdAsync(id));
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var departments = await _service.GetAllAsync();
+            return Ok(departments);
+        }
 
-    [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateDepartmentDto dto) => Ok(await _service.CreateDepartmentAsync(dto));
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var department = await _service.GetByIdAsync(id);
+            if (department == null) return NotFound();
+            return Ok(department);
+        }
 
-    [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, [FromBody] UpdateDepartmentDto dto) => Ok(await _service.UpdateDepartmentAsync(id, dto));
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] CreateDepartmentDto dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id) => Ok(await _service.DeleteDepartmentAsync(id));
+            var department = await _service.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = department.Id }, department);
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateDepartmentDto dto)
+        {
+            if (id != dto.Id) return BadRequest("ID mismatch");
+
+            var department = await _service.UpdateAsync(dto);
+            if (department == null) return NotFound();
+            return Ok(department);
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var deleted = await _service.DeleteAsync(id);
+            if (!deleted) return NotFound();
+            return NoContent();
+        }
+    }
 }

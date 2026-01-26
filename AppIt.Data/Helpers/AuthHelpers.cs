@@ -18,11 +18,22 @@ namespace AppIt.Data.Helpers
             {
                 foreach (var featureIds in featureAttributes.FeatureIds)
                 {
+                    int parsedId;
+                    if (!int.TryParse(featureIds, out parsedId))
+                    {
+                        // try to resolve from enum name
+                        if (!Enum.TryParse(typeof(Data.Enums.FeatureId), featureIds, true, out var enumVal) || enumVal == null)
+                        {
+                            continue; // skip unknown identifiers
+                        }
+                        parsedId = (int)enumVal;
+                    }
+
                     featurePermissions.Add(new FeaturePermission
                     {
                         Feature = feature,
                         Permission = permission,
-                        FeatureId = (int)featureIds,
+                        FeatureId = parsedId,
                     });
                 }
             }
@@ -35,14 +46,24 @@ namespace AppIt.Data.Helpers
             var featureAttributes = (FeatureAttributes?)Attribute.GetCustomAttribute(typeof(Feature), typeof(FeatureAttributes));
             if (featureAttributes != null)
             {
-                foreach (var featureId in featureAttributes.FeatureIds)
+                foreach (var featureIdStr in featureAttributes.FeatureIds)
                 {
+                    int parsedId;
+                    if (!int.TryParse(featureIdStr, out parsedId))
+                    {
+                        if (!Enum.TryParse(typeof(Data.Enums.FeatureId), featureIdStr, true, out var enumVal) || enumVal == null)
+                        {
+                            continue;
+                        }
+                        parsedId = (int)enumVal;
+                    }
+
                     roleFeaturePermissions.Add(new RoleFeaturePermission
                     {
                         RoleId = roleId,
                         Feature = feature,
                         Permission = permission,
-                        //FeatureId = (int)featureIds,
+                        FeatureId = parsedId,
                         IsActivated = isActivated
                     });
                 }
@@ -55,13 +76,23 @@ namespace AppIt.Data.Helpers
             var featureAttributes = (FeatureAttributes?)Attribute.GetCustomAttribute(typeof(Feature), typeof(FeatureAttributes));
             if (featureAttributes != null)
             {
-                foreach (var featureIds in featureAttributes.FeatureIds)
+                foreach (var featureIdStr in featureAttributes.FeatureIds)
                 {
+                    int parsedId;
+                    if (!int.TryParse(featureIdStr, out parsedId))
+                    {
+                        if (!Enum.TryParse(typeof(Data.Enums.FeatureId), featureIdStr, true, out var enumVal) || enumVal == null)
+                        {
+                            continue;
+                        }
+                        parsedId = (int)enumVal;
+                    }
+
                     roleFeatures.Add(new RoleFeature
                     {
                         RoleId = roleId,
                         Feature = feature,
-                        //FeatureId = (int)featureId,
+                        FeatureId = parsedId,
                         IsActivated = isActivated
                     });
                 }
@@ -74,13 +105,23 @@ namespace AppIt.Data.Helpers
             var featureAttributes = (FeatureAttributes?)Attribute.GetCustomAttribute(typeof(Feature), typeof(FeatureAttributes));
             if (featureAttributes != null)
             {
-                foreach (var featureId in featureAttributes.FeatureIds)
+                foreach (var featureIdStr in featureAttributes.FeatureIds)
                 {
+                    int parsedId;
+                    if (!int.TryParse(featureIdStr, out parsedId))
+                    {
+                        if (!Enum.TryParse(typeof(Data.Enums.FeatureId), featureIdStr, true, out var enumVal) || enumVal == null)
+                        {
+                            continue;
+                        }
+                        parsedId = (int)enumVal;
+                    }
+
                     roleFeatures.Add(new RoleFeature
                     {
                         RoleId = roleId,
                         Feature = feature,
-                        // FeatureId = (int)featureId,
+                        FeatureId = parsedId,
                         IsActivated = true
                     });
                 }
@@ -95,12 +136,22 @@ namespace AppIt.Data.Helpers
             var featureAttributes = (FeatureAttributes?)Attribute.GetCustomAttribute(typeof(Feature), typeof(FeatureAttributes));
             if (featureAttributes != null)
             {
-                foreach (var featureId in featureAttributes.FeatureIds)
+                foreach (var featureIdStr in featureAttributes.FeatureIds)
                 {
+                    int parsedId;
+                    if (!int.TryParse(featureIdStr, out parsedId))
+                    {
+                        if (!Enum.TryParse(typeof(Data.Enums.FeatureId), featureIdStr, true, out var enumVal) || enumVal == null)
+                        {
+                            continue;
+                        }
+                        parsedId = (int)enumVal;
+                    }
+
                     featurePermissions.Add(new FeaturePermission
                     {
                         Feature = feature,
-                        FeatureId = (int)featureId
+                        FeatureId = parsedId
                     });
                 }
             }
@@ -112,13 +163,23 @@ namespace AppIt.Data.Helpers
             var featureAttributes = (FeatureAttributes?)Attribute.GetCustomAttribute(typeof(Feature), typeof(FeatureAttributes));
             if (featureAttributes != null)
             {
-                foreach (var featureId in featureAttributes.FeatureIds)
+                foreach (var featureIdStr in featureAttributes.FeatureIds)
                 {
+                    int parsedId;
+                    if (!int.TryParse(featureIdStr, out parsedId))
+                    {
+                        if (!Enum.TryParse(typeof(Data.Enums.FeatureId), featureIdStr, true, out var enumVal) || enumVal == null)
+                        {
+                            continue;
+                        }
+                        parsedId = (int)enumVal;
+                    }
+
                     roleFeaturePermissions.Add(new RoleFeaturePermission
                     {
                         RoleId = roleId,
                         Feature = feature,
-                        //  FeatureId = (int)featureId,
+                        FeatureId = parsedId,
                         IsActivated = isActivated
                     });
                 }
@@ -132,13 +193,23 @@ namespace AppIt.Data.Helpers
             var featureAttributes = (FeatureAttributes?)Attribute.GetCustomAttribute(typeof(Feature), typeof(FeatureAttributes));
             if (featureAttributes != null)
             {
-                foreach (var featureId in featureAttributes.FeatureIds)
+                foreach (var featureIdStr in featureAttributes.FeatureIds)
                 {
+                    int parsedId;
+                    if (!int.TryParse(featureIdStr, out parsedId))
+                    {
+                        if (!Enum.TryParse(typeof(Data.Enums.FeatureId), featureIdStr, true, out var enumVal) || enumVal == null)
+                        {
+                            continue;
+                        }
+                        parsedId = (int)enumVal;
+                    }
+
                     roleFeaturePermissions.Add(new RoleFeaturePermission
                     {
                         RoleId = roleId,
                         Feature = feature,
-                        // FeatureId = (int)featureId,
+                        FeatureId = parsedId,
                         IsActivated = true
                     });
                 }
@@ -151,12 +222,22 @@ namespace AppIt.Data.Helpers
             var featureAttributes = (FeatureAttributes?)Attribute.GetCustomAttribute(typeof(Feature), typeof(FeatureAttributes));
             if (featureAttributes != null)
             {
-                foreach (var featureId in featureAttributes.FeatureIds)
+                foreach (var featureIdStr in featureAttributes.FeatureIds)
                 {
+                    int parsedId;
+                    if (!int.TryParse(featureIdStr, out parsedId))
+                    {
+                        if (!Enum.TryParse(typeof(Data.Enums.FeatureId), featureIdStr, true, out var enumVal) || enumVal == null)
+                        {
+                            continue;
+                        }
+                        parsedId = (int)enumVal;
+                    }
+
                     roleFeatures.Add(new RoleFeature
                     {
                         RoleId = roleId,
-                        // FeatureId = (int)featureId,
+                        FeatureId = parsedId,
                         IsActivated = true
                     });
                 }

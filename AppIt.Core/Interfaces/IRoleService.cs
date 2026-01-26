@@ -1,15 +1,15 @@
-﻿using System.Collections.Generic;
-    using System.Threading.Tasks;
-using AppIt.Core.DTOs;
+﻿using AppIt.Core.DTOs;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace AppIt.Core.Interfaces
 {
     public interface IRoleService
     {
-        Task<ServiceResponse<List<RoleDto>>> GetRolesAsync();
-        Task<ServiceResponse<RoleDto>> CreateRoleAsync(RoleDto roleDto);
-        Task<ServiceResponse<RoleDto>> UpdateRoleAsync(int id, RoleDto roleDto);
-        Task<ServiceResponse<bool>> DeleteRoleAsync(int id);
-        Task<ServiceResponse<RoleDto>> GetRoleByIdAsync(int id);
+        Task<ServiceResponse<RoleDto>> CreateAsync(CreateRoleDto dto);
+        Task<ServiceResponse<RoleDto>> UpdateAsync(int id, UpdateRoleDto dto);
+        Task<ServiceResponse<bool>> DeleteAsync(int id);
+        Task<ServiceResponse<List<RoleDto>>> GetAllAsync();
+        Task<ServiceResponse<RoleDto>> GetByIdAsync(int id);
     }
 }

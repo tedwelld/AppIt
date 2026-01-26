@@ -2,15 +2,19 @@
 using System.Collections.Generic;
 using System.Text;
 using AppIt.Core.DTOs;
+using System.Collections.Generic;
+ using System.Threading.Tasks;
 
-namespace AppIt.Core.Interfaces
-{
-    public interface IProductService
+    namespace AppIt.Core.Interfaces.Services
     {
-        Task<ServiceResponse<ProductResponseDto>> GetProductsAsync(ProductFilterDto filterDto);
-        Task<ServiceResponse<ProductDto>> CreateProductAsync(CreateProductDto createDto);
-        Task<ServiceResponse<ProductDto>> UpdateProductAsync(int id, UpdateProductDto updateDto);
-        Task<ServiceResponse<bool>> DeleteProductAsync(int id);
-        Task<ServiceResponse<ProductDto>> GetProductByIdAsync(int id);
+        public interface IProductService
+        {
+            Task<ProductReadDto> CreateAsync(CreateProductDto dto);
+            Task<ProductReadDto?> UpdateAsync(UpdateProductDto dto);
+            Task<bool> DeleteAsync(int productId);
+            Task<ProductReadDto?> GetByIdAsync(int productId);
+            Task<IEnumerable<ProductReadDto>> GetAllAsync();
+        }
     }
-}
+
+

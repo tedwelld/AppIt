@@ -1,43 +1,34 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Security;
-using System.Text;
-using AppIt.Data.EntityModels;
+using System.ComponentModel.DataAnnotations;
 
 namespace AppIt.Core.DTOs
 {
-    public class FeatureDto
+    public class FeatureReadDto
     {
-        public int? FeatureId { get; set; }
+        public int Id { get; set; }
 
         public int? PermissionId { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
 
-        public ICollection<FeaturePermission>? FeaturePermissions { get; set; } = new List<FeaturePermission>();
-        public ICollection<RoleFeature>? RoleFeatures { get; set; } = new List<RoleFeature>();
+        public string Name { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
     }
+
     public class CreateFeatureDto
     {
-        public int? FeatureId { get; set; }
         public int? PermissionId { get; set; }
+
+        [Required, MaxLength(150)]
         public string Name { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-    }
-    public class UpdateFeatureDto
-    {
-        public int? FeatureId { get; set; }
-        public int? PermissionId { get; set; }
-        public string Name { get; set; } = string.Empty;
+
+        [MaxLength(500)]
         public string Description { get; set; } = string.Empty;
     }
 
-    public class FeatureWithPermissionsDto
+    public class UpdateFeatureDto : CreateFeatureDto
     {
-        public int? FeatureId { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-       
+        [Required]
+        public int Id { get; set; }
     }
-
 }

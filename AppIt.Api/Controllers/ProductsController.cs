@@ -1,28 +1,68 @@
-using AppIt.Core.Interfaces;
 using AppIt.Core.DTOs;
+
+using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AppIt.Api.Controllers;
-
-[ApiController]
-[Route("api/[controller]")]
-public class ProductsController : ControllerBase
+namespace AppIt.Api.Controllers
 {
-    private readonly IProductService _service;
-    public ProductsController(IProductService service) => _service = service;
+    [ApiController]
+    [Route("api/[controller]")]
+    public class ProductController : ControllerBase
+    {
+        private readonly IProductService _service;
 
-    [HttpGet]
-    public async Task<IActionResult> Get([FromQuery] ProductFilterDto filter) => Ok(await _service.GetProductsAsync(filter));
+        public ProductController(IProductService service)
+        {
+            _service = service;
+        }
 
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(int id) => Ok(await _service.GetProductByIdAsync(id));
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var products = await _service.GetAllAsync();
+            return Ok(products);
+        }
 
-    [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateProductDto dto) => Ok(await _service.CreateProductAsync(dto));
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var product = await _service.GetByIdAsync(id);
+            if (product == null) return NotFound();
+            return Ok(product);
+        }
 
-    [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, [FromBody] UpdateProductDto dto) => Ok(await _service.UpdateProductAsync(id, dto));
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] CreateProductDto dto)
+        {
+            var product = await _service.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = product.ProductId }, product);
+        }
+       /* [HttpPost]
+        public async Task<IActionResult> Create([FromBody] CreateProductDto dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id) => Ok(await _service.DeleteProductAsync(id));
+            var product = await _service.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = product.ProductId }, product);
+        }*/
+
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateProductDto dto)
+        {
+            if (id != dto.ProductId) return BadRequest("Product ID mismatch");
+
+            var product = await _service.UpdateAsync(dto);
+            if (product == null) return NotFound();
+            return Ok(product);
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var deleted = await _service.DeleteAsync(id);
+            if (!deleted) return NotFound();
+            return NoContent();
+        }
+    }
 }

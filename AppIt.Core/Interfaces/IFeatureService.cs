@@ -1,17 +1,15 @@
 ﻿using AppIt.Core.DTOs;
-using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Threading.Tasks;
 
-namespace AppIt.Core.Interfaces
+namespace AppIt.Core.Interfaces.Services
 {
     public interface IFeatureService
     {
-        Task<ServiceResponse<FeatureDto>> GetFeatureAsync();
-        Task<ServiceResponse<FeatureDto>> GetFeatureByIdAsync(int id);
-        Task<ServiceResponse<CreateFeatureDto>> CreateFeatureAsync(CreateFeatureDto createDto);
-        Task<ServiceResponse<UpdateFeatureDto>> UpdateFeatureAsync(int id, UpdateFeatureDto updateDto);
-        Task<ServiceResponse<bool>> DeleteFeatureAsync(int id);
-
+        Task<FeatureReadDto> CreateAsync(CreateFeatureDto dto);
+        Task<FeatureReadDto?> UpdateAsync(UpdateFeatureDto dto);
+        Task<bool> DeleteAsync(int id);
+        Task<FeatureReadDto?> GetByIdAsync(int id);
+        Task<IEnumerable<FeatureReadDto>> GetAllAsync();
     }
 }

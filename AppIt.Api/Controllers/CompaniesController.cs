@@ -1,34 +1,60 @@
-using AppIt.Core.Interfaces;
 using AppIt.Core.DTOs;
+using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AppIt.Api.Controllers;
-
-[ApiController]
-[Route("api/[controller]")]
-public class CompaniesController : ControllerBase
+namespace AppIt.Api.Controllers
 {
-    private readonly ICompanyService _service;
-    public CompaniesController(ICompanyService service) => _service = service;
+    [ApiController]
+    [Route("api/[controller]")]
+    public class CompanyController : ControllerBase
+    {
+        private readonly ICompanyService _service;
 
-    [HttpGet("details")]
-    public async Task<IActionResult> Details() => Ok(await _service.CompanyDetailAsync());
+        public CompanyController(ICompanyService service)
+        {
+            _service = service;
+        }
 
-    [HttpGet("list/{companyId}")]
-    public async Task<IActionResult> List(int companyId) => Ok(await _service.CompanyListAsync(companyId));
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var companies = await _service.GetAllAsync();
+            return Ok(companies);
+        }
 
-    [HttpGet("dropdown/{companyId}")]
-    public async Task<IActionResult> Dropdown(int companyId) => Ok(await _service.CompanyDropdownAsync(companyId));
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var company = await _service.GetByIdAsync(id);
+            if (company == null) return NotFound();
+            return Ok(company);
+        }
 
-    [HttpGet("summary/{companyId}")]
-    public async Task<IActionResult> Summary(int companyId) => Ok(await _service.CompanySummary(companyId));
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] CreateCompanyDto dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
-    [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateCompanyDto model) => Ok(await _service.CreatCompanyAsync(0, 0, 0));
+            var company = await _service.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = company.CompanyId }, company);
+        }
 
-    [HttpPut("{companyId}")]
-    public async Task<IActionResult> Update(int companyId, [FromBody] UpdateCompanyDto model) => Ok(await _service.UpdateCompanyAsync(companyId, 0, 0));
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateCompanyDto dto)
+        {
+            if (id != dto.CompanyId) return BadRequest("Company ID mismatch");
 
-    [HttpDelete("{companyId}")]
-    public async Task<IActionResult> Delete(int companyId) => Ok(await _service.DeleteCompanyAsync(companyId, 0));
+            var company = await _service.UpdateAsync(dto);
+            if (company == null) return NotFound();
+            return Ok(company);
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var deleted = await _service.DeleteAsync(id);
+            if (!deleted) return NotFound();
+            return NoContent();
+        }
+    }
 }

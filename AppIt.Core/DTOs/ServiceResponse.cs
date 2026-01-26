@@ -8,6 +8,7 @@ namespace AppIt.Core.DTOs
         public bool IsSuccess { get; set; } = true;
         public string Message { get; set; } = string.Empty;
         public DateTime Time { get; set; } = DateTime.UtcNow;
+        public bool Success { get; set; }
 
         public ServiceResponse() { }
 

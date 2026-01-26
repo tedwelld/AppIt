@@ -9,6 +9,8 @@
   <ItemGroup>
     <Folder Include="DbContexts\" />
     <Folder Include="MigrationServices\" />
+    <Folder Include="Migrations\" />
+    <Folder Include="Repositories\" />
   </ItemGroup>
 
   <ItemGroup>

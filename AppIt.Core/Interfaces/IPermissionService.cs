@@ -1,16 +1,15 @@
-﻿using System;
+﻿using AppIt.Core.DTOs;
 using System.Collections.Generic;
-using System.Text;
-using AppIt.Core.DTOs;
+using System.Threading.Tasks;
 
-namespace AppIt.Core.Interfaces
+namespace AppIt.Core.Interfaces.Services
 {
     public interface IPermissionService
     {
-        Task<ServiceResponse<PermissionDto>> GetPermissionAsync();
-        Task<ServiceResponse<CreatePermissionDto>> CreatePermissionAsync(CreatePermissionDto createDto);
-        Task<ServiceResponse<UpdatePermissionDto>> UpdatePermissionAsync(int id, UpdatePermissionDto updateDto);
-        Task<ServiceResponse<DeletePermissionDto>> DeletePermissionAsync(int id);
-        Task<ServiceResponse<GetPermissionDto>> GetPermissionByIdAsync(int id);
+        Task<PermissionReadDto> CreateAsync(CreatePermissionDto dto);
+        Task<PermissionReadDto?> UpdateAsync(UpdatePermissionDto dto);
+        Task<bool> DeleteAsync(int id);
+        Task<PermissionReadDto?> GetByIdAsync(int id);
+        Task<IEnumerable<PermissionReadDto>> GetAllAsync();
     }
 }

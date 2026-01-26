@@ -1,35 +1,74 @@
 using AppIt.Core.DTOs;
-using AppIt.Core.Interfaces;
-using System.Threading.Tasks;
-using System.Collections.Generic;
+using AppIt.Core.Interfaces.Services;
+using AppIt.Data;
+using AppIt.Data.EntityModels;
+using Microsoft.EntityFrameworkCore;
 
-namespace AppIt.Core.AppServices
+namespace AppIt.Core.Services
 {
     public class PermissionService : IPermissionService
     {
-        public Task<ServiceResponse<CreatePermissionDto>> CreatePermissionAsync(CreatePermissionDto createDto)
+        private readonly AppItDbContext _context;
+
+        public PermissionService(AppItDbContext context)
         {
-            return Task.FromResult(new ServiceResponse<CreatePermissionDto>(createDto, "Permission created (stub)"));
+            _context = context;
         }
 
-        public Task<ServiceResponse<DeletePermissionDto>> DeletePermissionAsync(int id)
+        public async Task<PermissionReadDto> CreateAsync(CreatePermissionDto dto)
         {
-            return Task.FromResult(new ServiceResponse<DeletePermissionDto>(new DeletePermissionDto { Id = id }, "Permission deleted (stub)"));
+            var permission = new Permission
+            {
+                Name = dto.Name
+            };
+
+            _context.Permissions.Add(permission);
+            await _context.SaveChangesAsync();
+
+            return ToReadDto(permission);
         }
 
-        public Task<ServiceResponse<GetPermissionDto>> GetPermissionByIdAsync(int id)
+        public async Task<PermissionReadDto?> UpdateAsync(UpdatePermissionDto dto)
         {
-            return Task.FromResult(new ServiceResponse<GetPermissionDto>(new GetPermissionDto { Id = id, Name = "Permission" }, "Permission retrieved (stub)"));
+            var permission = await _context.Permissions.FindAsync(dto.PermissionId);
+            if (permission == null) return null;
+
+            permission.Name = dto.Name;
+
+            await _context.SaveChangesAsync();
+            return ToReadDto(permission);
         }
 
-        public Task<ServiceResponse<PermissionDto>> GetPermissionAsync()
+        public async Task<bool> DeleteAsync(int id)
         {
-            return Task.FromResult(new ServiceResponse<PermissionDto>(new PermissionDto(), "Permissions retrieved (stub)"));
+            var permission = await _context.Permissions.FindAsync(id);
+            if (permission == null) return false;
+
+            _context.Permissions.Remove(permission);
+            await _context.SaveChangesAsync();
+            return true;
         }
 
-        public Task<ServiceResponse<UpdatePermissionDto>> UpdatePermissionAsync(int id, UpdatePermissionDto updateDto)
+        public async Task<PermissionReadDto?> GetByIdAsync(int id)
         {
-            return Task.FromResult(new ServiceResponse<UpdatePermissionDto>(updateDto, "Permission updated (stub)"));
+            var permission = await _context.Permissions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.PermissionId == id);
+            return permission == null ? null : ToReadDto(permission);
         }
+
+        public async Task<IEnumerable<PermissionReadDto>> GetAllAsync()
+        {
+            var permissions = await _context.Permissions
+                .AsNoTracking()
+                .ToListAsync();
+            return permissions.Select(ToReadDto);
+        }
+
+        private PermissionReadDto ToReadDto(Permission p) => new()
+        {
+            PermissionId = p.PermissionId,
+            Name = p.Name
+        };
     }
 }

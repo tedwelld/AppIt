@@ -1,28 +1,60 @@
-using AppIt.Core.Interfaces;
 using AppIt.Core.DTOs;
+using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AppIt.Api.Controllers;
-
-[ApiController]
-[Route("api/[controller]")]
-public class PermissionsController : ControllerBase
+namespace AppIt.Api.Controllers
 {
-    private readonly IPermissionService _service;
-    public PermissionsController(IPermissionService service) => _service = service;
+    [ApiController]
+    [Route("api/[controller]")]
+    public class PermissionController : ControllerBase
+    {
+        private readonly IPermissionService _service;
 
-    [HttpGet]
-    public async Task<IActionResult> Get() => Ok(await _service.GetPermissionAsync());
+        public PermissionController(IPermissionService service)
+        {
+            _service = service;
+        }
 
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(int id) => Ok(await _service.GetPermissionByIdAsync(id));
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var permissions = await _service.GetAllAsync();
+            return Ok(permissions);
+        }
 
-    [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreatePermissionDto dto) => Ok(await _service.CreatePermissionAsync(dto));
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var permission = await _service.GetByIdAsync(id);
+            if (permission == null) return NotFound();
+            return Ok(permission);
+        }
 
-    [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, [FromBody] UpdatePermissionDto dto) => Ok(await _service.UpdatePermissionAsync(id, dto));
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] CreatePermissionDto dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id) => Ok(await _service.DeletePermissionAsync(id));
+            var permission = await _service.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = permission.PermissionId }, permission);
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, [FromBody] UpdatePermissionDto dto)
+        {
+            if (id != dto.PermissionId) return BadRequest("ID mismatch");
+
+            var permission = await _service.UpdateAsync(dto);
+            if (permission == null) return NotFound();
+            return Ok(permission);
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var deleted = await _service.DeleteAsync(id);
+            if (!deleted) return NotFound();
+            return NoContent();
+        }
+    }
 }

@@ -30,65 +30,36 @@ namespace AppIt.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("AccountType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreationTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatorId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("DeleterId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("DeletionTime")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("LastModifierId")
-                        .HasColumnType("int");
-
                     b.Property<string>("LastName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("NationalId")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("PasswordHash")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int>("RoleId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Title")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int?>("RoleId1")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedDate")
                         .HasColumnType("datetime2");
@@ -97,26 +68,9 @@ namespace AppIt.Data.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("Accounts");
-                });
+                    b.HasIndex("RoleId1");
 
-            modelBuilder.Entity("AppIt.Data.EntityModels.AccountCategory", b =>
-                {
-                    b.Property<int>("AccountCategoryId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AccountCategoryId"));
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Name")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("AccountCategoryId");
-
-                    b.ToTable("AccountCategories");
+                    b.ToTable("Accounts", (string)null);
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Company", b =>
@@ -129,11 +83,13 @@ namespace AppIt.Data.Migrations
 
                     b.Property<string>("AccountNumber")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("CompanyAddress")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("CompanyEmail")
                         .IsRequired()
@@ -141,7 +97,8 @@ namespace AppIt.Data.Migrations
 
                     b.Property<string>("CompanyName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("CompanyPhone")
                         .IsRequired()
@@ -152,18 +109,139 @@ namespace AppIt.Data.Migrations
 
                     b.Property<string>("RegNumber")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime>("UpdatedDate")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("VatNumber")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.HasKey("CompanyId");
 
-                    b.ToTable("Companies");
+                    b.ToTable("Companies", (string)null);
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.Customer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AgentCompanyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("DateUpdated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Dob")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("DurationOfStayDays")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FirstName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("IdType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte>("Image")
+                        .HasColumnType("tinyint");
+
+                    b.Property<int>("LastSavedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Nationality")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Profession")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProxyName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Region")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Surname")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TaxCategory")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgentCompanyId");
+
+                    b.ToTable("Customer");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.CustomerType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Age")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CustomerGroup")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("DateUpdated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Disability")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Family")
+                        .HasColumnType("int");
+
+                    b.Property<int>("GroupNumber")
+                        .HasColumnType("int");
+
+                    b.Property<int>("LastSavedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SpecialPice")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TaxationPercentage")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId")
+                        .IsUnique();
+
+                    b.ToTable("CustomerTypes");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Department", b =>
@@ -188,7 +266,7 @@ namespace AppIt.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Departments");
+                    b.ToTable("Departments", (string)null);
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Feature", b =>
@@ -215,8 +293,6 @@ namespace AppIt.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -228,7 +304,8 @@ namespace AppIt.Data.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<int?>("PermissionId")
                         .HasColumnType("int");
@@ -237,7 +314,7 @@ namespace AppIt.Data.Migrations
 
                     b.HasIndex("PermissionId");
 
-                    b.ToTable("Features");
+                    b.ToTable("Features", (string)null);
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.FeaturePermission", b =>
@@ -260,7 +337,7 @@ namespace AppIt.Data.Migrations
 
                     b.HasIndex("PermissionId");
 
-                    b.ToTable("FeaturePermissions");
+                    b.ToTable("FeaturePermissions", (string)null);
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Permission", b =>
@@ -277,7 +354,7 @@ namespace AppIt.Data.Migrations
 
                     b.HasKey("PermissionId");
 
-                    b.ToTable("Permissions");
+                    b.ToTable("Permissions", (string)null);
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Product", b =>
@@ -292,32 +369,97 @@ namespace AppIt.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
 
-                    b.Property<string>("ProductDescription")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ProductName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<decimal>("ProductPrice")
+                    b.Property<decimal>("Price")
                         .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("SupplierId")
-                        .HasColumnType("int");
 
                     b.HasKey("ProductId");
 
-                    b.HasIndex("SupplierId");
+                    b.ToTable("Products", (string)null);
+                });
 
-                    b.ToTable("Products");
+            modelBuilder.Entity("AppIt.Data.EntityModels.Reservation", b =>
+                {
+                    b.Property<int>("ReservationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ReservationId"));
+
+                    b.Property<int?>("AgencyConsultantId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("AgencyId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AgencyVoucherReference")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("AnalysisId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ClosingByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ClosingByUserName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ClosingDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Country")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("CurrencyExchangeRate")
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.Property<int?>("CurrencyId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CustomerEmail")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CustomerFirstName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CustomerIdNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CustomerLastName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("CustomerTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<bool?>("IsInvoiced")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("NumberOfPeople")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("Vat")
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.HasKey("ReservationId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("CustomerTypeId");
+
+                    b.ToTable("Reservation");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Role", b =>
@@ -330,11 +472,12 @@ namespace AppIt.Data.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.HasKey("RoleId");
 
-                    b.ToTable("Roles");
+                    b.ToTable("Roles", (string)null);
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.RoleFeature", b =>
@@ -360,7 +503,7 @@ namespace AppIt.Data.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("RoleFeatures");
+                    b.ToTable("RoleFeatures", (string)null);
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.RoleFeaturePermission", b =>
@@ -391,18 +534,66 @@ namespace AppIt.Data.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("RoleFeaturePermissions");
+                    b.ToTable("RoleFeaturePermissions", (string)null);
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.Supplier", b =>
+                {
+                    b.Property<int>("SupplierId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SupplierId"));
+
+                    b.Property<string>("ContactEmail")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ContactPhone")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("SupplierId");
+
+                    b.ToTable("Suppliers", (string)null);
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Account", b =>
                 {
-                    b.HasOne("AppIt.Data.EntityModels.Role", "Role")
+                    b.HasOne("AppIt.Data.EntityModels.Role", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AppIt.Data.EntityModels.Role", null)
+                        .WithMany("Accounts")
+                        .HasForeignKey("RoleId1");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.Customer", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.Company", "Agent")
+                        .WithMany()
+                        .HasForeignKey("AgentCompanyId");
+
+                    b.Navigation("Agent");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.CustomerType", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.Customer", "Customer")
+                        .WithOne("CustomerType")
+                        .HasForeignKey("AppIt.Data.EntityModels.CustomerType", "CustomerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Role");
+                    b.Navigation("Customer");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Feature", b =>
@@ -425,7 +616,7 @@ namespace AppIt.Data.Migrations
                     b.HasOne("AppIt.Data.EntityModels.Permission", "Permission")
                         .WithMany("FeaturePermissions")
                         .HasForeignKey("PermissionId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Feature");
@@ -433,15 +624,15 @@ namespace AppIt.Data.Migrations
                     b.Navigation("Permission");
                 });
 
-            modelBuilder.Entity("AppIt.Data.EntityModels.Product", b =>
+            modelBuilder.Entity("AppIt.Data.EntityModels.Reservation", b =>
                 {
-                    b.HasOne("AppIt.Data.EntityModels.Company", "Supplier")
-                        .WithMany()
-                        .HasForeignKey("SupplierId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.HasOne("AppIt.Data.EntityModels.Customer", null)
+                        .WithMany("Reservations")
+                        .HasForeignKey("CustomerId");
 
-                    b.Navigation("Supplier");
+                    b.HasOne("AppIt.Data.EntityModels.CustomerType", null)
+                        .WithMany("Reservations")
+                        .HasForeignKey("CustomerTypeId");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.RoleFeature", b =>
@@ -490,6 +681,18 @@ namespace AppIt.Data.Migrations
                     b.Navigation("Role");
                 });
 
+            modelBuilder.Entity("AppIt.Data.EntityModels.Customer", b =>
+                {
+                    b.Navigation("CustomerType");
+
+                    b.Navigation("Reservations");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.CustomerType", b =>
+                {
+                    b.Navigation("Reservations");
+                });
+
             modelBuilder.Entity("AppIt.Data.EntityModels.Feature", b =>
                 {
                     b.Navigation("FeaturePermissions");
@@ -500,6 +703,11 @@ namespace AppIt.Data.Migrations
             modelBuilder.Entity("AppIt.Data.EntityModels.Permission", b =>
                 {
                     b.Navigation("FeaturePermissions");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.Role", b =>
+                {
+                    b.Navigation("Accounts");
                 });
 #pragma warning restore 612, 618
         }

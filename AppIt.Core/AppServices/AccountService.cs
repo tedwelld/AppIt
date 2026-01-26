@@ -1,74 +1,126 @@
 ﻿using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
+using AppIt.Data;
 using AppIt.Data.EntityModels;
-using AppIt.Data.Enums;
+using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace AppIt.Core.AppServices
 {
-    // Minimal scaffold implementation to satisfy compilation and DI registration.
     public class AccountService : IAccountService
     {
-        public Task<Account> GetAccountAsync(int accountId)
+        private readonly AppItDbContext _db;
+
+        public AccountService(AppItDbContext db)
         {
-            // Return minimal Account instance; replace with DB lookup later.
-            return Task.FromResult(new Account());
+            _db = db;
         }
 
-        public Task<ServiceResponse<List<AccountResponseDto>>> GetAllAccountsAsync(AccountType? accountType = null)
+        public async Task<ServiceResponse<AccountDto>> CreateAsync(CreateAccountDto dto)
         {
-            return Task.FromResult(new ServiceResponse<List<AccountResponseDto>>(new List<AccountResponseDto>(), "Accounts retrieved (stub)"));
+            if (!await _db.Roles.AnyAsync(r => r.RoleId == dto.RoleId))
+            {
+                return new ServiceResponse<AccountDto>
+                {
+                    Success = false,
+                    Message = "Invalid RoleId"
+                };
+            }
+
+            var account = new Account
+            {
+                
+                FirstName = dto.FirstName,
+                LastName = dto.LastName,
+                NationalId = dto.NationalId,
+                Email = dto.Email,
+              
+                RoleId = dto.RoleId,
+              
+                IsActive = true,
+                CreatedDate = DateTime.UtcNow,
+                UpdatedDate = DateTime.UtcNow
+            };
+
+            _db.Accounts.Add(account);
+            await _db.SaveChangesAsync();
+
+            return new ServiceResponse<AccountDto>
+            {
+                Data = MapToDto(account),
+                Success = true,
+                Message = "Account created"
+            };
         }
 
-        public Task<ServiceResponse<AccountResponseDto>> CreateAccountAsync(CreateAccountDto createAccountDto)
+        public async Task<ServiceResponse<List<AccountDto>>> GetAllAsync()
         {
-            return Task.FromResult(new ServiceResponse<AccountResponseDto>(new AccountResponseDto(), "Account created (stub)"));
+            var accounts = await _db.Accounts
+                .AsNoTracking()
+                .Select(a => MapToDto(a))
+                .ToListAsync();
+
+            return new ServiceResponse<List<AccountDto>>(accounts, "Accounts retrieved");
         }
 
-        public Task<ServiceResponse<AccountResponseDto>> UpdateAccountAsync(int accountId, UpdateAccountDto updateAccountDto)
+        public async Task<ServiceResponse<AccountDto>> GetByIdAsync(int id)
         {
-            return Task.FromResult(new ServiceResponse<AccountResponseDto>(new AccountResponseDto(), "Account updated (stub)"));
+            var account = await _db.Accounts.FindAsync(id);
+            if (account == null)
+                return new ServiceResponse<AccountDto>(null, "Not found") { Success = false };
+
+            return new ServiceResponse<AccountDto>(MapToDto(account), "Retrieved");
         }
 
-        public Task<ServiceResponse<bool>> DeleteAccountAsync(int accountId)
+        public async Task<ServiceResponse<AccountDto>> UpdateAsync(int id, UpdateAccountDto dto)
         {
-            return Task.FromResult(new ServiceResponse<bool>(true, "Account deleted (stub)"));
+            var account = await _db.Accounts.FindAsync(id);
+            if (account == null)
+                return new ServiceResponse<AccountDto>(null, "Not found") { Success = false };
+
+            
+            account.FirstName = dto.FirstName;
+            account.LastName = dto.LastName;
+            account.NationalId = dto.NationalId;
+            account.Email = dto.Email;
+            account.RoleId = dto.RoleId;
+         
+            account.IsActive = dto.IsActive;
+            account.UpdatedDate = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            return new ServiceResponse<AccountDto>(MapToDto(account), "Updated");
         }
 
-        public Task<ServiceResponse<bool>> DeleteAccountAsync(int accountId, AccountType accountType)
+        public async Task<ServiceResponse<bool>> DeleteAsync(int id)
         {
-            return Task.FromResult(new ServiceResponse<bool>(true, "Account deleted (stub)"));
+            var account = await _db.Accounts.FindAsync(id);
+            if (account == null)
+                return new ServiceResponse<bool>(false, "Not found") { Success = false };
+
+            _db.Accounts.Remove(account);
+            await _db.SaveChangesAsync();
+
+            return new ServiceResponse<bool>(true, "Deleted");
         }
 
-        public Task<ServiceResponse<bool>> DeleteAccountAsync(int accountId, bool hardDelete)
+        private static AccountDto MapToDto(Account a) => new AccountDto
         {
-            return Task.FromResult(new ServiceResponse<bool>(true, "Account deleted (stub)"));
-        }
-
-        public Task<ServiceResponse<bool>> DeleteAccountAsync(int accountId, AccountType accountType, bool hardDelete)
-        {
-            return Task.FromResult(new ServiceResponse<bool>(true, "Account deleted (stub)"));
-        }
-
-        public Task<ServiceResponse<bool>> DeleteAccountAsync(int accountId, AccountType? accountType = null, bool hardDelete = false)
-        {
-            return Task.FromResult(new ServiceResponse<bool>(true, "Account deleted (stub)"));
-        }
-
-        public Task<ServiceResponse<AccountResponseDto>> GetById(int id)
-        {
-            return Task.FromResult(new ServiceResponse<AccountResponseDto>(new AccountResponseDto(), "Account retrieved (stub)"));
-        }
-
-        public Task<ServiceResponse<List<AccountWithRoleDto>>> GetAllRoles()
-        {
-            return Task.FromResult(new ServiceResponse<List<AccountWithRoleDto>>(new List<AccountWithRoleDto>(), "Roles retrieved (stub)"));
-        }
-
-        public Task<ServiceResponse<FeatureDto>> GetAllFeatures()
-        {
-            return Task.FromResult(new ServiceResponse<FeatureDto>(new FeatureDto(), "Features retrieved (stub)"));
-        }
+            Id = a.Id,
+           
+            FirstName = a.FirstName,
+            LastName = a.LastName,
+            NationalId = a.NationalId,
+            Email = a.Email,
+            RoleId = a.RoleId,
+           
+            IsActive = a.IsActive,
+            CreatedDate = a.CreatedDate,
+            UpdatedDate = a.UpdatedDate
+        };
     }
 }

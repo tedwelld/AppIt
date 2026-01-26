@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "AppIt.Core": {
+      "commandName": "Project",
+      "sqlDebugging": true,
+      "nativeDebugging": true
+    }
+  }
+}

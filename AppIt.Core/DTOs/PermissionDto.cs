@@ -1,34 +1,25 @@
-﻿using AppIt.Data.EntityModels;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Text;
+using System.ComponentModel.DataAnnotations;
 
 namespace AppIt.Core.DTOs
 {
-    public class PermissionDto
+    public class PermissionReadDto
     {
+        public int PermissionId { get; set; }
         public string Name { get; set; } = string.Empty;
-
-        public ICollection<FeaturePermission>? FeaturePermissions { get; set; } = new List<FeaturePermission>();
     }
 
     public class CreatePermissionDto
     {
+        [Required]
+        [MaxLength(150)]
         public string Name { get; set; } = string.Empty;
-    }
-    public class UpdatePermissionDto
-    {
-        public string Name { get; set; } = string.Empty;
-    }
-    public class DeletePermissionDto
-    { 
-        public int Id { get; set; }
-    }
-    public class GetPermissionDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public ICollection<FeaturePermission>? FeaturePermissions { get; set; } = new List<FeaturePermission>();
     }
 
+    public class UpdatePermissionDto : CreatePermissionDto
+    {
+        [Required]
+        public int PermissionId { get; set; }
+    }
 }

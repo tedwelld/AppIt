@@ -8,7 +8,7 @@ namespace AppIt.Api.Controllers;
 [Route("api/[controller]")]
 public class RoleFeaturesController : ControllerBase
 {
-    private readonly IRoleFeatureService _service;
+    public readonly IRoleFeatureService _service;
     public RoleFeaturesController(IRoleFeatureService service) => _service = service;
 
     [HttpGet]

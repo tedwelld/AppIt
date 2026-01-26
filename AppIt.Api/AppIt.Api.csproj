@@ -4,8 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <InvariantGlobalization>true</InvariantGlobalization>
-    <PublishAot>true</PublishAot>
+  
+    <!-- Enable Native AOT only for Release builds. Keep Debug/design-time builds non-AOT so tools that rely on reflection (EF, Swagger, JSON) work. -->
+    <PublishAot Condition="'$(Configuration)' == 'Release'">true</PublishAot>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +21,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <!-- Swagger / OpenAPI UI aligned with AppIt.Core versions -->
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="10.1.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.1.0" />
+    <PackageReference Include="Microsoft.OpenApi" Version="2.3.0" />
   </ItemGroup>
 
   <ItemGroup>
