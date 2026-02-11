@@ -7,8 +7,8 @@ namespace AppIt.Data.EntityModels
     {
         public int RoleId { get; set; }
         public string Name { get; set; } = string.Empty;
-
-        // Optional: navigation property if accounts are linked to roles
-        public List<Account>? Accounts { get; set; }
+        public ICollection<Account> Accounts { get; set; } = new List<Account>();
+        public ICollection<RoleFeature> RoleFeatures { get; set; } = new List<RoleFeature>();
+        public ICollection<RoleFeaturePermission> RoleFeaturePermissions { get; set; } = new List<RoleFeaturePermission>();
     }
 }

@@ -1,57 +1,42 @@
-﻿using AppIt.Core.DTOs.AppIt.Core.DTOs.AppIt.Core.DTOs;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
+using AppIt.Data;
 using AppIt.Data.EntityModels;
 using Microsoft.EntityFrameworkCore;
 
-public class UserProfileService : IUserProfileService
+namespace AppIt.Core.AppServices
 {
-    private readonly AppItDbContext _context;
-
-    public UserProfileService(AppItDbContext context)
+    public class UserProfileService : IUserProfileService
     {
-        _context = context;
-    }
+        private readonly AppItDbContext _context;
 
-    public async Task<UserProfileReadDto> CreateAsync(
-        int accountId,
-        CreateUserProfileDto dto,
-        CancellationToken cancellationToken = default)
-    {
-        if (dto == null)
-            throw new ArgumentNullException(nameof(dto));
-
-        var accountExists = await _context.Accounts
-            .AnyAsync(a => a.Id == accountId, cancellationToken);
-
-        if (!accountExists)
-            throw new InvalidOperationException("Account does not exist.");
-
-        var profile = new UserProfile
+        public UserProfileService(AppItDbContext context)
         {
-           
-            DisplayName = dto.DisplayName?.Trim()
-        };
-
-        _context.UserProfiles.Add(profile);
-
-        try
-        {
-            await _context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException)
-        {
-            throw new InvalidOperationException("User profile already exists for this account.");
+            _context = context;
         }
 
-        return new UserProfileReadDto(
-            profile.Id,
-            profile.DisplayName,
-            profile.IsActive
-        );
-    }
+        public async Task<UserProfileReadDto> CreateAsync(CreateUserProfileDto dto)
+        {
+            if (dto == null)
+            {
+                throw new ArgumentNullException(nameof(dto));
+            }
 
-    public Task<AppIt.Core.DTOs.AppIt.Core.DTOs.UserProfileReadDto> CreateAsync(CreateUserProfileDto dto)
-    {
-        throw new NotImplementedException();
+            var displayName = dto.DisplayName?.Trim();
+            if (string.IsNullOrWhiteSpace(displayName))
+            {
+                throw new ArgumentException("Display name is required.", nameof(dto));
+            }
+
+            var profile = new UserProfile
+            {
+                DisplayName = displayName
+            };
+
+            _context.UserProfiles.Add(profile);
+            await _context.SaveChangesAsync();
+
+            return new UserProfileReadDto(profile.Id, profile.DisplayName, profile.IsActive);
+        }
     }
 }

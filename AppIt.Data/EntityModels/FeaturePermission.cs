@@ -7,9 +7,8 @@ namespace AppIt.Data.EntityModels
 {
     public class FeaturePermission
     {
-        
-        public int FeaturePermissionId { get; set; }
         [Key]
+        public int FeaturePermissionId { get; set; }
         public int FeatureId { get; set; }
         public Feature? Feature { get; set; }
         public int PermissionId { get; set; }

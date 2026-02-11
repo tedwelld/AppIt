@@ -7,7 +7,7 @@ namespace AppIt.Data.AggregateRoots
 {
     public class AuditedAggregateRoot<T> : BasicAggregateRoot<T>
     {
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
         public DateTime CreationTime { get; set; } = DateTime.Now;
         public int? CreatorId { get; set; }
         // Navigation to Account is omitted to avoid ambiguous self-referencing relationships in EF

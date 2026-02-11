@@ -1,7 +1,5 @@
-﻿using AppIt.Core.DTOs;
-using AppIt.Core.Interfaces;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
-using AppIt.Data.Entities.AppIt.Core.DTOs;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers
@@ -28,9 +26,10 @@ namespace AppIt.Api.Controllers
         public async Task<IActionResult> GetById(int id)
         {
             var snapshot = await _service.GetByIdAsync(id);
-
             if (snapshot == null)
+            {
                 return NotFound();
+            }
 
             return Ok(snapshot);
         }

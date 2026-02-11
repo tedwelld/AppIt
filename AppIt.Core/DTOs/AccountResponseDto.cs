@@ -21,7 +21,7 @@ namespace AppIt.Core.DTOs
         public int RoleId { get; set; }
         public Role? Role { get; set; }
         [Required]
-        public string AccountType { get; set; }
+        public string AccountType { get; set; } = string.Empty;
         public DateTime CreatedDate { get; set; } = DateTime.Now;
         public DateTime UpdatedDate { get; set; } = DateTime.Now;
         public bool IsActive { get; set; } = true;

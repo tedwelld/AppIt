@@ -1,21 +1,11 @@
-import { HttpClient } from '@angular/common/http';
-import { inject, Injectable } from '@angular/core';
-import { environment } from '../environments/environment.development';
-import { Observable } from 'rxjs';
+import { Injectable, inject } from '@angular/core';
+import { ApiService } from './api.service';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Injectable({ providedIn: 'root' })
 export class Accounts {
-  
-  /*
-  private  http = inject (HttpClient);
-  private apiUrl = environment.apiURL + '/swagger/index.html'
+  private readonly api = inject(ApiService);
 
-  public get(): Observable<any>{
-  return this.http.get(this.apiUrl);
-  }*/
- AccountsService = inject(this.AccountsService);
- constructor(){}
-  this.AccountsService.get().subscribe()
+  getAll() {
+    return this.api.list('/api/Accounts');
+  }
 }

@@ -1,1 +1,64 @@
-<h2>Hello there</h2>
+<div class="shell" [attr.data-theme]="theme()">
+  <header class="topbar">
+    <div class="top-left">
+      <div class="logo">AI</div>
+      <div>
+        <h1>AppIt</h1>
+        <p>Operations Platform</p>
+      </div>
+    </div>
+
+    <h2 class="panel-title">Control Panel</h2>
+
+    <div class="top-right">
+      <div class="clock">
+        <p>{{ now() | date: 'EEEE, MMM d, y' }}</p>
+        <strong>{{ now() | date: 'HH:mm:ss' }}</strong>
+      </div>
+      <button class="btn-base btn-secondary btn-theme" (click)="toggleTheme()">
+        <span class="material-symbols-outlined">contrast</span>
+        {{ theme() === 'light' ? 'Switch to Black' : 'Switch to White' }}
+      </button>
+    </div>
+  </header>
+
+  <div class="body-layout">
+    <aside class="sidebar">
+      <label class="side-label">Quick Find</label>
+      <input
+        class="app-input side-search"
+        [ngModel]="sidebarQuery()"
+        (ngModelChange)="sidebarQuery.set($event)"
+        placeholder="Search pages"
+      />
+
+      <section class="nav-group" *ngFor="let group of filteredGroups()">
+        <button class="group-head" (click)="toggleGroup(group.id)">
+          <span class="group-title-wrap">
+            <span class="material-symbols-outlined">{{ group.icon }}</span>
+            <span>{{ group.name }}</span>
+          </span>
+          <span class="material-symbols-outlined">{{ isCollapsed(group.id) ? 'expand_more' : 'expand_less' }}</span>
+        </button>
+
+        <div class="group-links" [class.hidden]="isCollapsed(group.id)">
+          <a
+            *ngFor="let item of group.items"
+            [routerLink]="item.route"
+            routerLinkActive="active"
+            class="side-link"
+          >
+            <span class="material-symbols-outlined">{{ item.icon }}</span>
+            {{ item.title }}
+          </a>
+        </div>
+      </section>
+    </aside>
+
+    <main class="view">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+
+  <footer class="app-footer">Powered By Tedwell (YourItGuy -2026).</footer>
+</div>

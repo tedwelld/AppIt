@@ -1,18 +1,9 @@
-﻿using AppIt.Core.DTOs;
-using AppIt.Core.DTOs.AppIt.Core.DTOs;
-using AppIt.Core.DTOs.AppIt.Core.DTOs.AppIt.Core.DTOs;
-using AppIt.Data;
-using AppIt.Data.EntityModels;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using AppIt.Core.DTOs;
 
 namespace AppIt.Core.Interfaces
 {
     public interface IUserProfileService
     {
-        Task<DTOs.AppIt.Core.DTOs.UserProfileReadDto> CreateAsync(CreateUserProfileDto dto);
+        Task<UserProfileReadDto> CreateAsync(CreateUserProfileDto dto);
     }
-
-
 }

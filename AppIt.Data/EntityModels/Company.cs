@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace AppIt.Data.EntityModels
@@ -30,5 +31,7 @@ namespace AppIt.Data.EntityModels
 
         [MaxLength(50)]
         public string VatNumber { get; set; } = null!;
+
+        public ICollection<Customer> Customers { get; set; } = new List<Customer>();
     }
 }

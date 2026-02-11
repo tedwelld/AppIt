@@ -1,1 +1,70 @@
-/* You can add global styles to this file, and also import other style files */
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #ecf3fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+  font-size: 1.1rem;
+}
+
+.btn-base {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  min-height: 2rem;
+  min-width: 6.6rem;
+  padding: 0.34rem 0.9rem;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.82rem;
+  font-family: inherit;
+  line-height: 1.1;
+}
+
+.btn-base:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #0f4c5c;
+  color: #ffffff;
+}
+
+.btn-secondary {
+  background: #f2f6fc;
+  color: #102542;
+  border-color: #d9e2ef;
+}
+
+.btn-danger {
+  background: #fff3f3;
+  color: #8f1c21;
+  border-color: #edb8bb;
+}
+
+.btn-compact {
+  min-width: 6.6rem;
+}
+
+.app-input,
+.app-select,
+.app-textarea {
+  width: 100%;
+  border: 1px solid #c7d3e0;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  box-sizing: border-box;
+  background: #fff;
+}

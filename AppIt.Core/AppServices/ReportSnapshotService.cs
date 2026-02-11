@@ -1,11 +1,8 @@
-﻿using AppIt.Core.DTOs;
-using AppIt.Core.Interfaces;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using AppIt.Data;
 using AppIt.Data.Entities;
-using AppIt.Data.Entities.AppIt.Core.DTOs;
 using Microsoft.EntityFrameworkCore;
-using System;
 
 namespace AppIt.Core.Services
 {

@@ -1,4 +1,3 @@
-using AppIt.Api.Controllers;    
 using AppIt.Core.AppServices;
 using AppIt.Core.Interfaces;
 using AppIt.Core.Interfaces.Services;
@@ -6,9 +5,7 @@ using AppIt.Core.Services;
 using AppIt.Data;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
-using AppIt.Core.Interfaces.Repositories;
 //using AppIt.Data.Repositories;
 // Swagger/OpenAPI
 // Note: OpenApi types are not required in this file; Swashbuckle will auto-generate documents
@@ -94,10 +91,13 @@ namespace AppIt.Api
                 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
                 builder.Services.AddScoped<IAccountService, AccountService>();
                 builder.Services.AddScoped<ISupplierService, SupplierService>();
-                builder.Services.AddScoped<ISupplierService, SupplierService>();
                 builder.Services.AddScoped<ICustomerTypeService, CustomerTypeService>();
                 builder.Services.AddScoped<IReservationService, ReservationService>();
                 builder.Services.AddScoped<ICustomerService, CustomerService>();
+                builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+                builder.Services.AddScoped<INotificationService, NotificationService>();
+                builder.Services.AddScoped<IReportSnapshotService, ReportSnapshotService>();
+                builder.Services.AddScoped<IUserProfileService, UserProfileService>();
                 builder.Services.ConfigureHttpJsonOptions(options =>
                 {
                     // Ensure a runtime TypeInfoResolver is available so source-generation is not required
@@ -118,15 +118,12 @@ namespace AppIt.Api
                 builder.Services.AddEndpointsApiExplorer();
                 // Use Swashbuckle to generate OpenAPI/Swagger documents for controllers
                 builder.Services.AddSwaggerGen(options =>
-                options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+                options.SwaggerDoc("v1", new Microsoft.OpenApi.OpenApiInfo
                 {
                     Title = "AppIt API",
                     Version = "v2"
                 }));
             
-
-            // Core services registration (ensure PermissionService is registered)
-            builder.Services.AddScoped<IPermissionService, PermissionService>();
 
                 #endregion
 

@@ -16,7 +16,7 @@ namespace AppIt.Core.DTOs
         public string? Profession { get; set; }
         public string? ProxyName { get; set; }
         public string? Email { get; set; }
-        public string PhoneNumber { get; set; }
+        public string PhoneNumber { get; set; } = string.Empty;
         public byte Image { get; set; }
         public string? TaxCategory { get; set; }
         public string? Region { get; set; }
@@ -41,7 +41,7 @@ namespace AppIt.Core.DTOs
         public string? Profession { get; set; }
         public string? ProxyName { get; set; }
         public string? Email { get; set; }
-        public string PhoneNumber { get; set; }
+        public string PhoneNumber { get; set; } = string.Empty;
         public byte Image { get; set; }
         public string? TaxCategory { get; set; }
         public string? Region { get; set; }

@@ -16,7 +16,7 @@ namespace AppIt.Data.EntityModels
         public string? Profession { get; set; }
         public string? ProxyName { get; set; }
         public string? Email { get; set; }
-        public string PhoneNumber { get; set; }
+        public string PhoneNumber { get; set; } = string.Empty;
         public byte Image { get; set; }
         public string? TaxCategory { get; set; }
         public string? Region { get; set; }
@@ -26,9 +26,10 @@ namespace AppIt.Data.EntityModels
         public DateTime DateUpdated { get; set; }
         public string? Notes { get; set; }
 
+        public int? AgentCompanyId { get; set; }
         public Company? Agent { get; set; }
         public CustomerType? CustomerType { get; set; }
-        public ICollection<Reservation>? Reservations { get; set; }
+        public ICollection<Reservation> Reservations { get; set; } = new List<Reservation>();
 
     }
 }

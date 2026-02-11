@@ -1,4 +1,4 @@
-﻿using AppIt.Core.DTOs.AppIt.Core.DTOs.AppIt.Core.DTOs;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,6 +17,6 @@ public class UserProfilesController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateUserProfileDto dto)
     {
         var result = await _service.CreateAsync(dto);
-        return CreatedAtAction(nameof(Create), result);
+        return CreatedAtAction(nameof(Create), new { id = result.Id }, result);
     }
 }

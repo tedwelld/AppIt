@@ -89,7 +89,7 @@ namespace AppIt.Core.Services
         {
             var reservation = await Reservations
                 .AsNoTracking()
-                .FirstOrDefaultAsync(r => r.CustomerId == id);
+                .FirstOrDefaultAsync(r => r.ReservationId == id);
             return reservation == null ? null : ToReadDto(reservation);
         }
 
@@ -103,7 +103,7 @@ namespace AppIt.Core.Services
 
         private ReservationReadDto ToReadDto(Reservation r) => new()
         {
-            ReservationId = r.CustomerId ?? 0,
+            ReservationId = r.ReservationId,
             CustomerFirstName = r.CustomerFirstName,
             CustomerLastName = r.CustomerLastName,
             CustomerIdNumber = r.CustomerIdNumber,

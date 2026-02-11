@@ -22,15 +22,13 @@ namespace AppIt.Data.EntityModels
         [Required]
         public string Email { get; set; } = string.Empty;
 
-        // FK
         public int RoleId { get; set; }
+        public Role? Role { get; set; }
         public bool IsActive { get; set; } = true;
 
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedDate { get; set; } = DateTime.UtcNow;
-
-       
-        }
     }
+}
 
 

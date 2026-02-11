@@ -11,6 +11,14 @@ namespace AppIt.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(
+                @"IF OBJECT_ID(N'[FK_Invoice_Reservation_ReservationId]', N'F') IS NOT NULL
+                    ALTER TABLE [Invoice] DROP CONSTRAINT [FK_Invoice_Reservation_ReservationId];");
+
+            migrationBuilder.Sql(
+                @"IF OBJECT_ID(N'[Invoice]', N'U') IS NOT NULL
+                    DROP TABLE [Invoice];");
+
             migrationBuilder.DropForeignKey(
                 name: "FK_Customer_Companies_AgentCompanyId",
                 table: "Customer");
@@ -34,14 +42,6 @@ namespace AppIt.Data.Migrations
             migrationBuilder.DropForeignKey(
                 name: "FK_Reservation_Customer_CustomerId",
                 table: "Reservation");
-
-            migrationBuilder.DropPrimaryKey(
-                name: "PK_FeaturePermissions",
-                table: "FeaturePermissions");
-
-            migrationBuilder.DropIndex(
-                name: "IX_FeaturePermissions_FeatureId",
-                table: "FeaturePermissions");
 
             migrationBuilder.DropPrimaryKey(
                 name: "PK_Reservation",
@@ -92,30 +92,6 @@ namespace AppIt.Data.Migrations
                 oldType: "nvarchar(100)",
                 oldMaxLength: 100);
 
-            migrationBuilder.AlterColumn<int>(
-                name: "FeatureId",
-                table: "FeaturePermissions",
-                type: "int",
-                nullable: false,
-                oldClrType: typeof(int),
-                oldType: "int")
-                .Annotation("SqlServer:Identity", "1, 1");
-
-            migrationBuilder.AlterColumn<int>(
-                name: "FeaturePermissionId",
-                table: "FeaturePermissions",
-                type: "int",
-                nullable: false,
-                oldClrType: typeof(int),
-                oldType: "int")
-                .OldAnnotation("SqlServer:Identity", "1, 1");
-
-            migrationBuilder.AddColumn<int>(
-                name: "FeatureId1",
-                table: "FeaturePermissions",
-                type: "int",
-                nullable: true);
-
             migrationBuilder.AlterColumn<string>(
                 name: "LastName",
                 table: "Accounts",
@@ -135,11 +111,6 @@ namespace AppIt.Data.Migrations
                 oldMaxLength: 100);
 
             migrationBuilder.AddPrimaryKey(
-                name: "PK_FeaturePermissions",
-                table: "FeaturePermissions",
-                column: "FeatureId");
-
-            migrationBuilder.AddPrimaryKey(
                 name: "PK_Reservations",
                 table: "Reservations",
                 column: "ReservationId");
@@ -149,92 +120,11 @@ namespace AppIt.Data.Migrations
                 table: "Customers",
                 column: "Id");
 
-            migrationBuilder.CreateTable(
-                name: "Invoices",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ReservationId = table.Column<int>(type: "int", nullable: false),
-                    TotalAmount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    IsPaid = table.Column<bool>(type: "bit", nullable: false),
-                    IssuedDate = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Invoices", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Invoices_Reservations_ReservationId",
-                        column: x => x.ReservationId,
-                        principalTable: "Reservations",
-                        principalColumn: "ReservationId",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Notifications",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    UserId = table.Column<int>(type: "int", nullable: false),
-                    Title = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Message = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    IsRead = table.Column<bool>(type: "bit", nullable: false),
-                    ReadAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Notifications", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ReportSnapshots",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ReportKey = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Title = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    DataJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    SnapshotDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    GeneratedByUserId = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ReportSnapshots", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "UserProfiles",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    DisplayName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_UserProfiles", x => x.Id);
-                });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_FeaturePermissions_FeatureId1",
-                table: "FeaturePermissions",
-                column: "FeatureId1");
-
             migrationBuilder.CreateIndex(
                 name: "IX_Accounts_Email",
                 table: "Accounts",
                 column: "Email",
                 unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Invoices_ReservationId",
-                table: "Invoices",
-                column: "ReservationId");
 
             migrationBuilder.AddForeignKey(
                 name: "FK_Customers_Companies_AgentCompanyId",
@@ -252,9 +142,9 @@ namespace AppIt.Data.Migrations
                 onDelete: ReferentialAction.Cascade);
 
             migrationBuilder.AddForeignKey(
-                name: "FK_FeaturePermissions_Features_FeatureId1",
+                name: "FK_FeaturePermissions_Features_FeatureId",
                 table: "FeaturePermissions",
-                column: "FeatureId1",
+                column: "FeatureId",
                 principalTable: "Features",
                 principalColumn: "Id");
 
@@ -293,7 +183,7 @@ namespace AppIt.Data.Migrations
                 table: "CustomerTypes");
 
             migrationBuilder.DropForeignKey(
-                name: "FK_FeaturePermissions_Features_FeatureId1",
+                name: "FK_FeaturePermissions_Features_FeatureId",
                 table: "FeaturePermissions");
 
             migrationBuilder.DropForeignKey(
@@ -308,26 +198,6 @@ namespace AppIt.Data.Migrations
                 name: "FK_Reservations_Customers_CustomerId",
                 table: "Reservations");
 
-            migrationBuilder.DropTable(
-                name: "Invoices");
-
-            migrationBuilder.DropTable(
-                name: "Notifications");
-
-            migrationBuilder.DropTable(
-                name: "ReportSnapshots");
-
-            migrationBuilder.DropTable(
-                name: "UserProfiles");
-
-            migrationBuilder.DropPrimaryKey(
-                name: "PK_FeaturePermissions",
-                table: "FeaturePermissions");
-
-            migrationBuilder.DropIndex(
-                name: "IX_FeaturePermissions_FeatureId1",
-                table: "FeaturePermissions");
-
             migrationBuilder.DropIndex(
                 name: "IX_Accounts_Email",
                 table: "Accounts");
@@ -339,10 +209,6 @@ namespace AppIt.Data.Migrations
             migrationBuilder.DropPrimaryKey(
                 name: "PK_Customers",
                 table: "Customers");
-
-            migrationBuilder.DropColumn(
-                name: "FeatureId1",
-                table: "FeaturePermissions");
 
             migrationBuilder.RenameTable(
                 name: "Reservations",
@@ -385,24 +251,6 @@ namespace AppIt.Data.Migrations
                 oldClrType: typeof(string),
                 oldType: "nvarchar(max)");
 
-            migrationBuilder.AlterColumn<int>(
-                name: "FeaturePermissionId",
-                table: "FeaturePermissions",
-                type: "int",
-                nullable: false,
-                oldClrType: typeof(int),
-                oldType: "int")
-                .Annotation("SqlServer:Identity", "1, 1");
-
-            migrationBuilder.AlterColumn<int>(
-                name: "FeatureId",
-                table: "FeaturePermissions",
-                type: "int",
-                nullable: false,
-                oldClrType: typeof(int),
-                oldType: "int")
-                .OldAnnotation("SqlServer:Identity", "1, 1");
-
             migrationBuilder.AlterColumn<string>(
                 name: "LastName",
                 table: "Accounts",
@@ -422,11 +270,6 @@ namespace AppIt.Data.Migrations
                 oldType: "nvarchar(max)");
 
             migrationBuilder.AddPrimaryKey(
-                name: "PK_FeaturePermissions",
-                table: "FeaturePermissions",
-                column: "FeaturePermissionId");
-
-            migrationBuilder.AddPrimaryKey(
                 name: "PK_Reservation",
                 table: "Reservation",
                 column: "ReservationId");
@@ -435,11 +278,6 @@ namespace AppIt.Data.Migrations
                 name: "PK_Customer",
                 table: "Customer",
                 column: "Id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_FeaturePermissions_FeatureId",
-                table: "FeaturePermissions",
-                column: "FeatureId");
 
             migrationBuilder.AddForeignKey(
                 name: "FK_Customer_Companies_AgentCompanyId",

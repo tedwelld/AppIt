@@ -7,35 +7,29 @@ public class AppItDbContext : DbContext
     public AppItDbContext(DbContextOptions<AppItDbContext> options)
         : base(options) { }
 
+    public DbSet<Account> Accounts { get; set; }
+    public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<Company> Companies { get; set; }
-    public DbSet<Product> Products { get; set; }
+    public DbSet<Customer> Customers { get; set; }
+    public DbSet<CustomerType> CustomerTypes { get; set; }
+    public DbSet<Department> Departments { get; set; }
     public DbSet<Feature> Features { get; set; }
+    public DbSet<FeaturePermission> FeaturePermissions { get; set; }
+    public DbSet<Invoice> Invoices { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
     public DbSet<Permission> Permissions { get; set; }
+    public DbSet<Product> Products { get; set; }
+    public DbSet<ReportSnapshot> ReportSnapshots { get; set; }
+    public DbSet<Reservation> Reservations { get; set; }
     public DbSet<Role> Roles { get; set; }
     public DbSet<RoleFeature> RoleFeatures { get; set; }
     public DbSet<RoleFeaturePermission> RoleFeaturePermissions { get; set; }
-    public DbSet<Department> Departments { get; set; }
-    public DbSet<FeaturePermission> FeaturePermissions { get; set; }
-    public DbSet<Account> Accounts { get; set; }
-    public DbSet<Customer> Customers { get; set; }
-    public DbSet<CustomerType> CustomerTypes { get; set; }
     public DbSet<Supplier> Suppliers { get; set; }
-    public DbSet<Reservation> Reservations { get; set; }
-    public DbSet<Notification> Notifications { get; set; }
-    public DbSet<Invoice> Invoices { get; set; }
     public DbSet<UserProfile> UserProfiles { get; set; }
-
-    public DbSet<ReportSnapshot> ReportSnapshots { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
-        modelBuilder.Entity<Company>()
-            .HasKey(e => e.CompanyId);
-
-        modelBuilder.Entity<Department>()
-            .HasKey(e => e.Id);
 
         modelBuilder.Entity<Account>(b =>
         {
@@ -43,15 +37,155 @@ public class AppItDbContext : DbContext
             b.Property(e => e.Email).IsRequired().HasMaxLength(150);
             b.HasIndex(e => e.Email).IsUnique();
 
-            b.HasOne<Role>()
-                .WithMany()
+            b.HasOne(e => e.Role)
+                .WithMany(r => r.Accounts)
                 .HasForeignKey(e => e.RoleId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
-       
 
+        modelBuilder.Entity<Company>(b =>
+        {
+            b.HasKey(e => e.CompanyId);
+        });
 
-        modelBuilder.Entity<ReportSnapshot>()
-            .ToTable("ReportSnapshots");
+        modelBuilder.Entity<Customer>(b =>
+        {
+            b.HasKey(e => e.Id);
+
+            b.HasOne(e => e.Agent)
+                .WithMany(c => c.Customers)
+                .HasForeignKey(e => e.AgentCompanyId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<CustomerType>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasIndex(e => e.CustomerId).IsUnique();
+
+            b.HasOne(e => e.Customer)
+                .WithOne(c => c.CustomerType)
+                .HasForeignKey<CustomerType>(e => e.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Department>(b =>
+        {
+            b.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<Feature>(b =>
+        {
+            b.HasKey(e => e.Id);
+
+            b.HasOne(e => e.Permission)
+                .WithMany(p => p.Features)
+                .HasForeignKey(e => e.PermissionId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<FeaturePermission>(b =>
+        {
+            b.HasKey(e => e.FeaturePermissionId);
+            b.HasIndex(e => new { e.FeatureId, e.PermissionId }).IsUnique();
+
+            b.HasOne(e => e.Feature)
+                .WithMany(f => f.FeaturePermissions)
+                .HasForeignKey(e => e.FeatureId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(e => e.Permission)
+                .WithMany(p => p.FeaturePermissions)
+                .HasForeignKey(e => e.PermissionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Invoice>(b =>
+        {
+            b.HasKey(e => e.Id);
+
+            b.HasOne(e => e.Reservation)
+                .WithMany(r => r.Invoices)
+                .HasForeignKey(e => e.ReservationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Notification>(b =>
+        {
+            b.HasKey(e => e.Id);
+
+            b.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReportSnapshot>(b =>
+        {
+            b.ToTable("ReportSnapshots");
+            b.HasKey(e => e.Id);
+
+            b.HasOne(e => e.GeneratedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.GeneratedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Reservation>(b =>
+        {
+            b.HasKey(e => e.ReservationId);
+
+            b.HasOne(e => e.Customer)
+                .WithMany(c => c.Reservations)
+                .HasForeignKey(e => e.CustomerId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            b.HasOne(e => e.CustomerType)
+                .WithMany(c => c.Reservations)
+                .HasForeignKey(e => e.CustomerTypeId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Role>(b =>
+        {
+            b.HasKey(e => e.RoleId);
+        });
+
+        modelBuilder.Entity<RoleFeature>(b =>
+        {
+            b.HasKey(e => e.RoleFeatureId);
+            b.HasIndex(e => new { e.RoleId, e.FeatureId }).IsUnique();
+
+            b.HasOne(e => e.Role)
+                .WithMany(r => r.RoleFeatures)
+                .HasForeignKey(e => e.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(e => e.Feature)
+                .WithMany(f => f.RoleFeatures)
+                .HasForeignKey(e => e.FeatureId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RoleFeaturePermission>(b =>
+        {
+            b.HasKey(e => e.RoleFeaturePermissionId);
+            b.HasIndex(e => new { e.RoleId, e.FeatureId, e.PermissionId }).IsUnique();
+
+            b.HasOne(e => e.Role)
+                .WithMany(r => r.RoleFeaturePermissions)
+                .HasForeignKey(e => e.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(e => e.Feature)
+                .WithMany(f => f.RoleFeaturePermissions)
+                .HasForeignKey(e => e.FeatureId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(e => e.Permission)
+                .WithMany(p => p.RoleFeaturePermissions)
+                .HasForeignKey(e => e.PermissionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 }
