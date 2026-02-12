@@ -74,6 +74,86 @@ namespace AppIt.Core.AppServices
             return invoice == null ? null : ToReadDto(invoice);
         }
 
+        public async Task<InvoicePaymentVerificationSummaryDto> VerifyPaymentsAsync(string granularity, DateTime? atUtc = null)
+        {
+            var (startUtc, endUtc, normalizedGranularity) = ResolveWindow(granularity, atUtc ?? DateTime.UtcNow);
+            var invoices = await _context.Set<Invoice>()
+                .AsNoTracking()
+                .Where(i => i.IssuedDate >= startUtc && i.IssuedDate < endUtc)
+                .OrderByDescending(i => i.IssuedDate)
+                .ToListAsync();
+
+            var invoiceIds = invoices.Select(i => i.Id).ToList();
+            var payments = invoiceIds.Count == 0
+                ? new List<Payment>()
+                : await _context.Payments
+                    .AsNoTracking()
+                    .Where(p => invoiceIds.Contains(p.InvoiceId))
+                    .Where(p => !p.ProcessedAt.HasValue || (p.ProcessedAt.Value >= startUtc && p.ProcessedAt.Value < endUtc))
+                    .ToListAsync();
+
+            var paymentsByInvoiceId = payments
+                .GroupBy(p => p.InvoiceId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(p => p.ProcessedAt ?? DateTime.MinValue).ToList());
+
+            var items = invoices.Select(invoice =>
+            {
+                paymentsByInvoiceId.TryGetValue(invoice.Id, out var invoicePayments);
+                var paymentRows = invoicePayments ?? new List<Payment>();
+                var hasPaymentRecord = paymentRows.Count > 0;
+                var hasPaidPayment = paymentRows.Any(p => p.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase));
+                var lastPayment = paymentRows.FirstOrDefault();
+                var invoiceMarkedPaid = invoice.IsPaid || invoice.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase);
+                var isValidated = invoiceMarkedPaid == hasPaidPayment;
+
+                return new InvoicePaymentVerificationItemDto
+                {
+                    InvoiceId = invoice.Id,
+                    ReservationId = invoice.ReservationId,
+                    TotalAmount = invoice.TotalAmount,
+                    Currency = invoice.CurrencyCode,
+                    InvoiceStatus = invoice.Status,
+                    IssuedAt = invoice.IssuedDate,
+                    HasPaymentRecord = hasPaymentRecord,
+                    HasPaidPayment = hasPaidPayment,
+                    PaymentRecordCount = paymentRows.Count,
+                    LastPaymentStatus = lastPayment?.Status ?? "N/A",
+                    LastPaymentAt = lastPayment?.ProcessedAt,
+                    IsValidated = isValidated
+                };
+            }).ToList();
+
+            return new InvoicePaymentVerificationSummaryDto
+            {
+                Granularity = normalizedGranularity,
+                WindowStartUtc = startUtc,
+                WindowEndUtc = endUtc,
+                GeneratedAtUtc = DateTime.UtcNow,
+                TotalInvoices = items.Count,
+                PaidInvoices = items.Count(i => i.InvoiceStatus.Equals("Paid", StringComparison.OrdinalIgnoreCase)),
+                UnpaidInvoices = items.Count(i => !i.InvoiceStatus.Equals("Paid", StringComparison.OrdinalIgnoreCase)),
+                ValidatedInvoices = items.Count(i => i.IsValidated),
+                MismatchedInvoices = items.Count(i => !i.IsValidated),
+                MissingPaymentRecords = items.Count(i => i.InvoiceStatus.Equals("Paid", StringComparison.OrdinalIgnoreCase) && !i.HasPaymentRecord),
+                Items = items
+            };
+        }
+
+        private static (DateTime startUtc, DateTime endUtc, string granularity) ResolveWindow(string granularity, DateTime dateUtc)
+        {
+            var normalized = (granularity ?? "day").Trim().ToLowerInvariant();
+            var utcDate = DateTime.SpecifyKind(dateUtc, DateTimeKind.Utc);
+
+            return normalized switch
+            {
+                "moment" => (utcDate.AddMinutes(-1), utcDate.AddMinutes(1), "moment"),
+                "day" => (utcDate.Date, utcDate.Date.AddDays(1), "day"),
+                "month" => (new DateTime(utcDate.Year, utcDate.Month, 1, 0, 0, 0, DateTimeKind.Utc), new DateTime(utcDate.Year, utcDate.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(1), "month"),
+                "year" => (new DateTime(utcDate.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc), new DateTime(utcDate.Year + 1, 1, 1, 0, 0, 0, DateTimeKind.Utc), "year"),
+                _ => (utcDate.Date, utcDate.Date.AddDays(1), "day")
+            };
+        }
+
         private static InvoiceReadDto ToReadDto(Invoice invoice)
         {
             return new InvoiceReadDto

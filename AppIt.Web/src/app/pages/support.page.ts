@@ -68,7 +68,7 @@ interface SupportMessage {
     </section>
   `,
   styles: `
-    .support { display: grid; gap: 0.9rem; }
+    .support { display: grid; gap: 0.7rem; height: 100%; min-height: 0; grid-template-rows: auto 1fr; }
     .hero {
       border: 1px solid #dbe3ef;
       border-radius: 1rem;
@@ -86,7 +86,8 @@ interface SupportMessage {
       background: #fff;
       display: grid;
       grid-template-rows: 1fr auto auto;
-      min-height: 420px;
+      min-height: 0;
+      height: 100%;
       overflow: hidden;
     }
     .messages {
@@ -122,6 +123,10 @@ interface SupportMessage {
       display: grid;
       grid-template-columns: 1fr 1.2fr auto;
       gap: 0.5rem;
+      position: sticky;
+      bottom: 0;
+      background: #fff;
+      z-index: 2;
     }
     .status { margin: 0; padding: 0.5rem 0.7rem; font-size: 0.8rem; color: #0f4c5c; background: #eaf7f5; border-top: 1px solid #cce8e3; }
     @media (max-width: 760px) {

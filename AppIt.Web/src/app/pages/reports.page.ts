@@ -14,13 +14,12 @@ import { ApiService } from '../api.service';
         <div>
           <p class="eyebrow">Business Intelligence</p>
           <h1><span class="material-symbols-outlined">insights</span> Report Studio</h1>
-          <p>Generate datasets, save snapshots, and export in JSON, CSV, or PDF.</p>
+          <p>Generate datasets, save snapshots, and export in JSON or PDF.</p>
         </div>
         <div class="header-actions">
           <button class="btn-base btn-primary" (click)="generate()">Generate</button>
           <button class="btn-base btn-secondary" (click)="saveSnapshot()" [disabled]="!reportRows().length">Save Snapshot</button>
           <button class="btn-base btn-secondary" (click)="exportJson()" [disabled]="!reportRows().length">JSON</button>
-          <button class="btn-base btn-secondary" (click)="exportCsv()" [disabled]="!reportRows().length">CSV</button>
           <button class="btn-base btn-secondary" (click)="exportPdf()" [disabled]="!reportRows().length">PDF</button>
         </div>
       </header>
@@ -102,10 +101,11 @@ import { ApiService } from '../api.service';
   styles: `
     .reports {
       display: grid;
-      gap: 0.8rem;
+      gap: 0.7rem;
       height: 100%;
       min-height: 0;
       grid-template-rows: auto auto 1fr auto;
+      overflow: hidden;
     }
     .report-header {
       border: 1px solid #d9e4f1;
@@ -120,7 +120,7 @@ import { ApiService } from '../api.service';
     .eyebrow { margin: 0; text-transform: uppercase; letter-spacing: 0.09em; font-size: 0.72rem; color: #0f4c5c; font-weight: 700; }
     .report-header h1 { margin: 0.2rem 0; display: flex; align-items: center; gap: 0.35rem; font-size: 1.2rem; }
     .report-header p { margin: 0; color: #5f6f82; font-size: 0.9rem; }
-    .header-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end; }
+    .header-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end; position: sticky; top: 0; z-index: 2; background: inherit; }
 
     .grid { display: grid; gap: 0.8rem; min-height: 0; }
     .top-grid { grid-template-columns: 1.2fr 1fr; }
@@ -173,7 +173,7 @@ import { ApiService } from '../api.service';
       border-radius: 0.7rem;
       background: #fff;
     }
-    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    table { width: 100%; min-width: 780px; border-collapse: collapse; font-size: 0.8rem; }
     th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid #edf1f6; vertical-align: top; }
     th {
       position: sticky;
@@ -283,22 +283,6 @@ export class ReportsPageComponent {
     this.downloadFile(`${this.reportKey}.json`, 'application/json', JSON.stringify(this.reportRows(), null, 2));
   }
 
-  exportCsv(): void {
-    const rows = this.reportRows();
-    if (!rows.length) {
-      return;
-    }
-
-    const headers = Object.keys(rows[0]);
-    const lines = [headers.join(',')];
-    rows.forEach((row) => {
-      const values = headers.map((h) => this.escapeCsv(row[h]));
-      lines.push(values.join(','));
-    });
-
-    this.downloadFile(`${this.reportKey}.csv`, 'text/csv', lines.join('\n'));
-  }
-
   exportPdf(): void {
     const rows = this.reportRows();
     if (!rows.length) {
@@ -377,15 +361,6 @@ export class ReportsPageComponent {
       return JSON.stringify(value);
     }
     return String(value);
-  }
-
-  private escapeCsv(value: unknown): string {
-    if (value === null || value === undefined) {
-      return '';
-    }
-
-    const text = String(value).replace(/"/g, '""');
-    return `"${text}"`;
   }
 
   private calculateNumericTotal(rows: any[]): number {

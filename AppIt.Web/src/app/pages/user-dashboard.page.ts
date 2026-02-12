@@ -1,6 +1,7 @@
-﻿import { CommonModule } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { jsPDF } from 'jspdf';
 import { catchError, of } from 'rxjs';
 import { ApiService } from '../api.service';
 import { AuthService } from '../auth.service';
@@ -69,7 +70,7 @@ import { Accommodation, Activity, CurrencyCode, Invoice, Product, Reservation, V
           <form (ngSubmit)="bookAccommodation()" class="booking-form">
             <label>Room Type</label>
             <select class="app-select" [(ngModel)]="booking.roomId" name="roomId">
-              <option *ngFor="let room of accommodations()" [value]="room.id">
+              <option *ngFor="let room of accommodations()" [ngValue]="room.id">
                 {{ room.type }} (Sleeps {{ room.capacity }}) - {{ formatMoney(convertPrice(room.basePriceUsd), preferredCurrency) }}/night
               </option>
             </select>
@@ -88,7 +89,7 @@ import { Accommodation, Activity, CurrencyCode, Invoice, Product, Reservation, V
               <option *ngFor="let method of paymentMethods" [value]="method">{{ method }}</option>
             </select>
 
-            <button class="btn-base btn-primary" type="submit">Reserve & Generate Invoice</button>
+            <button class="btn-base btn-primary" type="submit">Reserve & Generate Invoice PDF</button>
           </form>
           <p class="status" *ngIf="status()">{{ status() }}</p>
         </article>
@@ -122,6 +123,7 @@ import { Accommodation, Activity, CurrencyCode, Invoice, Product, Reservation, V
                   <th>Voucher</th>
                   <th>Status</th>
                   <th>Total</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -130,6 +132,11 @@ import { Accommodation, Activity, CurrencyCode, Invoice, Product, Reservation, V
                   <td>{{ res.voucherCode }}</td>
                   <td>{{ res.status }}</td>
                   <td>{{ formatMoney(res.totalAmount, res.currency) }}</td>
+                  <td class="actions">
+                    <button class="btn-base btn-secondary" (click)="deleteReservation(res)" [disabled]="!canDeleteReservation(res)">
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -151,6 +158,7 @@ import { Accommodation, Activity, CurrencyCode, Invoice, Product, Reservation, V
                   <th>Status</th>
                   <th>Amount</th>
                   <th>Issued</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -159,6 +167,10 @@ import { Accommodation, Activity, CurrencyCode, Invoice, Product, Reservation, V
                   <td>{{ invoice.status }}</td>
                   <td>{{ formatMoney(invoice.totalAmount, invoice.currency) }}</td>
                   <td>{{ invoice.issuedAt | date: 'mediumDate' }}</td>
+                  <td class="actions">
+                    <button class="btn-base btn-secondary" (click)="downloadInvoicePdf(invoice)">PDF</button>
+                    <button class="btn-base btn-primary" (click)="payInvoice(invoice)">Pay</button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -184,8 +196,10 @@ import { Accommodation, Activity, CurrencyCode, Invoice, Product, Reservation, V
   styles: `
     .user-dashboard {
       display: grid;
-      gap: 0.9rem;
+      gap: 0.7rem;
       min-height: 0;
+      height: 100%;
+      overflow: auto;
     }
     .hero {
       border-radius: 1.2rem;
@@ -240,7 +254,7 @@ import { Accommodation, Activity, CurrencyCode, Invoice, Product, Reservation, V
     .stat-card .value { margin: 0.2rem 0; font-size: 1.3rem; font-weight: 800; color: #0f4c5c; }
     .stat-card .sub { margin: 0; font-size: 0.82rem; }
 
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.8rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0.7rem; align-items: start; }
     .panel {
       border: 1px solid #dce6f2;
       border-radius: 1rem;
@@ -249,6 +263,8 @@ import { Accommodation, Activity, CurrencyCode, Invoice, Product, Reservation, V
       display: grid;
       gap: 0.6rem;
       min-height: 0;
+      max-height: 420px;
+      overflow: auto;
     }
     .panel h2 { margin: 0; font-size: 1.05rem; color: #14334f; }
     .item-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.6rem; }
@@ -264,12 +280,15 @@ import { Accommodation, Activity, CurrencyCode, Invoice, Product, Reservation, V
     .item-card p { margin: 0; font-size: 0.82rem; color: #5b6f85; }
     .price { margin: 0; font-weight: 800; color: #0f4c5c; }
 
-    .booking-form { display: grid; gap: 0.45rem; }
+    .booking-form { display: grid; gap: 0.45rem; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; }
+    .booking-form button, .booking-form .status { grid-column: 1 / -1; }
 
     .table-wrap { border: 1px solid #e1e8f1; border-radius: 0.8rem; overflow: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 0.82rem; }
     th, td { padding: 0.5rem 0.55rem; border-bottom: 1px solid #edf1f6; text-align: left; }
     th { background: #0f4c5c; color: #fff; position: sticky; top: 0; }
+    .actions { white-space: nowrap; }
+    .actions button { margin-right: 0.35rem; }
     .empty { margin: 0; padding: 0.8rem; color: #6d8096; }
 
     .voucher-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.6rem; }
@@ -288,6 +307,7 @@ import { Accommodation, Activity, CurrencyCode, Invoice, Product, Reservation, V
 
     @media (max-width: 900px) {
       .hero { flex-direction: column; }
+      .booking-form { grid-template-columns: 1fr; }
     }
   `
 })
@@ -305,6 +325,7 @@ export class UserDashboardPageComponent {
     phone: '',
     avatarUrl: ''
   };
+
   readonly profile = signal(this.auth.user() ?? this.fallbackProfile);
   readonly displayName = computed(() => `${this.profile().firstName} ${this.profile().lastName}`.trim());
   readonly initials = computed(
@@ -324,7 +345,7 @@ export class UserDashboardPageComponent {
   preferredCurrency: CurrencyCode = this.profile().preferredCurrency ?? 'USD';
 
   booking = {
-    roomId: '',
+    roomId: null as number | null,
     checkIn: '',
     nights: 1,
     guests: 1,
@@ -376,33 +397,55 @@ export class UserDashboardPageComponent {
     const voucherCode = this.buildVoucher('Activity');
     const total = this.totalActivities();
 
-    const reservation: Reservation = {
-      id: `RES-${Date.now()}`,
-      userId: this.profile().id,
+    this.api.post('/api/reservations', {
       reference,
       voucherCode,
       currency: this.preferredCurrency,
       totalAmount: total,
       status: 'Pending',
-      createdAt: new Date().toISOString()
-    };
+      customerEmail: this.profile().email
+    }).pipe(
+      catchError(() => of(null))
+    ).subscribe((row) => {
+      if (!row) {
+        this.status.set('Failed to book activities.');
+        return;
+      }
 
-    this.api.post('/api/reservations', reservation).pipe(catchError(() => of(reservation))).subscribe(() => {
+      const reservation = this.normalizeReservation(row);
       this.reservations.update((list) => [reservation, ...list]);
-      this.api.post('/api/vouchers', { code: voucherCode, reference, type: 'Activity' }).pipe(catchError(() => of({}))).subscribe();
-      this.vouchers.update((list) => [
-        ...list,
-        {
-          id: `VCH-${Date.now()}`,
-          code: voucherCode,
-          reference,
-          type: 'Activity',
-          createdAt: new Date().toISOString()
-        }
-      ]);
+      this.api.post('/api/invoices', {
+        reservationId: reservation.id,
+        totalAmount: total,
+        currency: this.preferredCurrency,
+        status: 'Pending'
+      }).subscribe({
+        next: (invoiceRow) => {
+          const invoice = this.normalizeInvoice(invoiceRow);
+          this.invoices.update((list) => [invoice, ...list]);
+          this.downloadInvoicePdf(invoice);
 
-      this.status.set(`Activities booked. Voucher ${voucherCode} generated.`);
-      this.selectedActivities.set([]);
+          this.api.post('/api/vouchers', { code: voucherCode, reference, type: 'Activity' }).pipe(catchError(() => of({}))).subscribe();
+          this.vouchers.update((list) => [
+            ...list,
+            {
+              id: `VCH-${Date.now()}`,
+              code: voucherCode,
+              reference,
+              type: 'Activity',
+              createdAt: new Date().toISOString()
+            }
+          ]);
+
+          this.status.set(`Activities booked. Invoice ${invoice.id} generated and voucher ${voucherCode} created.`);
+          this.selectedActivities.set([]);
+
+          if (window.confirm(`Invoice ${invoice.id} is ready. Pay now with ${this.booking.paymentMethod}?`)) {
+            this.payInvoice(invoice);
+          }
+        },
+        error: (err) => this.status.set(this.describeError(err))
+      });
     });
   }
 
@@ -417,39 +460,132 @@ export class UserDashboardPageComponent {
     const reference = this.buildReference('ACC');
     const voucherCode = this.buildVoucher('Accommodation');
 
-    const reservation: Reservation = {
-      id: `RES-${Date.now()}`,
-      userId: this.profile().id,
+    this.api.post('/api/reservations', {
       reference,
       voucherCode,
       currency: this.preferredCurrency,
       totalAmount: total,
       status: 'Pending',
-      createdAt: new Date().toISOString()
-    };
+      customerEmail: this.profile().email
+    }).subscribe({
+      next: (reservationRow) => {
+        const reservation = this.normalizeReservation(reservationRow);
+        this.reservations.update((list) => [reservation, ...list]);
 
-    const invoice: Invoice = {
-      id: `INV-${Date.now()}`,
-      reservationId: reservation.id,
-      totalAmount: total,
-      currency: this.preferredCurrency,
-      status: 'Pending',
-      issuedAt: new Date().toISOString()
-    };
+        this.api.post('/api/invoices', {
+          reservationId: reservation.id,
+          totalAmount: total,
+          currency: this.preferredCurrency,
+          status: 'Pending'
+        }).subscribe({
+          next: (invoiceRow) => {
+            const invoice = this.normalizeInvoice(invoiceRow);
+            this.invoices.update((list) => [invoice, ...list]);
+            this.downloadInvoicePdf(invoice);
 
-    this.api.post('/api/reservations', reservation).pipe(catchError(() => of(reservation))).subscribe(() => {
-      this.reservations.update((list) => [reservation, ...list]);
+            this.api.post('/api/vouchers', { code: voucherCode, reference, type: 'Accommodation' }).pipe(
+              catchError(() => of({}))
+            ).subscribe();
+            this.vouchers.update((list) => [
+              ...list,
+              {
+                id: `VCH-${Date.now()}`,
+                code: voucherCode,
+                reference,
+                type: 'Accommodation',
+                createdAt: new Date().toISOString()
+              }
+            ]);
+
+            this.status.set(`Invoice ${invoice.id} generated and PDF downloaded.`);
+
+            if (window.confirm(`Invoice ${invoice.id} is ready. Pay now with ${this.booking.paymentMethod}?`)) {
+              this.payInvoice(invoice);
+            }
+          },
+          error: (err) => this.status.set(this.describeError(err))
+        });
+      },
+      error: (err) => this.status.set(this.describeError(err))
     });
-    this.api.post('/api/invoices', invoice).pipe(catchError(() => of(invoice))).subscribe(() => {
-      this.invoices.update((list) => [invoice, ...list]);
-    });
-    this.api.post('/api/vouchers', { code: voucherCode, reference, type: 'Accommodation' }).pipe(catchError(() => of({}))).subscribe();
-    this.vouchers.update((list) => [
-      ...list,
-      { id: `VCH-${Date.now()}`, code: voucherCode, reference, type: 'Accommodation', createdAt: new Date().toISOString() }
-    ]);
+  }
 
-    this.status.set(`Reservation created. Invoice ${invoice.id} is Pending.`);
+  payInvoice(invoice: Invoice): void {
+    this.api.post('/api/payments/process', {
+      invoiceId: invoice.id,
+      method: this.booking.paymentMethod,
+      amount: invoice.totalAmount,
+      currencyCode: invoice.currency,
+      returnUrl: `${window.location.origin}/user`,
+      cancelUrl: `${window.location.origin}/user`
+    }).subscribe({
+      next: (res) => {
+        const status = String(res?.status ?? 'Pending');
+        const ref = String(res?.transactionReference ?? '');
+        const provider = String(res?.provider ?? this.booking.paymentMethod);
+        const redirectUrl = res?.redirectUrl as string | null | undefined;
+
+        if (status.toLowerCase() === 'paid') {
+          this.invoices.update((rows) => rows.map((item) => item.id === invoice.id ? { ...item, status: 'Paid' } : item));
+        }
+
+        this.status.set(`Payment ${status} via ${provider}. Ref: ${ref}`);
+        this.loadInvoices();
+
+        if (redirectUrl) {
+          window.open(redirectUrl, '_blank', 'noopener,noreferrer');
+        }
+      },
+      error: (err) => this.status.set(this.describeError(err))
+    });
+  }
+
+  canDeleteReservation(reservation: Reservation): boolean {
+    const relatedInvoices = this.invoices().filter((invoice) => invoice.reservationId === reservation.id);
+    return !relatedInvoices.some((invoice) => invoice.status.toLowerCase() === 'paid');
+  }
+
+  deleteReservation(reservation: Reservation): void {
+    if (!this.canDeleteReservation(reservation)) {
+      this.status.set(`Reservation ${reservation.reference} cannot be deleted because it has already been paid.`);
+      return;
+    }
+
+    if (!window.confirm(`Delete reservation ${reservation.reference}?`)) {
+      return;
+    }
+
+    this.api.delete(`/api/reservations/${reservation.id}`).subscribe({
+      next: () => {
+        this.reservations.update((rows) => rows.filter((row) => row.id !== reservation.id));
+        this.invoices.update((rows) => rows.filter((row) => row.reservationId !== reservation.id));
+        this.status.set(`Reservation ${reservation.reference} deleted.`);
+      },
+      error: (err) => this.status.set(this.describeError(err))
+    });
+  }
+
+  downloadInvoicePdf(invoice: Invoice): void {
+    const doc = new jsPDF();
+    doc.setFillColor(18, 46, 83);
+    doc.rect(0, 0, 210, 28, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.text('AppIt Invoice', 14, 17);
+
+    doc.setTextColor(20, 36, 54);
+    doc.setFontSize(12);
+    doc.text(`Invoice ID: ${invoice.id}`, 14, 42);
+    doc.text(`Status: ${invoice.status}`, 14, 50);
+    doc.text(`Currency: ${invoice.currency}`, 14, 58);
+    doc.text(`Total: ${this.formatMoney(invoice.totalAmount, invoice.currency)}`, 14, 66);
+    doc.text(`Issued: ${new Date(invoice.issuedAt).toLocaleString()}`, 14, 74);
+    doc.text(`Guest: ${this.profile().firstName} ${this.profile().lastName}`, 14, 82);
+    doc.text(`Email: ${this.profile().email}`, 14, 90);
+
+    doc.setFontSize(10);
+    doc.text('Thank you for booking with AppIt.', 14, 110);
+    doc.save(`invoice-${invoice.id}.pdf`);
   }
 
   convertPrice(baseUsd: number): number {
@@ -470,16 +606,16 @@ export class UserDashboardPageComponent {
   private loadProducts(): void {
     this.api.list('/api/products').pipe(
       catchError(() => of(this.sampleProducts()))
-    ).subscribe((rows) => this.products.set(rows as Product[]));
+    ).subscribe((rows) => this.products.set((rows as any[]).map((r) => this.normalizeProduct(r))));
   }
 
   private loadAccommodations(): void {
     this.api.list('/api/accommodations').pipe(
       catchError(() => of(this.sampleAccommodations()))
     ).subscribe((rows) => {
-      const data = rows as Accommodation[];
+      const data = (rows as any[]).map((r) => this.normalizeAccommodation(r));
       this.accommodations.set(data);
-      if (!this.booking.roomId && data.length) {
+      if (this.booking.roomId == null && data.length) {
         this.booking.roomId = data[0].id;
       }
     });
@@ -488,25 +624,83 @@ export class UserDashboardPageComponent {
   private loadActivities(): void {
     this.api.list('/api/activities').pipe(
       catchError(() => of(this.sampleActivities()))
-    ).subscribe((rows) => this.activities.set(rows as Activity[]));
+    ).subscribe((rows) => this.activities.set((rows as any[]).map((r) => this.normalizeActivity(r))));
   }
 
   private loadReservations(): void {
-    this.api.list('/api/reservations/mine').pipe(
+    const email = encodeURIComponent(this.profile().email ?? '');
+    this.api.list(`/api/reservations/mine?email=${email}`).pipe(
       catchError(() => of([]))
-    ).subscribe((rows) => this.reservations.set(rows as Reservation[]));
+    ).subscribe((rows) => this.reservations.set((rows as any[]).map((r) => this.normalizeReservation(r))));
   }
 
   private loadInvoices(): void {
     this.api.list('/api/invoices/mine').pipe(
       catchError(() => of([]))
-    ).subscribe((rows) => this.invoices.set(rows as Invoice[]));
+    ).subscribe((rows) => this.invoices.set((rows as any[]).map((r) => this.normalizeInvoice(r))));
   }
 
   private loadVouchers(): void {
     this.api.list('/api/vouchers/mine').pipe(
       catchError(() => of([]))
     ).subscribe((rows) => this.vouchers.set(rows as Voucher[]));
+  }
+
+  private normalizeProduct(row: any): Product {
+    return {
+      id: Number(row?.productId ?? row?.id ?? 0),
+      name: String(row?.name ?? ''),
+      description: row?.description ? String(row.description) : '',
+      category: String(row?.category ?? 'Adventure'),
+      basePriceUsd: Number(row?.basePriceUsd ?? 0)
+    };
+  }
+
+  private normalizeAccommodation(row: any): Accommodation {
+    return {
+      id: Number(row?.id ?? 0),
+      type: String(row?.type ?? 'Standard') as Accommodation['type'],
+      description: row?.description ? String(row.description) : '',
+      capacity: Number(row?.capacity ?? 1),
+      basePriceUsd: Number(row?.basePriceUsd ?? 0)
+    };
+  }
+
+  private normalizeActivity(row: any): Activity {
+    return {
+      id: Number(row?.id ?? 0),
+      name: String(row?.name ?? ''),
+      description: row?.description ? String(row.description) : '',
+      basePriceUsd: Number(row?.basePriceUsd ?? 0)
+    };
+  }
+
+  private normalizeReservation(row: any): Reservation {
+    return {
+      id: Number(row?.reservationId ?? row?.id ?? 0),
+      reference: String(row?.reference ?? ''),
+      voucherCode: String(row?.voucherCode ?? ''),
+      currency: String(row?.currency ?? 'USD') as CurrencyCode,
+      totalAmount: Number(row?.totalAmount ?? 0),
+      status: String(row?.status ?? 'Pending') as Reservation['status'],
+      createdAt: String(row?.createdAt ?? new Date().toISOString())
+    };
+  }
+
+  private normalizeInvoice(row: any): Invoice {
+    return {
+      id: Number(row?.id ?? 0),
+      reservationId: Number(row?.reservationId ?? 0),
+      totalAmount: Number(row?.totalAmount ?? 0),
+      currency: String(row?.currency ?? 'USD') as CurrencyCode,
+      status: String(row?.status ?? 'Pending') as Invoice['status'],
+      issuedAt: String(row?.issuedAt ?? new Date().toISOString())
+    };
+  }
+
+  private describeError(err: any): string {
+    const fromApi = err?.error?.message ?? err?.error?.title ?? err?.message;
+    return fromApi ? `Request failed: ${fromApi}` : 'Request failed';
   }
 
   private buildReference(prefix: string): string {
@@ -523,30 +717,30 @@ export class UserDashboardPageComponent {
 
   private sampleProducts(): Product[] {
     return [
-      { id: 'prd-bungee', name: 'Bungee', description: 'Leap from the gorge with expert guides.', category: 'Adventure', basePriceUsd: 120 },
-      { id: 'prd-swing', name: 'Swing', description: 'A giant swing over the river.', category: 'Adventure', basePriceUsd: 95 },
-      { id: 'prd-bridge', name: 'Bridge Tours', description: 'Guided bridge walk and history.', category: 'Tours', basePriceUsd: 55 },
-      { id: 'prd-falls', name: 'View of the Falls', description: 'Sunrise viewpoints and photo stops.', category: 'Scenic', basePriceUsd: 35 },
-      { id: 'prd-boat', name: 'Boat Cruise', description: 'Sunset cruise with refreshments.', category: 'Water', basePriceUsd: 80 }
+      { id: 1, name: 'Bungee', description: 'Leap from the gorge with expert guides.', category: 'Adventure', basePriceUsd: 120 },
+      { id: 2, name: 'Swing', description: 'A giant swing over the river.', category: 'Adventure', basePriceUsd: 95 },
+      { id: 3, name: 'Bridge Tours', description: 'Guided bridge walk and history.', category: 'Tours', basePriceUsd: 55 },
+      { id: 4, name: 'View of the Falls', description: 'Sunrise viewpoints and photo stops.', category: 'Scenic', basePriceUsd: 35 },
+      { id: 5, name: 'Boat Cruise', description: 'Sunset cruise with refreshments.', category: 'Water', basePriceUsd: 80 }
     ];
   }
 
   private sampleAccommodations(): Accommodation[] {
     return [
-      { id: 'acc-single', type: 'Single', description: 'Cozy single room with balcony.', capacity: 1, basePriceUsd: 75 },
-      { id: 'acc-double', type: 'Double', description: 'Double room with panoramic views.', capacity: 2, basePriceUsd: 120 },
-      { id: 'acc-express', type: 'Express', description: 'Fast check-in business suite.', capacity: 2, basePriceUsd: 150 },
-      { id: 'acc-standard', type: 'Standard', description: 'Classic comfort room.', capacity: 2, basePriceUsd: 95 }
+      { id: 1, type: 'Single', description: 'Cozy single room with balcony.', capacity: 1, basePriceUsd: 75 },
+      { id: 2, type: 'Double', description: 'Double room with panoramic views.', capacity: 2, basePriceUsd: 120 },
+      { id: 3, type: 'Express', description: 'Fast check-in business suite.', capacity: 2, basePriceUsd: 150 },
+      { id: 4, type: 'Standard', description: 'Classic comfort room.', capacity: 2, basePriceUsd: 95 }
     ];
   }
 
   private sampleActivities(): Activity[] {
     return [
-      { id: 'act-bungee', name: 'Bungee', description: 'High-adrenaline jump experience.', basePriceUsd: 120 },
-      { id: 'act-swing', name: 'Gorge Swing', description: 'Swing over the misty gorge.', basePriceUsd: 90 },
-      { id: 'act-bridge', name: 'Bridge Tour', description: 'Architecture and history tour.', basePriceUsd: 55 },
-      { id: 'act-falls', name: 'Falls View', description: 'Guided falls vista walk.', basePriceUsd: 35 },
-      { id: 'act-boat', name: 'Boat Cruise', description: 'Sunset cruise and wildlife.', basePriceUsd: 80 }
+      { id: 1, name: 'Bungee', description: 'High-adrenaline jump experience.', basePriceUsd: 120 },
+      { id: 2, name: 'Gorge Swing', description: 'Swing over the misty gorge.', basePriceUsd: 90 },
+      { id: 3, name: 'Bridge Tour', description: 'Architecture and history tour.', basePriceUsd: 55 },
+      { id: 4, name: 'Falls View', description: 'Guided falls vista walk.', basePriceUsd: 35 },
+      { id: 5, name: 'Boat Cruise', description: 'Sunset cruise and wildlife.', basePriceUsd: 80 }
     ];
   }
 }

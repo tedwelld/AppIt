@@ -42,15 +42,12 @@
 
   <div class="body-layout">
     <aside class="sidebar">
-      <label class="side-label">Quick Find</label>
-      <input
-        class="app-input side-search"
-        [ngModel]="sidebarQuery()"
-        (ngModelChange)="sidebarQuery.set($event)"
-        placeholder="Search pages"
-      />
+      <section class="welcome-banner glass-card" *ngIf="welcome()">
+        <p>{{ welcome() }}</p>
+        <button class="btn-base btn-secondary btn-compact" (click)="dismissWelcome()">Dismiss</button>
+      </section>
 
-      <section class="nav-group" *ngFor="let group of filteredGroups()">
+      <section class="nav-group" *ngFor="let group of navGroups()">
         <button class="group-head" (click)="toggleGroup(group.id)">
           <span class="group-title-wrap">
             <span class="material-symbols-outlined">{{ group.icon }}</span>

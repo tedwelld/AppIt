@@ -65,8 +65,9 @@ namespace AppIt.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var deleted = await _service.DeleteAsync(id);
-            if (!deleted) return NotFound();
+            var result = await _service.DeleteAsync(id);
+            if (result.NotFound) return NotFound();
+            if (!result.Success) return BadRequest(result);
             return NoContent();
         }
     }

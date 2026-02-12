@@ -11,18 +11,27 @@ export interface UserProfile {
   phone?: string;
   avatarUrl?: string;
   preferredCurrency?: 'USD' | 'ZAR' | 'GBP';
+  preferredLanguage?: 'en' | 'fr' | 'es';
+  timezone?: string;
+  emailNotifications?: boolean;
+  smsNotifications?: boolean;
+  marketingEmails?: boolean;
 }
 
 interface StoredUser extends UserProfile {
   password: string;
+  isApproved?: boolean;
 }
 
 const AUTH_KEY = 'appit.auth.user';
 const USERS_KEY = 'appit.auth.users';
+const ONLINE_KEY = 'appit.auth.online';
+const WELCOME_KEY = 'appit.auth.welcome';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   readonly user = signal<UserProfile | null>(null);
+  readonly welcomeMessage = signal('');
 
   constructor() {
     this.seedSuperUser();
@@ -35,8 +44,13 @@ export class AuthService {
     if (!match || match.password !== password) {
       return { ok: false, message: 'Invalid email or password.' };
     }
+    if (match.isApproved === false) {
+      return { ok: false, message: 'Account is waiting for super-user approval.' };
+    }
 
     this.setUser(match);
+    this.setWelcomeMessage(`Welcome ${match.firstName} ${match.lastName}`.trim());
+    this.markOnline(match.email);
     return { ok: true };
   }
 
@@ -56,13 +70,13 @@ export class AuthService {
       phone: profile.phone,
       avatarUrl: profile.avatarUrl,
       preferredCurrency: profile.preferredCurrency ?? 'USD',
-      password: profile.password
+      password: profile.password,
+      isApproved: false
     };
 
     users.push(next);
     this.saveUsers(users);
-    this.setUser(next);
-    return { ok: true };
+    return { ok: true, message: 'Account created and pending approval.' };
   }
 
   createSuperUser(profile: Omit<UserProfile, 'id' | 'role'> & { password: string }): { ok: boolean; message?: string } {
@@ -81,7 +95,8 @@ export class AuthService {
       phone: profile.phone,
       avatarUrl: profile.avatarUrl,
       preferredCurrency: profile.preferredCurrency ?? 'USD',
-      password: profile.password
+      password: profile.password,
+      isApproved: true
     };
 
     users.push(next);
@@ -90,22 +105,69 @@ export class AuthService {
   }
 
   updateProfile(patch: Partial<UserProfile>): void {
+    this.updateAccountSettings(patch);
+  }
+
+  updateAccountSettings(patch: Partial<UserProfile>): { ok: boolean; message?: string } {
     const current = this.user();
     if (!current) {
-      return;
+      return { ok: false, message: 'No active user session.' };
+    }
+
+    const normalizedEmail = (patch.email ?? current.email).trim();
+    const users = this.getUsers();
+    const duplicateEmail = users.some(
+      (item) => item.id !== current.id && item.email.toLowerCase() === normalizedEmail.toLowerCase()
+    );
+    if (duplicateEmail) {
+      return { ok: false, message: 'Email is already in use by another account.' };
+    }
+
+    const idx = users.findIndex((item) => item.id === current.id);
+    if (idx >= 0) {
+      users[idx] = { ...users[idx], ...patch, email: normalizedEmail };
+      this.saveUsers(users);
+    }
+
+    this.setUser({ ...current, ...patch, email: normalizedEmail });
+    if (current.email.toLowerCase() !== normalizedEmail.toLowerCase()) {
+      this.markOffline(current.email);
+      this.markOnline(normalizedEmail);
+    }
+
+    return { ok: true };
+  }
+
+  changePassword(currentPassword: string, newPassword: string): { ok: boolean; message?: string } {
+    const current = this.user();
+    if (!current) {
+      return { ok: false, message: 'No active user session.' };
     }
 
     const users = this.getUsers();
     const idx = users.findIndex((item) => item.id === current.id);
-    if (idx >= 0) {
-      users[idx] = { ...users[idx], ...patch };
-      this.saveUsers(users);
+    if (idx < 0) {
+      return { ok: false, message: 'User account not found.' };
     }
 
-    this.setUser({ ...current, ...patch });
+    if (users[idx].password !== currentPassword) {
+      return { ok: false, message: 'Current password is incorrect.' };
+    }
+
+    if (newPassword.trim().length < 6) {
+      return { ok: false, message: 'New password must be at least 6 characters.' };
+    }
+
+    users[idx].password = newPassword.trim();
+    this.saveUsers(users);
+    return { ok: true, message: 'Password updated.' };
   }
 
   logout(): void {
+    const current = this.user();
+    if (current?.email) {
+      this.markOffline(current.email);
+    }
     this.user.set(null);
     localStorage.removeItem(AUTH_KEY);
   }
@@ -120,6 +182,27 @@ export class AuthService {
 
   listUsers(): UserProfile[] {
     return this.getUsers().map(({ password, ...rest }) => rest);
+  }
+
+  listOnlineUsers(): UserProfile[] {
+    const users = this.getUsers();
+    const onlineMap = this.getOnlineMap();
+    return users
+      .filter((u) => onlineMap[u.email.toLowerCase()])
+      .map(({ password, ...rest }) => rest);
+  }
+
+  listPendingUsers(): UserProfile[] {
+    return this.getUsers()
+      .filter((u) => u.isApproved === false)
+      .map(({ password, ...rest }) => rest);
+  }
+
+  consumeWelcomeMessage(): string {
+    const message = this.welcomeMessage();
+    this.welcomeMessage.set('');
+    localStorage.removeItem(WELCOME_KEY);
+    return message;
   }
 
   private setUser(user: StoredUser | UserProfile): void {
@@ -137,6 +220,11 @@ export class AuthService {
     try {
       const parsed = JSON.parse(raw) as UserProfile;
       this.user.set(parsed);
+      this.markOnline(parsed.email);
+      const welcome = localStorage.getItem(WELCOME_KEY);
+      if (welcome) {
+        this.welcomeMessage.set(welcome);
+      }
     } catch {
       localStorage.removeItem(AUTH_KEY);
     }
@@ -158,6 +246,45 @@ export class AuthService {
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
   }
 
+  private setWelcomeMessage(message: string): void {
+    this.welcomeMessage.set(message);
+    localStorage.setItem(WELCOME_KEY, message);
+  }
+
+  private getOnlineMap(): Record<string, string> {
+    const raw = localStorage.getItem(ONLINE_KEY);
+    if (!raw) {
+      return {};
+    }
+    try {
+      return JSON.parse(raw) as Record<string, string>;
+    } catch {
+      return {};
+    }
+  }
+
+  private saveOnlineMap(map: Record<string, string>): void {
+    localStorage.setItem(ONLINE_KEY, JSON.stringify(map));
+  }
+
+  private markOnline(email: string): void {
+    if (!email) {
+      return;
+    }
+    const map = this.getOnlineMap();
+    map[email.toLowerCase()] = new Date().toISOString();
+    this.saveOnlineMap(map);
+  }
+
+  private markOffline(email: string): void {
+    if (!email) {
+      return;
+    }
+    const map = this.getOnlineMap();
+    delete map[email.toLowerCase()];
+    this.saveOnlineMap(map);
+  }
+
   private seedSuperUser(): void {
     const users = this.getUsers();
     if (users.length > 0) {
@@ -173,7 +300,8 @@ export class AuthService {
       phone: '+263 77 000 0000',
       avatarUrl: '',
       preferredCurrency: 'USD',
-      password: 'Admin@2026'
+      password: 'Admin@2026',
+      isApproved: true
     };
 
     this.saveUsers([seed]);

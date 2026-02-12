@@ -19,14 +19,6 @@ import { FieldDef, ResourceConfig } from '../models';
           <p>{{ cfg.summary }}</p>
         </div>
         <div class="toolbar-actions">
-          <input
-            class="app-input"
-            type="search"
-            [ngModel]="query()"
-            (ngModelChange)="query.set($event)"
-            placeholder="Search records"
-          />
-          <button class="btn-base btn-secondary" (click)="clearSearch()">Clear Search</button>
           <button class="btn-base btn-secondary" (click)="reload()">Refresh</button>
           <button class="btn-base btn-primary" (click)="startCreate()" [disabled]="cfg.readOnly">New</button>
         </div>
@@ -37,9 +29,6 @@ import { FieldDef, ResourceConfig } from '../models';
       <div class="content-grid">
         <section class="table-panel">
           <div class="table-header-actions">
-            <button class="btn-base btn-secondary btn-compact" (click)="duplicateSelected()" [disabled]="!selected() || cfg.readOnly">
-              Duplicate Selected
-            </button>
             <button class="btn-base btn-danger btn-compact" (click)="deleteSelected()" [disabled]="!selected() || cfg.readOnly || !cfg.deletePath">
               Delete Selected
             </button>
@@ -124,10 +113,11 @@ import { FieldDef, ResourceConfig } from '../models';
   styles: `
     .entity-page {
       display: grid;
-      gap: 0.8rem;
+      gap: 0.7rem;
       height: 100%;
       min-height: 0;
       grid-template-rows: auto auto 1fr;
+      overflow: hidden;
     }
     .toolbar {
       display: flex;
@@ -143,7 +133,6 @@ import { FieldDef, ResourceConfig } from '../models';
     .toolbar p { margin: 0; color: #5f6f82; font-size: 0.9rem; }
     .eyebrow { text-transform: uppercase; font-size: 0.69rem; letter-spacing: 0.09em; color: #0f4c5c !important; font-weight: 700; }
     .toolbar-actions { display: flex; gap: 0.45rem; align-items: center; }
-    .toolbar-actions .app-input { width: 200px; border-radius: 999px; }
     .status {
       margin: 0;
       background: #eff9f8;
@@ -171,7 +160,7 @@ import { FieldDef, ResourceConfig } from '../models';
       flex-wrap: wrap;
     }
     .table-wrap { overflow: auto; min-height: 0; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    table { width: 100%; min-width: 820px; border-collapse: collapse; font-size: 0.85rem; }
     th, td { text-align: left; padding: 0.55rem 0.6rem; border-bottom: 1px solid #edf1f6; vertical-align: top; }
     th { position: sticky; top: 0; background: #0f4c5c; color: #ffffff; font-weight: 700; }
     .actions { display: flex; gap: 0.35rem; }
@@ -191,6 +180,10 @@ import { FieldDef, ResourceConfig } from '../models';
       display: flex;
       gap: 0.45rem;
       flex-wrap: wrap;
+      position: sticky;
+      bottom: 0;
+      background: #fff;
+      z-index: 2;
     }
     .empty { padding: 0.8rem; margin: 0; color: #6d8096; }
     .missing { border: 1px dashed #c9d5e5; border-radius: 1rem; padding: 1rem; background: #fff; }
@@ -202,7 +195,6 @@ import { FieldDef, ResourceConfig } from '../models';
     @media (max-width: 760px) {
       .toolbar { flex-direction: column; }
       .toolbar-actions { width: 100%; flex-wrap: wrap; }
-      .toolbar-actions .app-input { width: 100%; }
     }
   `
 })
@@ -216,7 +208,6 @@ export class EntitiesPageComponent {
   readonly message = signal('');
   readonly editing = signal(false);
   readonly selected = signal<any | null>(null);
-  readonly query = signal('');
 
   form: FormGroup = this.fb.group({});
 
@@ -231,14 +222,7 @@ export class EntitiesPageComponent {
       .slice(0, 8);
   });
 
-  readonly filteredRows = computed(() => {
-    const term = this.query().trim().toLowerCase();
-    if (!term) {
-      return this.rows();
-    }
-
-    return this.rows().filter((item) => JSON.stringify(item).toLowerCase().includes(term));
-  });
+  readonly filteredRows = computed(() => this.rows());
 
   constructor() {
     this.route.paramMap.subscribe({
@@ -274,10 +258,6 @@ export class EntitiesPageComponent {
     });
   }
 
-  clearSearch(): void {
-    this.query.set('');
-  }
-
   startCreate(): void {
     this.editing.set(false);
     this.selected.set(null);
@@ -311,23 +291,6 @@ export class EntitiesPageComponent {
     this.message.set('Edit mode');
   }
 
-  duplicateSelected(): void {
-    const cfg = this.config();
-    const row = this.selected();
-    if (!cfg || !row || cfg.readOnly) {
-      return;
-    }
-
-    this.editing.set(false);
-    cfg.fields.forEach((field) => {
-      const rawValue = row[field.key];
-      const normalized = this.toFormValue(rawValue, field.type);
-      this.form.get(field.key)?.setValue(normalized);
-    });
-
-    this.message.set('Selected record copied to form. Click Save to create a new one.');
-  }
-
   save(): void {
     const cfg = this.config();
     if (!cfg || cfg.readOnly) {
@@ -335,6 +298,11 @@ export class EntitiesPageComponent {
     }
 
     const payload = this.buildPayload(cfg.fields);
+    const duplicate = this.findDuplicate(cfg, payload, this.selected());
+    if (duplicate) {
+      this.message.set('Duplicate data is not allowed.');
+      return;
+    }
 
     if (!this.editing()) {
       if (!cfg.createPath) {
@@ -543,6 +511,34 @@ export class EntitiesPageComponent {
     }
 
     return value;
+  }
+
+  private findDuplicate(cfg: ResourceConfig, payload: Record<string, unknown>, currentRow: any): boolean {
+    const keys = cfg.fields.map((f) => f.key);
+    const currentId = this.extractId(currentRow);
+
+    return this.rows().some((row) => {
+      const rowId = this.extractId(row);
+      if (currentId !== undefined && currentId !== null && rowId === currentId) {
+        return false;
+      }
+
+      return keys.every((key) => {
+        const left = this.normalizeForCompare(payload[key]);
+        const right = this.normalizeForCompare(row?.[key]);
+        return left === right;
+      });
+    });
+  }
+
+  private normalizeForCompare(value: unknown): string {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    if (typeof value === 'string') {
+      return value.trim().toLowerCase();
+    }
+    return String(value).trim().toLowerCase();
   }
 
   private describeError(err: any): string {

@@ -1,6 +1,7 @@
-﻿using AppIt.Core.DTOs;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using AppIt.Data;
+using AppIt.Data.Entities;
 using AppIt.Data.EntityModels;
 using Microsoft.EntityFrameworkCore;
 
@@ -65,16 +66,26 @@ namespace AppIt.Core.Services
                 };
             }
 
-            var providerResult = await provider.ProcessAsync(
-                new ProcessPaymentDto
-                {
-                    InvoiceId = dto.InvoiceId,
-                    Method = dto.Method,
-                    Amount = amount,
-                    CurrencyCode = currencyCode,
-                    ReturnUrl = dto.ReturnUrl,
-                    CancelUrl = dto.CancelUrl
-                });
+            var providerRequest = new ProcessPaymentDto
+            {
+                InvoiceId = dto.InvoiceId,
+                Method = dto.Method,
+                Amount = amount,
+                CurrencyCode = currencyCode,
+                ReturnUrl = dto.ReturnUrl,
+                CancelUrl = dto.CancelUrl
+            };
+
+            var providerResult = await provider.ProcessAsync(providerRequest);
+            var activeProvider = provider;
+            if (!providerResult.Success
+                && provider.Name.Equals("Stripe", StringComparison.OrdinalIgnoreCase)
+                && providerResult.Message.Contains("not configured", StringComparison.OrdinalIgnoreCase)
+                && _providerMap.TryGetValue("Manual", out var manualProvider))
+            {
+                providerResult = await manualProvider.ProcessAsync(providerRequest);
+                activeProvider = manualProvider;
+            }
 
             if (!providerResult.Success)
             {
@@ -82,7 +93,7 @@ namespace AppIt.Core.Services
                 {
                     Success = false,
                     Status = "Failed",
-                    Provider = provider.Name,
+                    Provider = activeProvider.Name,
                     Message = providerResult.Message
                 };
             }
@@ -119,10 +130,12 @@ namespace AppIt.Core.Services
 
             await _context.SaveChangesAsync();
 
+            await NotifyAdminsAsync(invoice.Id, amount, currencyCode, payment.Method, paymentStatus, payment.TransactionReference);
+
             return new ProcessPaymentResultDto
             {
                 Success = true,
-                Provider = provider.Name,
+                Provider = activeProvider.Name,
                 Status = paymentStatus,
                 Message = providerResult.Message,
                 TransactionReference = providerResult.TransactionReference,
@@ -134,7 +147,10 @@ namespace AppIt.Core.Services
         public async Task<PaymentReadDto?> UpdateAsync(UpdatePaymentDto dto)
         {
             var payment = await _context.Payments.FindAsync(dto.Id);
-            if (payment == null) return null;
+            if (payment == null)
+            {
+                return null;
+            }
 
             payment.InvoiceId = dto.InvoiceId;
             payment.Method = dto.Method;
@@ -151,7 +167,10 @@ namespace AppIt.Core.Services
         public async Task<bool> DeleteAsync(int id)
         {
             var payment = await _context.Payments.FindAsync(id);
-            if (payment == null) return false;
+            if (payment == null)
+            {
+                return false;
+            }
 
             _context.Payments.Remove(payment);
             await _context.SaveChangesAsync();
@@ -211,7 +230,51 @@ namespace AppIt.Core.Services
                 return "Stripe";
             }
 
+            if (method.Equals("CashApp", StringComparison.OrdinalIgnoreCase)
+                || method.Equals("EcoCash", StringComparison.OrdinalIgnoreCase)
+                || method.Equals("Bank Transfer", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Manual";
+            }
+
             return method;
+        }
+
+        private async Task NotifyAdminsAsync(int invoiceId, decimal amount, string currencyCode, string method, string paymentStatus, string txRef)
+        {
+            var superUsers = await _context.Accounts
+                .AsNoTracking()
+                .Include(a => a.Role)
+                .Where(a => a.IsActive
+                    && a.Role != null
+                    && (a.Role.Name.ToLower() == "super" || a.Role.Name.ToLower() == "admin"))
+                .ToListAsync();
+
+            if (superUsers.Count == 0)
+            {
+                return;
+            }
+
+            var title = paymentStatus.Equals("Paid", StringComparison.OrdinalIgnoreCase)
+                ? "Payment Received"
+                : "Payment Initiated";
+            var message = paymentStatus.Equals("Paid", StringComparison.OrdinalIgnoreCase)
+                ? $"Invoice {invoiceId} was paid via {method}. Amount: {amount:0.00} {currencyCode.ToUpperInvariant()}. Ref: {txRef}."
+                : $"Invoice {invoiceId} payment started via {method}. Amount: {amount:0.00} {currencyCode.ToUpperInvariant()}. Ref: {txRef}.";
+
+            foreach (var user in superUsers)
+            {
+                _context.Notifications.Add(new Notification
+                {
+                    UserId = user.Id,
+                    Title = title,
+                    Message = message,
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            await _context.SaveChangesAsync();
         }
     }
 }

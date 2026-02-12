@@ -68,3 +68,25 @@ body {
   box-sizing: border-box;
   background: #fff;
 }
+
+.panel,
+.card,
+.stat,
+.stat-card,
+.hero,
+.table-panel,
+.auth-panel,
+.report-header {
+  backdrop-filter: blur(14px) saturate(130%);
+  background: rgba(255, 255, 255, 0.72) !important;
+  border-color: rgba(170, 193, 220, 0.65) !important;
+}
+
+.table-wrap {
+  overflow: auto;
+  max-width: 100%;
+}
+
+.table-wrap table {
+  min-width: 720px;
+}

@@ -37,6 +37,13 @@ namespace AppIt.Api.Controllers
             return Ok(invoice);
         }
 
+        [HttpGet("verification")]
+        public async Task<IActionResult> VerifyPayments([FromQuery] string granularity = "day", [FromQuery] DateTime? atUtc = null)
+        {
+            var result = await _service.VerifyPaymentsAsync(granularity, atUtc);
+            return Ok(result);
+        }
+
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateInvoiceDto dto)
         {

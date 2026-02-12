@@ -39,7 +39,7 @@ export interface SnapshotDetail extends SnapshotSummary {
 export type CurrencyCode = 'USD' | 'ZAR' | 'GBP';
 
 export interface Product {
-  id: string;
+  id: number;
   name: string;
   description?: string;
   category: string;
@@ -47,7 +47,7 @@ export interface Product {
 }
 
 export interface Accommodation {
-  id: string;
+  id: number;
   type: 'Single' | 'Double' | 'Express' | 'Standard';
   description?: string;
   capacity: number;
@@ -55,15 +55,15 @@ export interface Accommodation {
 }
 
 export interface Activity {
-  id: string;
+  id: number;
   name: string;
   description?: string;
   basePriceUsd: number;
 }
 
 export interface Reservation {
-  id: string;
-  userId: string;
+  id: number;
+  userId?: string;
   reference: string;
   voucherCode: string;
   currency: CurrencyCode;
@@ -73,8 +73,8 @@ export interface Reservation {
 }
 
 export interface Invoice {
-  id: string;
-  reservationId: string;
+  id: number;
+  reservationId: number;
   totalAmount: number;
   currency: CurrencyCode;
   status: 'Paid' | 'Not Paid' | 'Pending' | 'Cancelled';
@@ -82,8 +82,8 @@ export interface Invoice {
 }
 
 export interface Payment {
-  id: string;
-  invoiceId: string;
+  id: number;
+  invoiceId: number;
   method: 'Mastercard' | 'PayPal' | 'CashApp' | 'EcoCash' | 'Bank Transfer';
   status: 'Paid' | 'Pending' | 'Cancelled';
   transactionReference: string;

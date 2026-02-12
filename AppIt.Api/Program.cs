@@ -103,6 +103,7 @@ namespace AppIt.Api
                 builder.Services.AddScoped<IPaymentProvider, StripePaymentProvider>();
                 builder.Services.AddHttpClient<PayPalPaymentProvider>();
                 builder.Services.AddScoped<IPaymentProvider>(sp => sp.GetRequiredService<PayPalPaymentProvider>());
+                builder.Services.AddScoped<IPaymentProvider, ManualPaymentProvider>();
                 builder.Services.AddScoped<IVoucherService, VoucherService>();
                 builder.Services.AddScoped<ISupportMessageService, SupportMessageService>();
                 builder.Services.AddScoped<INotificationService, NotificationService>();

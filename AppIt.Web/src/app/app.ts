@@ -31,7 +31,7 @@ export class App implements OnDestroy {
   private readonly router = inject(Router);
   readonly theme = signal<'light' | 'dark'>('light');
   readonly now = signal(new Date());
-  readonly sidebarQuery = signal('');
+  readonly welcome = signal('');
 
   readonly currentUser = computed(() => this.auth.user());
   readonly isSuperUser = computed(() => this.auth.isSuperUser());
@@ -79,7 +79,7 @@ export class App implements OnDestroy {
           id: 'welcome',
           name: 'Welcome',
           icon: 'login',
-          items: [{ key: 'auth', title: 'Sign In / Register', icon: 'login', route: '/auth' }]
+          items: [{ key: 'auth', title: 'Sign In', icon: 'login', route: '/auth' }]
         }
       ];
     }
@@ -143,21 +143,11 @@ export class App implements OnDestroy {
     user: false
   });
 
-  readonly filteredGroups = computed(() => {
-    const query = this.sidebarQuery().trim().toLowerCase();
-    if (!query) {
-      return this.navGroups();
-    }
-
-    return this.navGroups()
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) => item.title.toLowerCase().includes(query))
-      }))
-      .filter((group) => group.items.length > 0 || group.name.toLowerCase().includes(query));
-  });
-
   private readonly timer = setInterval(() => this.now.set(new Date()), 1000);
+
+  constructor() {
+    this.welcome.set(this.auth.consumeWelcomeMessage());
+  }
 
   toggleTheme(): void {
     this.theme.set(this.theme() === 'light' ? 'dark' : 'light');
@@ -178,5 +168,9 @@ export class App implements OnDestroy {
   logout(): void {
     this.auth.logout();
     this.router.navigateByUrl('/auth');
+  }
+
+  dismissWelcome(): void {
+    this.welcome.set('');
   }
 }

@@ -32,4 +32,12 @@ namespace AppIt.Core.DTOs
         [Required]
         public int ReservationId { get; set; }
     }
+
+    public class ReservationDeleteResultDto
+    {
+        public bool Success { get; set; }
+        public bool NotFound { get; set; }
+        public bool HasPaidInvoice { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
 }

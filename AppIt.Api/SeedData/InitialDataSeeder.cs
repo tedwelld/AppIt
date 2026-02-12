@@ -10,6 +10,7 @@ namespace AppIt.Api.SeedData
             await dbContext.Database.MigrateAsync();
 
             await SeedRolesAsync(dbContext);
+            await SeedAdminAccountAsync(dbContext);
             await SeedProductsAsync(dbContext);
             await SeedAccommodationsAsync(dbContext);
             await SeedActivitiesAsync(dbContext);
@@ -49,6 +50,36 @@ namespace AppIt.Api.SeedData
             }
 
             dbContext.Products.AddRange(missing);
+            await dbContext.SaveChangesAsync();
+        }
+
+        private static async Task SeedAdminAccountAsync(AppItDbContext dbContext)
+        {
+            var superRole = await dbContext.Roles.FirstOrDefaultAsync(r => r.Name.ToLower() == "super");
+            if (superRole == null)
+            {
+                return;
+            }
+
+            var exists = await dbContext.Accounts.AnyAsync(a => a.Email.ToLower() == "admin@appit.com");
+            if (exists)
+            {
+                return;
+            }
+
+            dbContext.Accounts.Add(new Account
+            {
+                FirstName = "System",
+                LastName = "Administrator",
+                Email = "admin@appit.com",
+                Phone = "+263 77 000 0000",
+                PreferredCurrency = "USD",
+                RoleId = superRole.RoleId,
+                IsActive = true,
+                CreatedDate = DateTime.UtcNow,
+                UpdatedDate = DateTime.UtcNow
+            });
+
             await dbContext.SaveChangesAsync();
         }
 

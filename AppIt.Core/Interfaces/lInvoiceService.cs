@@ -9,5 +9,6 @@ namespace AppIt.Core.Interfaces
         Task<bool> DeleteAsync(int id);
         Task<IEnumerable<InvoiceReadDto>> GetAllAsync();
         Task<InvoiceReadDto?> GetByIdAsync(int id);
+        Task<InvoicePaymentVerificationSummaryDto> VerifyPaymentsAsync(string granularity, DateTime? atUtc = null);
     }
 }

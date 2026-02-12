@@ -57,14 +57,49 @@ namespace AppIt.Core.Services
             return ToReadDto(reservation);
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<ReservationDeleteResultDto> DeleteAsync(int id)
         {
             var reservation = await Reservations.FindAsync(id);
-            if (reservation == null) return false;
+            if (reservation == null)
+            {
+                return new ReservationDeleteResultDto
+                {
+                    Success = false,
+                    NotFound = true,
+                    Message = "Reservation not found."
+                };
+            }
+
+            var invoiceIds = await _context.Invoices
+                .Where(i => i.ReservationId == id)
+                .Select(i => i.Id)
+                .ToListAsync();
+
+            var hasPaidInvoice = await _context.Invoices
+                .Where(i => i.ReservationId == id)
+                .AnyAsync(i => i.IsPaid || i.Status.Equals("Paid"));
+
+            var hasPaidPayment = invoiceIds.Count > 0 && await _context.Payments
+                .Where(p => invoiceIds.Contains(p.InvoiceId))
+                .AnyAsync(p => p.Status.Equals("Paid"));
+
+            if (hasPaidInvoice || hasPaidPayment)
+            {
+                return new ReservationDeleteResultDto
+                {
+                    Success = false,
+                    HasPaidInvoice = true,
+                    Message = "Reservation cannot be deleted because payment has already been made."
+                };
+            }
 
             Reservations.Remove(reservation);
             await _context.SaveChangesAsync();
-            return true;
+            return new ReservationDeleteResultDto
+            {
+                Success = true,
+                Message = "Reservation deleted."
+            };
         }
 
         public async Task<ReservationReadDto?> GetByIdAsync(int id)
