@@ -1,14 +1,13 @@
 ﻿using AppIt.Core.DTOs;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace AppIt.Core.Interfaces
 {
     public interface IInvoiceService
     {
         Task<InvoiceReadDto> CreateAsync(CreateInvoiceDto dto);
+        Task<InvoiceReadDto?> UpdateAsync(UpdateInvoiceDto dto);
+        Task<bool> DeleteAsync(int id);
         Task<IEnumerable<InvoiceReadDto>> GetAllAsync();
+        Task<InvoiceReadDto?> GetByIdAsync(int id);
     }
-
 }

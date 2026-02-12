@@ -1,7 +1,9 @@
 using AppIt.Core.AppServices;
+using AppIt.Core.Configuration;
 using AppIt.Core.Interfaces;
 using AppIt.Core.Interfaces.Services;
 using AppIt.Core.Services;
+using AppIt.Api.SeedData;
 using AppIt.Data;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics;
@@ -85,6 +87,8 @@ namespace AppIt.Api
                 builder.Services.AddScoped<IFeaturePermissionService, FeaturePermissionService>();
                 builder.Services.AddScoped<IPermissionService, PermissionService>();
                 builder.Services.AddScoped<IProductService, ProductService>();
+                builder.Services.AddScoped<IAccommodationService, AccommodationService>();
+                builder.Services.AddScoped<IActivityService, ActivityService>();
                 builder.Services.AddScoped<IRoleService, RoleService>();
                 builder.Services.AddScoped<IRoleFeatureService, RoleFeatureService>();
                 builder.Services.AddScoped<ICompanyService, CompanyService>();
@@ -95,6 +99,12 @@ namespace AppIt.Api
                 builder.Services.AddScoped<IReservationService, ReservationService>();
                 builder.Services.AddScoped<ICustomerService, CustomerService>();
                 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+                builder.Services.AddScoped<IPaymentService, PaymentService>();
+                builder.Services.AddScoped<IPaymentProvider, StripePaymentProvider>();
+                builder.Services.AddHttpClient<PayPalPaymentProvider>();
+                builder.Services.AddScoped<IPaymentProvider>(sp => sp.GetRequiredService<PayPalPaymentProvider>());
+                builder.Services.AddScoped<IVoucherService, VoucherService>();
+                builder.Services.AddScoped<ISupportMessageService, SupportMessageService>();
                 builder.Services.AddScoped<INotificationService, NotificationService>();
                 builder.Services.AddScoped<IReportSnapshotService, ReportSnapshotService>();
                 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
@@ -104,6 +114,7 @@ namespace AppIt.Api
                     // This prevents JsonTypeInfo metadata errors when serializing DTOs at runtime.
                     options.SerializerOptions.TypeInfoResolver = new DefaultJsonTypeInfoResolver();
                 });
+                builder.Services.Configure<PaymentProviderOptions>(builder.Configuration.GetSection("Payments"));
 
                 #endregion
 
@@ -118,7 +129,7 @@ namespace AppIt.Api
                 builder.Services.AddEndpointsApiExplorer();
                 // Use Swashbuckle to generate OpenAPI/Swagger documents for controllers
                 builder.Services.AddSwaggerGen(options =>
-                options.SwaggerDoc("v1", new Microsoft.OpenApi.OpenApiInfo
+                options.SwaggerDoc("v2", new Microsoft.OpenApi.OpenApiInfo
                 {
                     Title = "AppIt API",
                     Version = "v2"
@@ -128,6 +139,11 @@ namespace AppIt.Api
                 #endregion
 
                 var app = builder.Build();
+                using (var scope = app.Services.CreateScope())
+                {
+                    var dbContext = scope.ServiceProvider.GetRequiredService<AppItDbContext>();
+                    InitialDataSeeder.SeedAsync(dbContext).GetAwaiter().GetResult();
+                }
 
                 #region Global Exception Handling (HTTP Pipeline)
 

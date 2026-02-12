@@ -9,8 +9,6 @@ namespace AppIt.Data.EntityModels
         [Key]
         public int Id { get; set; }
 
-        
-
         [Required]
         public string FirstName { get; set; } = string.Empty;
 
@@ -21,6 +19,10 @@ namespace AppIt.Data.EntityModels
 
         [Required]
         public string Email { get; set; } = string.Empty;
+
+        public string? Phone { get; set; }
+        public string? AvatarUrl { get; set; }
+        public string PreferredCurrency { get; set; } = "USD";
 
         public int RoleId { get; set; }
         public Role? Role { get; set; }

@@ -35,3 +35,65 @@ export interface SnapshotDetail extends SnapshotSummary {
   dataJson: string;
   generatedByUserId: number;
 }
+
+export type CurrencyCode = 'USD' | 'ZAR' | 'GBP';
+
+export interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  basePriceUsd: number;
+}
+
+export interface Accommodation {
+  id: string;
+  type: 'Single' | 'Double' | 'Express' | 'Standard';
+  description?: string;
+  capacity: number;
+  basePriceUsd: number;
+}
+
+export interface Activity {
+  id: string;
+  name: string;
+  description?: string;
+  basePriceUsd: number;
+}
+
+export interface Reservation {
+  id: string;
+  userId: string;
+  reference: string;
+  voucherCode: string;
+  currency: CurrencyCode;
+  totalAmount: number;
+  status: 'Pending' | 'Confirmed' | 'Cancelled';
+  createdAt: string;
+}
+
+export interface Invoice {
+  id: string;
+  reservationId: string;
+  totalAmount: number;
+  currency: CurrencyCode;
+  status: 'Paid' | 'Not Paid' | 'Pending' | 'Cancelled';
+  issuedAt: string;
+}
+
+export interface Payment {
+  id: string;
+  invoiceId: string;
+  method: 'Mastercard' | 'PayPal' | 'CashApp' | 'EcoCash' | 'Bank Transfer';
+  status: 'Paid' | 'Pending' | 'Cancelled';
+  transactionReference: string;
+  processedAt?: string;
+}
+
+export interface Voucher {
+  id: string;
+  code: string;
+  reference: string;
+  type: 'Reservation' | 'Accommodation' | 'Activity' | 'Combo';
+  createdAt: string;
+}

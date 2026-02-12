@@ -20,8 +20,12 @@ namespace AppIt.Data.EntityModels
         [MaxLength(500)]
         public string? Description { get; set; }
 
-       
-        public decimal Price { get; set; }
+        [MaxLength(120)]
+        public string Category { get; set; } = "Adventure";
+
+        public decimal BasePriceUsd { get; set; }
+
+        public bool IsActive { get; set; } = true;
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     }
 }

@@ -1,11 +1,11 @@
-using AppIt.Core.DTOs;
+﻿using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/report-snapshots")]
     public class ReportSnapshotsController : ControllerBase
     {
         private readonly IReportSnapshotService _service;
@@ -13,6 +13,13 @@ namespace AppIt.Api.Controllers
         public ReportSnapshotsController(IReportSnapshotService service)
         {
             _service = service;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var snapshots = await _service.GetByReportKeyAsync(string.Empty);
+            return Ok(snapshots);
         }
 
         [HttpGet("report/{reportKey}")]

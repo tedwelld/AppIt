@@ -9,8 +9,9 @@ namespace AppIt.Core.DTOs
         public int ProductId { get; set; }
         public string Name { get; set; } = null!;
         public string? Description { get; set; }
-        public decimal Price { get; set; }
-      
+        public string Category { get; set; } = "Adventure";
+        public decimal BasePriceUsd { get; set; }
+        public bool IsActive { get; set; }
         public DateTime CreatedDate { get; set; }
     }
 
@@ -20,14 +21,17 @@ namespace AppIt.Core.DTOs
         [MaxLength(150)]
         public string Name { get; set; } = null!;
 
+        [MaxLength(120)]
+        public string Category { get; set; } = "Adventure";
+
         [MaxLength(500)]
         public string? Description { get; set; }
 
         [Required]
         [Range(0.01, double.MaxValue, ErrorMessage = "Price must be greater than 0")]
-        public decimal Price { get; set; }
+        public decimal BasePriceUsd { get; set; }
 
-    
+        public bool IsActive { get; set; } = true;
     }
 
     public class UpdateProductDto
@@ -39,13 +43,16 @@ namespace AppIt.Core.DTOs
         [MaxLength(150)]
         public string Name { get; set; } = null!;
 
+        [MaxLength(120)]
+        public string Category { get; set; } = "Adventure";
+
         [MaxLength(500)]
         public string? Description { get; set; }
 
         [Required]
         [Range(0.01, double.MaxValue, ErrorMessage = "Price must be greater than 0")]
-        public decimal Price { get; set; }
+        public decimal BasePriceUsd { get; set; }
 
-    
+        public bool IsActive { get; set; } = true;
     }
 }

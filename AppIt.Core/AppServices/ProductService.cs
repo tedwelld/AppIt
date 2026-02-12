@@ -20,9 +20,10 @@ namespace AppIt.Core.Services
             var product = new Product
             {
                 Name = dto.Name,
+                Category = dto.Category,
                 Description = dto.Description,
-                Price = dto.Price,
-             
+                BasePriceUsd = dto.BasePriceUsd,
+                IsActive = dto.IsActive,
                 CreatedDate = DateTime.UtcNow
             };
 
@@ -33,9 +34,10 @@ namespace AppIt.Core.Services
             {
                 ProductId = product.ProductId,
                 Name = product.Name,
+                Category = product.Category,
                 Description = product.Description,
-                Price = product.Price,
-               
+                BasePriceUsd = product.BasePriceUsd,
+                IsActive = product.IsActive,
                 CreatedDate = product.CreatedDate
             };
         }
@@ -46,8 +48,10 @@ namespace AppIt.Core.Services
             if (product == null) return null;
 
             product.Name = dto.Name;
+            product.Category = dto.Category;
             product.Description = dto.Description;
-            product.Price = dto.Price;
+            product.BasePriceUsd = dto.BasePriceUsd;
+            product.IsActive = dto.IsActive;
             
 
             await _context.SaveChangesAsync();
@@ -56,9 +60,10 @@ namespace AppIt.Core.Services
             {
                 ProductId = product.ProductId,
                 Name = product.Name,
+                Category = product.Category,
                 Description = product.Description,
-                Price = product.Price,
-             
+                BasePriceUsd = product.BasePriceUsd,
+                IsActive = product.IsActive,
                 CreatedDate = product.CreatedDate
             };
         }
@@ -82,9 +87,10 @@ namespace AppIt.Core.Services
             {
                 ProductId = product.ProductId,
                 Name = product.Name,
+                Category = product.Category,
                 Description = product.Description,
-                Price = product.Price,
-         
+                BasePriceUsd = product.BasePriceUsd,
+                IsActive = product.IsActive,
                 CreatedDate = product.CreatedDate
             };
         }
@@ -96,9 +102,10 @@ namespace AppIt.Core.Services
             {
                 ProductId = p.ProductId,
                 Name = p.Name,
+                Category = p.Category,
                 Description = p.Description,
-                Price = p.Price,
-           
+                BasePriceUsd = p.BasePriceUsd,
+                IsActive = p.IsActive,
                 CreatedDate = p.CreatedDate
             });
         }

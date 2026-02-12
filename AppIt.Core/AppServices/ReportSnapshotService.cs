@@ -17,9 +17,14 @@ namespace AppIt.Core.Services
 
         public async Task<IEnumerable<ReportSnapshotDto>> GetByReportKeyAsync(string reportKey)
         {
-            return await _context.ReportSnapshots
+            var query = _context.ReportSnapshots.AsNoTracking();
+            if (!string.IsNullOrWhiteSpace(reportKey))
+            {
+                query = query.Where(r => r.ReportKey == reportKey);
+            }
+
+            return await query
                 .AsNoTracking()
-                .Where(r => r.ReportKey == reportKey)
                 .OrderByDescending(r => r.SnapshotDate)
                 .Select(r => new ReportSnapshotDto
                 {

@@ -19,26 +19,19 @@ namespace AppIt.Core.Services
 
         public async Task<ReservationReadDto> CreateAsync(CreateReservationDto dto)
         {
+            var reference = string.IsNullOrWhiteSpace(dto.Reference) ? BuildReference("RES") : dto.Reference!;
+            var voucher = string.IsNullOrWhiteSpace(dto.VoucherCode) ? BuildVoucher("RES") : dto.VoucherCode!;
+
             var reservation = new Reservation
             {
-                CustomerFirstName = dto.CustomerFirstName,
-                CustomerLastName = dto.CustomerLastName,
-                CustomerIdNumber = dto.CustomerIdNumber,
-                AgencyId = dto.AgencyId,
-                AgencyConsultantId = dto.AgencyConsultantId,
-                AgencyVoucherReference = dto.AgencyVoucherReference,
-                NumberOfPeople = dto.NumberOfPeople,
-                CurrencyId = dto.CurrencyId,
-                CurrencyExchangeRate = dto.CurrencyExchangeRate,
-                Country = dto.Country,
-                Vat = dto.Vat,
-                IsInvoiced = dto.IsInvoiced,
-                Notes = dto.Notes,
-                AnalysisId = dto.AnalysisId,
-                CustomerEmail = dto.CustomerEmail,
-                ClosingByUserId = dto.ClosingByUserId,
-                ClosingByUserName = dto.ClosingByUserName,
-                ClosingDate = dto.ClosingDate
+                Reference = reference,
+                VoucherCode = voucher,
+                CurrencyCode = string.IsNullOrWhiteSpace(dto.Currency) ? "USD" : dto.Currency,
+                TotalAmount = dto.TotalAmount,
+                Status = string.IsNullOrWhiteSpace(dto.Status) ? "Pending" : dto.Status,
+                CreatedDate = DateTime.UtcNow,
+                CustomerId = dto.CustomerId,
+                CustomerEmail = dto.CustomerEmail
             };
 
             Reservations.Add(reservation);
@@ -52,24 +45,13 @@ namespace AppIt.Core.Services
             var reservation = await Reservations.FindAsync(dto.ReservationId);
             if (reservation == null) return null;
 
-            reservation.CustomerFirstName = dto.CustomerFirstName;
-            reservation.CustomerLastName = dto.CustomerLastName;
-            reservation.CustomerIdNumber = dto.CustomerIdNumber;
-            reservation.AgencyId = dto.AgencyId;
-            reservation.AgencyConsultantId = dto.AgencyConsultantId;
-            reservation.AgencyVoucherReference = dto.AgencyVoucherReference;
-            reservation.NumberOfPeople = dto.NumberOfPeople;
-            reservation.CurrencyId = dto.CurrencyId;
-            reservation.CurrencyExchangeRate = dto.CurrencyExchangeRate;
-            reservation.Country = dto.Country;
-            reservation.Vat = dto.Vat;
-            reservation.IsInvoiced = dto.IsInvoiced;
-            reservation.Notes = dto.Notes;
-            reservation.AnalysisId = dto.AnalysisId;
+            reservation.Reference = string.IsNullOrWhiteSpace(dto.Reference) ? reservation.Reference : dto.Reference!;
+            reservation.VoucherCode = string.IsNullOrWhiteSpace(dto.VoucherCode) ? reservation.VoucherCode : dto.VoucherCode!;
+            reservation.CurrencyCode = string.IsNullOrWhiteSpace(dto.Currency) ? reservation.CurrencyCode : dto.Currency;
+            reservation.TotalAmount = dto.TotalAmount;
+            reservation.Status = string.IsNullOrWhiteSpace(dto.Status) ? reservation.Status : dto.Status;
+            reservation.CustomerId = dto.CustomerId;
             reservation.CustomerEmail = dto.CustomerEmail;
-            reservation.ClosingByUserId = dto.ClosingByUserId;
-            reservation.ClosingByUserName = dto.ClosingByUserName;
-            reservation.ClosingDate = dto.ClosingDate;
 
             await _context.SaveChangesAsync();
             return ToReadDto(reservation);
@@ -104,24 +86,28 @@ namespace AppIt.Core.Services
         private ReservationReadDto ToReadDto(Reservation r) => new()
         {
             ReservationId = r.ReservationId,
-            CustomerFirstName = r.CustomerFirstName,
-            CustomerLastName = r.CustomerLastName,
-            CustomerIdNumber = r.CustomerIdNumber,
-            AgencyId = r.AgencyId,
-            AgencyConsultantId = r.AgencyConsultantId,
-            AgencyVoucherReference = r.AgencyVoucherReference,
-            NumberOfPeople = r.NumberOfPeople,
-            CurrencyId = r.CurrencyId,
-            CurrencyExchangeRate = r.CurrencyExchangeRate,
-            Country = r.Country,
-            Vat = r.Vat,
-            IsInvoiced = r.IsInvoiced,
-            Notes = r.Notes,
-            AnalysisId = r.AnalysisId,
-            CustomerEmail = r.CustomerEmail,
-            ClosingByUserId = r.ClosingByUserId,
-            ClosingByUserName = r.ClosingByUserName,
-            ClosingDate = r.ClosingDate
+            Reference = r.Reference,
+            VoucherCode = r.VoucherCode,
+            CustomerId = r.CustomerId,
+            Currency = r.CurrencyCode,
+            TotalAmount = r.TotalAmount,
+            Status = r.Status,
+            CreatedAt = r.CreatedDate,
+            CustomerEmail = r.CustomerEmail
         };
+
+        private static string BuildReference(string prefix)
+        {
+            var now = DateTime.UtcNow;
+            var stamp = now.ToString("yyyyMMdd");
+            var rand = Random.Shared.Next(1000, 9999);
+            return $"APP-{prefix}-{stamp}-{rand}";
+        }
+
+        private static string BuildVoucher(string prefix)
+        {
+            var rand = Random.Shared.Next(100000, 999999);
+            return $"VCH-{prefix}-{rand}";
+        }
     }
 }

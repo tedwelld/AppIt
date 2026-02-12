@@ -210,33 +210,37 @@ export class ReportsPageComponent {
   private readonly api = inject(ApiService);
 
   readonly datasets = [
-    { label: 'Accounts', path: '/api/Accounts' },
-    { label: 'Products', path: '/api/Product' },
-    { label: 'Companies', path: '/api/Company' },
-    { label: 'Customers', path: '/api/Customer' },
-    { label: 'Reservations', path: '/api/Reservation' },
-    { label: 'Invoices', path: '/api/invoices' }
+    { label: 'Accounts', path: '/api/accounts' },
+    { label: 'Products', path: '/api/products' },
+    { label: 'Accommodations', path: '/api/accommodations' },
+    { label: 'Activities', path: '/api/activities' },
+    { label: 'Reservations', path: '/api/reservations' },
+    { label: 'Invoices', path: '/api/invoices' },
+    { label: 'Payments', path: '/api/payments' },
+    { label: 'Vouchers', path: '/api/vouchers' }
   ];
 
   readonly reportKeyOptions = [
     { value: 'operations-overview', label: 'Operations Overview' },
     { value: 'accounts-summary', label: 'Accounts Summary' },
     { value: 'sales-products', label: 'Sales & Products' },
-    { value: 'customer-activity', label: 'Customer Activity' },
+    { value: 'accommodation-utilization', label: 'Accommodation Utilization' },
     { value: 'reservation-utilization', label: 'Reservation Utilization' },
-    { value: 'invoice-financials', label: 'Invoice Financials' }
+    { value: 'invoice-financials', label: 'Invoice Financials' },
+    { value: 'payment-status', label: 'Payment Status' }
   ];
 
   readonly reportTitleOptions = [
     'Operations Daily Summary',
     'User Accounts and Access Matrix',
     'Product Performance and Pricing',
-    'Customer Portfolio Analysis',
+    'Accommodation & Room Mix',
     'Reservation Pipeline Report',
-    'Invoice and Revenue Snapshot'
+    'Invoice and Revenue Snapshot',
+    'Payment Status Overview'
   ];
 
-  selectedDataset = '/api/Accounts';
+  selectedDataset = '/api/accounts';
   reportKey = 'operations-overview';
   reportTitle = 'Operations Daily Summary';
   generatedByUserId = 1;
@@ -269,7 +273,7 @@ export class ReportsPageComponent {
       generatedByUserId: Number(this.generatedByUserId)
     };
 
-    this.api.post('/api/ReportSnapshots', payload).subscribe({
+    this.api.post('/api/report-snapshots', payload).subscribe({
       next: () => this.status.set('Snapshot saved successfully.'),
       error: (err) => this.status.set(this.describeError(err))
     });

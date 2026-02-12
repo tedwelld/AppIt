@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace AppIt.Api.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/accounts")]
     public class AccountsController : ControllerBase
     {
         private readonly IAccountService _service;

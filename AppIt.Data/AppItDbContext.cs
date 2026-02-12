@@ -8,6 +8,8 @@ public class AppItDbContext : DbContext
         : base(options) { }
 
     public DbSet<Account> Accounts { get; set; }
+    public DbSet<Accommodation> Accommodations { get; set; }
+    public DbSet<Activity> Activities { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<Company> Companies { get; set; }
     public DbSet<Customer> Customers { get; set; }
@@ -17,6 +19,7 @@ public class AppItDbContext : DbContext
     public DbSet<FeaturePermission> FeaturePermissions { get; set; }
     public DbSet<Invoice> Invoices { get; set; }
     public DbSet<Notification> Notifications { get; set; }
+    public DbSet<Payment> Payments { get; set; }
     public DbSet<Permission> Permissions { get; set; }
     public DbSet<Product> Products { get; set; }
     public DbSet<ReportSnapshot> ReportSnapshots { get; set; }
@@ -25,7 +28,9 @@ public class AppItDbContext : DbContext
     public DbSet<RoleFeature> RoleFeatures { get; set; }
     public DbSet<RoleFeaturePermission> RoleFeaturePermissions { get; set; }
     public DbSet<Supplier> Suppliers { get; set; }
+    public DbSet<SupportMessage> SupportMessages { get; set; }
     public DbSet<UserProfile> UserProfiles { get; set; }
+    public DbSet<Voucher> Vouchers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -110,6 +115,16 @@ public class AppItDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<Payment>(b =>
+        {
+            b.HasKey(e => e.Id);
+
+            b.HasOne(e => e.Invoice)
+                .WithMany()
+                .HasForeignKey(e => e.InvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<Notification>(b =>
         {
             b.HasKey(e => e.Id);
@@ -134,6 +149,11 @@ public class AppItDbContext : DbContext
         modelBuilder.Entity<Reservation>(b =>
         {
             b.HasKey(e => e.ReservationId);
+
+            b.HasOne(e => e.Account)
+                .WithMany()
+                .HasForeignKey(e => e.AccountId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             b.HasOne(e => e.Customer)
                 .WithMany(c => c.Reservations)
@@ -186,6 +206,17 @@ public class AppItDbContext : DbContext
                 .WithMany(p => p.RoleFeaturePermissions)
                 .HasForeignKey(e => e.PermissionId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Voucher>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasIndex(e => e.Code).IsUnique();
+
+            b.HasOne(e => e.Reservation)
+                .WithMany()
+                .HasForeignKey(e => e.ReservationId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

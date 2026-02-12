@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace AppIt.Api.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/reservations")]
     public class ReservationController : ControllerBase
     {
         private readonly IReservationService _service;
@@ -20,6 +20,19 @@ namespace AppIt.Api.Controllers
         {
             var reservations = await _service.GetAllAsync();
             return Ok(reservations);
+        }
+
+        [HttpGet("mine")]
+        public async Task<IActionResult> GetMine([FromQuery] string? email)
+        {
+            var reservations = await _service.GetAllAsync();
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return Ok(reservations);
+            }
+
+            var filtered = reservations.Where(r => string.Equals(r.CustomerEmail, email, StringComparison.OrdinalIgnoreCase));
+            return Ok(filtered);
         }
 
         [HttpGet("{id}")]

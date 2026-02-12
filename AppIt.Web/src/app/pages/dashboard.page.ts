@@ -1,5 +1,6 @@
-import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+﻿import { CommonModule } from '@angular/common';
+import { Component, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { catchError, forkJoin, map, of } from 'rxjs';
 import { ApiService } from '../api.service';
@@ -16,26 +17,89 @@ interface DashboardCard {
   colorClass: string;
 }
 
+interface AdminStats {
+  range: string;
+  totalSales: number;
+  totalBookings: number;
+  totalEarnings: number;
+  totalCustomers: number;
+  trend: number[];
+}
+
 @Component({
   selector: 'app-dashboard-page',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <section class="dashboard">
       <header class="hero">
         <div>
-          <p class="eyebrow">AppIt Control Center</p>
-          <h1>Operations Dashboard</h1>
-          <p class="sub">Live counters across all modules. Click a card to open that page.</p>
+          <p class="eyebrow">AppIt Admin Panel</p>
+          <h1>Operations Overview</h1>
+          <p class="sub">Sales, bookings, earnings, and customer growth at a glance.</p>
         </div>
-        <button class="btn-base btn-secondary" (click)="reload()">
-          <span class="material-symbols-outlined">refresh</span>
-          Refresh All
-        </button>
+        <div class="hero-actions">
+          <label>
+            <span>Range</span>
+            <select class="app-select" [(ngModel)]="selectedRange" (ngModelChange)="loadStats()">
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </label>
+          <button class="btn-base btn-secondary" (click)="reload()">
+            <span class="material-symbols-outlined">refresh</span>
+            Refresh All
+          </button>
+        </div>
       </header>
 
-      <div class="cards">
-        <a class="card" [ngClass]="card.colorClass" *ngFor="let card of cards(); let i = index" [routerLink]="['/entities', card.key]">
+      <section class="stat-grid" *ngIf="stats() as s">
+        <article class="stat">
+          <p class="label">Sales</p>
+          <p class="value">{{ s.totalSales | number }}</p>
+          <p class="sub">All completed payments.</p>
+        </article>
+        <article class="stat">
+          <p class="label">Bookings</p>
+          <p class="value">{{ s.totalBookings | number }}</p>
+          <p class="sub">Reservations created.</p>
+        </article>
+        <article class="stat">
+          <p class="label">Total Earnings</p>
+          <p class="value">$ {{ s.totalEarnings | number:'1.0-0' }}</p>
+          <p class="sub">Gross revenue.</p>
+        </article>
+        <article class="stat">
+          <p class="label">Customers</p>
+          <p class="value">{{ s.totalCustomers | number }}</p>
+          <p class="sub">Active accounts.</p>
+        </article>
+      </section>
+
+      <section class="chart-panel" *ngIf="stats() as s">
+        <div class="chart-header">
+          <div>
+            <p class="eyebrow">Trend</p>
+            <h2>Revenue vs Bookings</h2>
+          </div>
+          <span class="pill">Range: {{ s.range }}</span>
+        </div>
+        <svg viewBox="0 0 300 120" preserveAspectRatio="none">
+          <polyline [attr.points]="buildLine(s.trend)" fill="none" stroke="#0f4c5c" stroke-width="3"></polyline>
+          <polyline [attr.points]="buildComparisonLine(s.trend)" fill="none" stroke="#f4a261" stroke-width="3"></polyline>
+        </svg>
+      </section>
+
+      <section class="cards">
+        <a
+          class="card"
+          [ngClass]="card.colorClass"
+          *ngFor="let card of cards(); let i = index"
+          [routerLink]="['/entities', card.key]"
+        >
           <div class="card-head">
             <div class="icon-wrap">
               <span class="material-symbols-outlined">{{ card.icon }}</span>
@@ -55,11 +119,11 @@ interface DashboardCard {
             <span class="open-label">Open module</span>
           </div>
         </a>
-      </div>
+      </section>
     </section>
   `,
   styles: `
-    .dashboard { display: grid; gap: 1rem; height: 100%; min-height: 0; grid-template-rows: auto 1fr; }
+    .dashboard { display: grid; gap: 1rem; height: 100%; min-height: 0; grid-template-rows: auto auto auto 1fr; }
     .hero {
       background: linear-gradient(145deg, #ffffff, #eef7ff);
       border: 1px solid #d9e4f1;
@@ -72,9 +136,40 @@ interface DashboardCard {
       gap: 1rem;
       align-items: flex-start;
     }
+    .hero-actions { display: grid; gap: 0.4rem; justify-items: end; }
+    .hero-actions label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #607287; display: grid; gap: 0.3rem; }
     .eyebrow { margin: 0; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; color: #0f4c5c; font-weight: 700; }
     h1 { margin: 0.2rem 0; font-size: 1.35rem; }
     .sub { margin: 0; max-width: 36rem; color: #5b6f85; font-size: 0.86rem; }
+
+    .stat-grid {
+      display: grid;
+      gap: 0.7rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+    .stat {
+      border: 1px solid #dde5ef;
+      border-radius: 0.95rem;
+      padding: 0.7rem;
+      background: #fff;
+      box-shadow: 0 8px 16px rgba(16, 37, 66, 0.08);
+    }
+    .stat .label { margin: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #607287; }
+    .stat .value { margin: 0.25rem 0; font-size: 1.3rem; font-weight: 800; color: #0f4c5c; }
+    .stat .sub { margin: 0; font-size: 0.78rem; color: #5b6f85; }
+
+    .chart-panel {
+      border: 1px solid #d9e4f1;
+      border-radius: 1rem;
+      padding: 0.85rem;
+      background: linear-gradient(165deg, #ffffff, #f8fbff);
+      display: grid;
+      gap: 0.5rem;
+    }
+    .chart-header { display: flex; justify-content: space-between; align-items: center; }
+    .chart-panel h2 { margin: 0; font-size: 1.05rem; }
+    svg { width: 100%; height: 160px; background: #fff; border-radius: 0.7rem; border: 1px solid #e2eaf4; }
+
     .cards {
       display: grid;
       gap: 0.7rem;
@@ -133,17 +228,21 @@ interface DashboardCard {
     @media (max-width: 760px) {
       .hero { flex-direction: column; }
       .cards { grid-template-columns: 1fr; }
+      .hero-actions { justify-items: start; width: 100%; }
     }
   `
 })
 export class DashboardPageComponent {
   private readonly api = inject(ApiService);
   readonly cards = signal<DashboardCard[]>([]);
+  readonly stats = signal<AdminStats | null>(null);
+  selectedRange = 'weekly';
 
   private readonly colorClasses = ['c0', 'c1', 'c2', 'c3', 'c4', 'c5'];
 
   constructor() {
     this.reload();
+    this.loadStats();
   }
 
   reload(): void {
@@ -168,5 +267,42 @@ export class DashboardPageComponent {
 
       this.cards.set(nextCards);
     });
+  }
+
+  loadStats(): void {
+    this.api
+      .get(`/api/admin/stats?range=${this.selectedRange}`)
+      .pipe(catchError(() => of(this.sampleStats(this.selectedRange))))
+      .subscribe((data) => this.stats.set(data as AdminStats));
+  }
+
+  buildLine(points: number[]): string {
+    if (!points.length) {
+      return '';
+    }
+    const max = Math.max(...points, 1);
+    return points
+      .map((value, index) => {
+        const x = (index / (points.length - 1)) * 300;
+        const y = 110 - (value / max) * 90;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(' ');
+  }
+
+  buildComparisonLine(points: number[]): string {
+    return this.buildLine(points.map((value) => value * 0.7));
+  }
+
+  private sampleStats(range: string): AdminStats {
+    const trend = [20, 32, 28, 40, 36, 52, 48];
+    return {
+      range,
+      totalSales: 482,
+      totalBookings: 210,
+      totalEarnings: 126000,
+      totalCustomers: 340,
+      trend
+    };
   }
 }

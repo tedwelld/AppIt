@@ -21,12 +21,13 @@ namespace AppIt.Core.AppServices
 
         public async Task<ServiceResponse<AccountDto>> CreateAsync(CreateAccountDto dto)
         {
-            if (!await _db.Roles.AnyAsync(r => r.RoleId == dto.RoleId))
+            var roleId = await ResolveRoleIdAsync(dto.RoleId, dto.Role);
+            if (roleId == null)
             {
                 return new ServiceResponse<AccountDto>
                 {
                     Success = false,
-                    Message = "Invalid RoleId"
+                    Message = "Invalid role"
                 };
             }
 
@@ -35,10 +36,12 @@ namespace AppIt.Core.AppServices
                 
                 FirstName = dto.FirstName,
                 LastName = dto.LastName,
-                NationalId = dto.NationalId,
                 Email = dto.Email,
+                Phone = dto.Phone,
+                AvatarUrl = dto.AvatarUrl,
+                PreferredCurrency = string.IsNullOrWhiteSpace(dto.PreferredCurrency) ? "USD" : dto.PreferredCurrency,
               
-                RoleId = dto.RoleId,
+                RoleId = roleId.Value,
               
                 IsActive = true,
                 CreatedDate = DateTime.UtcNow,
@@ -60,15 +63,19 @@ namespace AppIt.Core.AppServices
         {
             var accounts = await _db.Accounts
                 .AsNoTracking()
-                .Select(a => MapToDto(a))
+                .Include(a => a.Role)
                 .ToListAsync();
 
-            return new ServiceResponse<List<AccountDto>>(accounts, "Accounts retrieved");
+            var dtos = accounts.Select(MapToDto).ToList();
+            return new ServiceResponse<List<AccountDto>>(dtos, "Accounts retrieved");
         }
 
         public async Task<ServiceResponse<AccountDto>> GetByIdAsync(int id)
         {
-            var account = await _db.Accounts.FindAsync(id);
+            var account = await _db.Accounts
+                .AsNoTracking()
+                .Include(a => a.Role)
+                .FirstOrDefaultAsync(a => a.Id == id);
             if (account == null)
                 return new ServiceResponse<AccountDto>(null, "Not found") { Success = false };
 
@@ -81,12 +88,19 @@ namespace AppIt.Core.AppServices
             if (account == null)
                 return new ServiceResponse<AccountDto>(null, "Not found") { Success = false };
 
-            
+            var roleId = await ResolveRoleIdAsync(dto.RoleId, dto.Role);
+            if (roleId == null)
+            {
+                return new ServiceResponse<AccountDto>(null, "Invalid role") { Success = false };
+            }
+
             account.FirstName = dto.FirstName;
             account.LastName = dto.LastName;
-            account.NationalId = dto.NationalId;
             account.Email = dto.Email;
-            account.RoleId = dto.RoleId;
+            account.Phone = dto.Phone;
+            account.AvatarUrl = dto.AvatarUrl;
+            account.PreferredCurrency = string.IsNullOrWhiteSpace(dto.PreferredCurrency) ? "USD" : dto.PreferredCurrency;
+            account.RoleId = roleId.Value;
          
             account.IsActive = dto.IsActive;
             account.UpdatedDate = DateTime.UtcNow;
@@ -114,13 +128,42 @@ namespace AppIt.Core.AppServices
            
             FirstName = a.FirstName,
             LastName = a.LastName,
-            NationalId = a.NationalId,
             Email = a.Email,
+            Phone = a.Phone,
+            AvatarUrl = a.AvatarUrl,
+            PreferredCurrency = a.PreferredCurrency,
+            Role = a.Role?.Name ?? "regular",
             RoleId = a.RoleId,
            
             IsActive = a.IsActive,
             CreatedDate = a.CreatedDate,
             UpdatedDate = a.UpdatedDate
         };
+
+        private async Task<int?> ResolveRoleIdAsync(int? roleId, string? roleName)
+        {
+            if (roleId.HasValue)
+            {
+                var exists = await _db.Roles.AnyAsync(r => r.RoleId == roleId.Value);
+                return exists ? roleId.Value : null;
+            }
+
+            if (string.IsNullOrWhiteSpace(roleName))
+            {
+                return null;
+            }
+
+            var normalized = roleName.Trim().ToLowerInvariant();
+            var existing = await _db.Roles.FirstOrDefaultAsync(r => r.Name.ToLower() == normalized);
+            if (existing != null)
+            {
+                return existing.RoleId;
+            }
+
+            var role = new Role { Name = normalized };
+            _db.Roles.Add(role);
+            await _db.SaveChangesAsync();
+            return role.RoleId;
+        }
     }
 }

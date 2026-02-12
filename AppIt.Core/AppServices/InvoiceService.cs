@@ -3,9 +3,6 @@ using AppIt.Core.Interfaces;
 using AppIt.Data;
 using AppIt.Data.EntityModels;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace AppIt.Core.AppServices
 {
@@ -23,21 +20,71 @@ namespace AppIt.Core.AppServices
             var invoice = new Invoice
             {
                 ReservationId = dto.ReservationId,
-                TotalAmount = dto.TotalAmount
+                TotalAmount = dto.TotalAmount,
+                CurrencyCode = string.IsNullOrWhiteSpace(dto.Currency) ? "USD" : dto.Currency,
+                Status = string.IsNullOrWhiteSpace(dto.Status) ? "Pending" : dto.Status,
+                IsPaid = dto.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase),
+                IssuedDate = DateTime.UtcNow
             };
 
             _context.Add(invoice);
             await _context.SaveChangesAsync();
 
-            return new InvoiceReadDto(invoice.Id, invoice.ReservationId, invoice.TotalAmount, invoice.IsPaid);
+            return ToReadDto(invoice);
+        }
+
+        public async Task<InvoiceReadDto?> UpdateAsync(UpdateInvoiceDto dto)
+        {
+            var invoice = await _context.Set<Invoice>().FindAsync(dto.Id);
+            if (invoice == null) return null;
+
+            invoice.ReservationId = dto.ReservationId;
+            invoice.TotalAmount = dto.TotalAmount;
+            invoice.CurrencyCode = string.IsNullOrWhiteSpace(dto.Currency) ? invoice.CurrencyCode : dto.Currency;
+            invoice.Status = string.IsNullOrWhiteSpace(dto.Status) ? invoice.Status : dto.Status;
+            invoice.IsPaid = invoice.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase);
+
+            await _context.SaveChangesAsync();
+            return ToReadDto(invoice);
+        }
+
+        public async Task<bool> DeleteAsync(int id)
+        {
+            var invoice = await _context.Set<Invoice>().FindAsync(id);
+            if (invoice == null) return false;
+
+            _context.Remove(invoice);
+            await _context.SaveChangesAsync();
+            return true;
         }
 
         public async Task<IEnumerable<InvoiceReadDto>> GetAllAsync()
         {
             return await _context.Set<Invoice>()
-                .Select(i => new InvoiceReadDto(i.Id, i.ReservationId, i.TotalAmount, i.IsPaid))
+                .AsNoTracking()
+                .Select(i => ToReadDto(i))
                 .ToListAsync();
         }
-    }
 
+        public async Task<InvoiceReadDto?> GetByIdAsync(int id)
+        {
+            var invoice = await _context.Set<Invoice>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.Id == id);
+            return invoice == null ? null : ToReadDto(invoice);
+        }
+
+        private static InvoiceReadDto ToReadDto(Invoice invoice)
+        {
+            return new InvoiceReadDto
+            {
+                Id = invoice.Id,
+                ReservationId = invoice.ReservationId,
+                TotalAmount = invoice.TotalAmount,
+                Currency = invoice.CurrencyCode,
+                Status = invoice.Status,
+                IssuedAt = invoice.IssuedDate
+            };
+        }
+    }
 }

@@ -10,6 +10,26 @@ namespace AppIt.Data.EntityModels
         [Key]
         public int ReservationId { get; set; }
 
+        [MaxLength(50)]
+        public string Reference { get; set; } = string.Empty;
+
+        [MaxLength(50)]
+        public string VoucherCode { get; set; } = string.Empty;
+
+        [MaxLength(10)]
+        public string CurrencyCode { get; set; } = "USD";
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal TotalAmount { get; set; }
+
+        [MaxLength(30)]
+        public string Status { get; set; } = "Pending";
+
+        public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+
+        public int? AccountId { get; set; }
+        public Account? Account { get; set; }
+
         public string? CustomerFirstName { get; set; }
         public string? CustomerLastName { get; set; }
         public string? CustomerIdNumber { get; set; }
