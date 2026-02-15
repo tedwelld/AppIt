@@ -11,5 +11,6 @@ namespace AppIt.Core.Interfaces.Services
         Task<ReservationDeleteResultDto> DeleteAsync(int id);
         Task<ReservationReadDto?> GetByIdAsync(int id);
         Task<IEnumerable<ReservationReadDto>> GetAllAsync();
+        Task<IEnumerable<ReservationReadDto>> GetByAccountIdAsync(int accountId);
     }
 }

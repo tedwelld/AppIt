@@ -26,12 +26,18 @@ import { FieldDef, ResourceConfig } from '../models';
 
       <p class="status" *ngIf="message()">{{ message() }}</p>
 
-      <div class="content-grid">
+      <div class="content-grid" [class.read-only]="cfg.readOnly">
         <section class="table-panel">
           <div class="table-header-actions">
             <button class="btn-base btn-danger btn-compact" (click)="deleteSelected()" [disabled]="!selected() || cfg.readOnly || !cfg.deletePath">
               Delete Selected
             </button>
+            <input
+              class="app-input table-search"
+              [ngModel]="searchTerm()"
+              (ngModelChange)="searchTerm.set($event)"
+              placeholder="Search records..."
+            />
           </div>
 
           <div class="table-wrap">
@@ -114,10 +120,10 @@ import { FieldDef, ResourceConfig } from '../models';
     .entity-page {
       display: grid;
       gap: 0.7rem;
-      height: 100%;
+      height: auto;
       min-height: 0;
-      grid-template-rows: auto auto 1fr;
-      overflow: hidden;
+      grid-template-rows: auto auto auto;
+      overflow: visible;
     }
     .toolbar {
       display: flex;
@@ -142,15 +148,25 @@ import { FieldDef, ResourceConfig } from '../models';
       padding: 0.45rem 0.7rem;
       font-size: 0.88rem;
     }
-    .content-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 0.8rem; min-height: 0; }
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 2.2fr) minmax(340px, 1fr);
+      gap: 0.8rem;
+      min-height: 0;
+      align-items: stretch;
+    }
+    .content-grid.read-only {
+      grid-template-columns: 1fr;
+    }
     .table-panel,
     .panel {
       border: 1px solid #dce6f2;
       border-radius: 1rem;
       background: linear-gradient(160deg, #ffffff, #f7fbff);
-      min-height: 0;
+      min-height: 100%;
       display: grid;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: auto auto;
+      overflow: visible;
     }
     .table-header-actions {
       padding: 0.6rem 0.7rem;
@@ -159,17 +175,28 @@ import { FieldDef, ResourceConfig } from '../models';
       gap: 0.4rem;
       flex-wrap: wrap;
     }
-    .table-wrap { overflow: auto; min-height: 0; }
-    table { width: 100%; min-width: 820px; border-collapse: collapse; font-size: 0.85rem; }
-    th, td { text-align: left; padding: 0.55rem 0.6rem; border-bottom: 1px solid #edf1f6; vertical-align: top; }
-    th { position: sticky; top: 0; background: #0f4c5c; color: #ffffff; font-weight: 700; }
-    .actions { display: flex; gap: 0.35rem; }
+    .table-search {
+      min-width: 220px;
+      max-width: 360px;
+    }
+    .table-wrap { overflow: visible; min-height: 0; }
+    table { width: 100%; min-width: 100%; border-collapse: collapse; font-size: 0.84rem; table-layout: fixed; }
+    th, td {
+      text-align: left;
+      padding: 0.52rem 0.55rem;
+      border-bottom: 1px solid #edf1f6;
+      vertical-align: top;
+      white-space: normal;
+      word-break: break-word;
+    }
+    th { background: #0f4c5c; color: #ffffff; font-weight: 700; position: static; }
+    .actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
     tr.selected-row { background: #dff1ff; }
     tr:hover { background: #eef6ff; }
     .panel { padding: 0.7rem; }
     .panel h2 { margin: 0 0 0.5rem; font-size: 1.03rem; }
-    form { min-height: 0; display: grid; grid-template-rows: 1fr auto; gap: 0.6rem; }
-    .form-scroll { min-height: 0; overflow: auto; }
+    form { min-height: 0; display: grid; grid-template-rows: auto auto; gap: 0.6rem; align-content: start; }
+    .form-scroll { min-height: 0; overflow: visible; }
     .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; }
     .field { display: grid; gap: 0.3rem; }
     .field label { font-size: 0.82rem; font-weight: 700; color: #43576d; }
@@ -180,10 +207,8 @@ import { FieldDef, ResourceConfig } from '../models';
       display: flex;
       gap: 0.45rem;
       flex-wrap: wrap;
-      position: sticky;
-      bottom: 0;
-      background: #fff;
-      z-index: 2;
+      position: static;
+      background: transparent;
     }
     .empty { padding: 0.8rem; margin: 0; color: #6d8096; }
     .missing { border: 1px dashed #c9d5e5; border-radius: 1rem; padding: 1rem; background: #fff; }
@@ -208,6 +233,7 @@ export class EntitiesPageComponent {
   readonly message = signal('');
   readonly editing = signal(false);
   readonly selected = signal<any | null>(null);
+  readonly searchTerm = signal('');
 
   form: FormGroup = this.fb.group({});
 
@@ -222,7 +248,22 @@ export class EntitiesPageComponent {
       .slice(0, 8);
   });
 
-  readonly filteredRows = computed(() => this.rows());
+  readonly filteredRows = computed(() => {
+    const rows = this.rows();
+    const query = this.searchTerm().trim().toLowerCase();
+    if (!query) {
+      return rows;
+    }
+
+    return rows.filter((row) =>
+      Object.entries(row ?? {}).some(([key, value]) => {
+        if (value === null || value === undefined || typeof value === 'object') {
+          return false;
+        }
+        return `${key} ${String(value)}`.toLowerCase().includes(query);
+      })
+    );
+  });
 
   constructor() {
     this.route.paramMap.subscribe({
@@ -232,6 +273,7 @@ export class EntitiesPageComponent {
         this.config.set(cfg);
         this.rebuildForm(cfg);
         this.rows.set([]);
+        this.searchTerm.set('');
         this.resetForm();
 
         if (!cfg) {

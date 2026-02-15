@@ -1,4 +1,6 @@
-﻿using AppIt.Core.Interfaces;
+using AppIt.Api.Infrastructure;
+using AppIt.Core.DTOs;
+using AppIt.Core.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers
@@ -15,8 +17,13 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
-            => Ok(await _service.GetAllAsync());
+        public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
+        {
+            var logs = await _service.GetAllAsync();
+            return Ok(logs.ApplyQuery(query,
+                nameof(AuditLogReadDto.Action),
+                nameof(AuditLogReadDto.EntityName),
+                nameof(AuditLogReadDto.PerformedBy)));
+        }
     }
-
 }

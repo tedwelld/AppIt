@@ -69,5 +69,18 @@ namespace AppIt.Core.Services
 
             return snapshot.Id;
         }
+
+        public async Task<bool> DeleteAsync(int id)
+        {
+            var snapshot = await _context.ReportSnapshots.FirstOrDefaultAsync(r => r.Id == id);
+            if (snapshot == null)
+            {
+                return false;
+            }
+
+            _context.ReportSnapshots.Remove(snapshot);
+            await _context.SaveChangesAsync();
+            return true;
+        }
     }
 }

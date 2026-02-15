@@ -20,6 +20,10 @@ namespace AppIt.Data.EntityModels
         [Required]
         public string Email { get; set; } = string.Empty;
 
+        [Required]
+        [MaxLength(500)]
+        public string PasswordHash { get; set; } = string.Empty;
+
         public string? Phone { get; set; }
         public string? AvatarUrl { get; set; }
         public string PreferredCurrency { get; set; } = "USD";

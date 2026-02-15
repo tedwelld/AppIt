@@ -32,7 +32,7 @@ import { AuthService } from '../auth.service';
           </div>
         </article>
 
-        <article class="panel">
+        <article class="panel panel-wide">
           <h2>Personal Details</h2>
           <form (ngSubmit)="saveProfile()" class="form">
             <label>First Name</label>
@@ -105,7 +105,7 @@ import { AuthService } from '../auth.service';
           </form>
         </article>
 
-        <article class="panel" *ngIf="isSuperUser()">
+        <article class="panel panel-wide" *ngIf="isSuperUser()">
           <h2>Create Super User</h2>
           <form (ngSubmit)="createSuperUser()" class="form">
             <label>First Name</label>
@@ -140,7 +140,12 @@ import { AuthService } from '../auth.service';
     }
     .eyebrow { margin: 0; text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.7rem; color: #0f4c5c; font-weight: 700; }
     .sub { margin: 0; color: #5b6f85; font-size: 0.85rem; }
-    .grid { display: grid; gap: 0.8rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .grid {
+      display: grid;
+      gap: 0.8rem;
+      grid-template-columns: repeat(2, minmax(340px, 1fr));
+      align-items: start;
+    }
     .panel {
       border: 1px solid #dce6f2;
       border-radius: 1rem;
@@ -149,9 +154,10 @@ import { AuthService } from '../auth.service';
       display: grid;
       gap: 0.6rem;
       align-content: start;
-      max-height: 430px;
-      overflow: auto;
+      min-height: 260px;
+      overflow: visible;
     }
+    .panel-wide { grid-column: span 2; }
     .panel h2 { margin: 0; font-size: 1.05rem; color: #14334f; }
     .form { display: grid; gap: 0.45rem; }
     .avatar-wrap { display: grid; gap: 0.6rem; }
@@ -171,6 +177,10 @@ import { AuthService } from '../auth.service';
     .avatar-actions { display: grid; gap: 0.4rem; }
     .check { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.88rem; }
     .status { margin: 0; font-size: 0.8rem; color: #0f4c5c; background: #eaf7f5; border: 1px solid #cce8e3; border-radius: 0.7rem; padding: 0.4rem 0.6rem; }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      .panel-wide { grid-column: auto; }
+    }
   `
 })
 export class SettingsPageComponent {
@@ -233,8 +243,8 @@ export class SettingsPageComponent {
     this.profile.avatarUrl = '';
   }
 
-  saveProfile(): void {
-    const result = this.auth.updateAccountSettings({
+  async saveProfile(): Promise<void> {
+    const result = await this.auth.updateAccountSettings({
       firstName: this.profile.firstName.trim(),
       lastName: this.profile.lastName.trim(),
       email: this.profile.email.trim(),
@@ -251,21 +261,21 @@ export class SettingsPageComponent {
     this.status.set(result.ok ? 'Settings saved.' : (result.message ?? 'Failed to save settings.'));
   }
 
-  changePassword(): void {
+  async changePassword(): Promise<void> {
     if (this.password.next.trim() !== this.password.confirm.trim()) {
       this.passwordStatus.set('New password and confirmation do not match.');
       return;
     }
 
-    const result = this.auth.changePassword(this.password.current, this.password.next);
+    const result = await this.auth.changePassword(this.password.current, this.password.next);
     this.passwordStatus.set(result.message ?? (result.ok ? 'Password updated.' : 'Failed to update password.'));
     if (result.ok) {
       this.password = { current: '', next: '', confirm: '' };
     }
   }
 
-  createSuperUser(): void {
-    const result = this.auth.createSuperUser({
+  async createSuperUser(): Promise<void> {
+    const result = await this.auth.createSuperUser({
       firstName: this.superUser.firstName.trim(),
       lastName: this.superUser.lastName.trim(),
       email: this.superUser.email.trim(),

@@ -1,4 +1,5 @@
-﻿using AppIt.Core.DTOs;
+using AppIt.Api.Infrastructure;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,17 +17,21 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
         {
             var snapshots = await _service.GetByReportKeyAsync(string.Empty);
-            return Ok(snapshots);
+            return Ok(snapshots.ApplyQuery(query,
+                nameof(ReportSnapshotDto.ReportKey),
+                nameof(ReportSnapshotDto.Title)));
         }
 
         [HttpGet("report/{reportKey}")]
-        public async Task<IActionResult> GetByReportKey(string reportKey)
+        public async Task<IActionResult> GetByReportKey(string reportKey, [FromQuery] ListQueryOptions query)
         {
             var snapshots = await _service.GetByReportKeyAsync(reportKey);
-            return Ok(snapshots);
+            return Ok(snapshots.ApplyQuery(query,
+                nameof(ReportSnapshotDto.ReportKey),
+                nameof(ReportSnapshotDto.Title)));
         }
 
         [HttpGet("{id:int}")]
@@ -46,6 +51,18 @@ namespace AppIt.Api.Controllers
         {
             var id = await _service.CreateAsync(dto);
             return CreatedAtAction(nameof(GetById), new { id }, null);
+        }
+
+        [HttpDelete("{id:int}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var deleted = await _service.DeleteAsync(id);
+            if (!deleted)
+            {
+                return NotFound();
+            }
+
+            return NoContent();
         }
     }
 }

@@ -66,6 +66,16 @@ namespace AppIt.Core.AppServices
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<InvoiceReadDto>> GetByAccountIdAsync(int accountId)
+        {
+            return await _context.Set<Invoice>()
+                .AsNoTracking()
+                .Include(i => i.Reservation)
+                .Where(i => i.Reservation != null && i.Reservation.AccountId == accountId)
+                .Select(i => ToReadDto(i))
+                .ToListAsync();
+        }
+
         public async Task<InvoiceReadDto?> GetByIdAsync(int id)
         {
             var invoice = await _context.Set<Invoice>()

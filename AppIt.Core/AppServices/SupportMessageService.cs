@@ -83,6 +83,25 @@ namespace AppIt.Core.Services
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<SupportMessageReadDto>> GetByEmailAsync(string email)
+        {
+            var normalized = email.Trim().ToLowerInvariant();
+            return await _context.SupportMessages.AsNoTracking()
+                .Where(m => m.FromEmail.ToLower() == normalized || m.ToEmail.ToLower() == normalized)
+                .Select(m => new SupportMessageReadDto
+                {
+                    Id = m.Id,
+                    FromEmail = m.FromEmail,
+                    ToEmail = m.ToEmail,
+                    Subject = m.Subject,
+                    Message = m.Message,
+                    Status = m.Status,
+                    CreatedAt = m.CreatedDate,
+                    UpdatedAt = m.UpdatedDate
+                })
+                .ToListAsync();
+        }
+
         private static SupportMessageReadDto ToReadDto(SupportMessage message)
         {
             return new SupportMessageReadDto

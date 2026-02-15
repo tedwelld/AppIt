@@ -1,3 +1,4 @@
+using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -16,10 +17,12 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
         {
             var features = await _service.GetAllAsync();
-            return Ok(features);
+            return Ok(features.ApplyQuery(query,
+                nameof(FeatureReadDto.Name),
+                nameof(FeatureReadDto.Description)));
         }
 
         [HttpGet("{id}")]

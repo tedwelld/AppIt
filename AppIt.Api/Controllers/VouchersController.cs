@@ -1,4 +1,5 @@
-﻿using AppIt.Core.DTOs;
+using AppIt.Api.Infrastructure;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,16 +17,36 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll() => Ok(await _service.GetAllAsync());
+        public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
+        {
+            var vouchers = await _service.GetAllAsync();
+
+            return Ok(vouchers.ApplyQuery(query,
+                nameof(VoucherReadDto.Code),
+                nameof(VoucherReadDto.Reference),
+                nameof(VoucherReadDto.Type)));
+        }
 
         [HttpGet("mine")]
-        public async Task<IActionResult> GetMine() => Ok(await _service.GetAllAsync());
+        public async Task<IActionResult> GetMine([FromQuery] ListQueryOptions query)
+        {
+            var vouchers = await _service.GetAllAsync();
+            return Ok(vouchers.ApplyQuery(query,
+                nameof(VoucherReadDto.Code),
+                nameof(VoucherReadDto.Reference),
+                nameof(VoucherReadDto.Type)));
+        }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             var item = await _service.GetByIdAsync(id);
-            return item == null ? NotFound() : Ok(item);
+            if (item == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(item);
         }
 
         [HttpPost]
@@ -38,16 +59,30 @@ namespace AppIt.Api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateVoucherDto dto)
         {
-            if (id != dto.Id) return BadRequest("ID mismatch");
+            if (id != dto.Id)
+            {
+                return BadRequest("ID mismatch");
+            }
+
             var item = await _service.UpdateAsync(dto);
-            return item == null ? NotFound() : Ok(item);
+            if (item == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(item);
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
             var deleted = await _service.DeleteAsync(id);
-            return deleted ? NoContent() : NotFound();
+            if (!deleted)
+            {
+                return NotFound();
+            }
+
+            return NoContent();
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using AppIt.Core.DTOs;
+using AppIt.Api.Infrastructure;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,10 +17,14 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
         {
             var customers = await _service.GetAllAsync();
-            return Ok(customers);
+            return Ok(customers.ApplyQuery(query,
+                nameof(CustomerReadDto.FirstName),
+                nameof(CustomerReadDto.Surname),
+                nameof(CustomerReadDto.Email),
+                nameof(CustomerReadDto.PhoneNumber)));
         }
 
         [HttpGet("{id}")]

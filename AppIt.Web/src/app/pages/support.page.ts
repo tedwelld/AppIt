@@ -1,12 +1,12 @@
 ﻿import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { catchError, of } from 'rxjs';
 import { ApiService } from '../api.service';
 import { AuthService } from '../auth.service';
 
 interface SupportMessage {
-  id: string;
+  id: number | string;
   fromEmail: string;
   toEmail: string;
   body: string;
@@ -25,8 +25,14 @@ interface SupportMessage {
           <p class="eyebrow">Support Chat</p>
           <h1>Live assistance via admin@appit.com</h1>
           <p class="sub">Messages are delivered to the admin inbox and synced here.</p>
+          <input
+            class="app-input search-input"
+            [ngModel]="searchTerm()"
+            (ngModelChange)="searchTerm.set($event)"
+            placeholder="Search messages..."
+          />
         </div>
-        <button class="btn-base btn-secondary" (click)="refresh()">
+        <button class="btn-base btn-secondary btn-compact" (click)="refresh()">
           <span class="material-symbols-outlined">refresh</span>
           Refresh
         </button>
@@ -36,7 +42,7 @@ interface SupportMessage {
         <div class="messages">
           <div
             class="message"
-            *ngFor="let msg of messages()"
+            *ngFor="let msg of filteredMessages()"
             [class.outgoing]="msg.author === 'user'"
           >
             <div class="meta">
@@ -61,7 +67,7 @@ interface SupportMessage {
             [(ngModel)]="draft"
             name="draft"
           />
-          <button class="btn-base btn-primary" type="submit">Send</button>
+          <button class="btn-base btn-primary btn-compact" type="submit">Send</button>
         </form>
         <p class="status" *ngIf="status()">{{ status() }}</p>
       </article>
@@ -80,6 +86,7 @@ interface SupportMessage {
     }
     .eyebrow { margin: 0; text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.7rem; color: #0f4c5c; font-weight: 700; }
     .sub { margin: 0; color: #5b6f85; font-size: 0.85rem; }
+    .search-input { margin-top: 0.55rem; width: min(340px, 100%); }
     .chat-panel {
       border: 1px solid #dce6f2;
       border-radius: 1rem;
@@ -128,6 +135,10 @@ interface SupportMessage {
       background: #fff;
       z-index: 2;
     }
+    .hero .btn-base,
+    .composer .btn-base {
+      min-width: 6.6rem;
+    }
     .status { margin: 0; padding: 0.5rem 0.7rem; font-size: 0.8rem; color: #0f4c5c; background: #eaf7f5; border-top: 1px solid #cce8e3; }
     @media (max-width: 760px) {
       .hero { flex-direction: column; }
@@ -142,7 +153,18 @@ export class SupportPageComponent implements OnDestroy {
 
   readonly messages = signal<SupportMessage[]>([]);
   readonly status = signal('');
+  readonly searchTerm = signal('');
   readonly isSuperUser = signal(this.auth.isSuperUser());
+  readonly filteredMessages = computed(() => {
+    const query = this.searchTerm().trim().toLowerCase();
+    if (!query) {
+      return this.messages();
+    }
+
+    return this.messages().filter((message) =>
+      `${message.fromEmail} ${message.toEmail} ${message.body}`.toLowerCase().includes(query)
+    );
+  });
   draft = '';
   recipientEmail = this.auth.isSuperUser() ? '' : 'admin@appit.com';
 
@@ -153,15 +175,20 @@ export class SupportPageComponent implements OnDestroy {
   }
 
   refresh(): void {
-    const email = this.auth.user()?.email ?? 'guest@appit.com';
     const path = this.auth.isSuperUser()
       ? '/api/support/messages'
-      : `/api/support/messages?email=${encodeURIComponent(email)}`;
+      : '/api/support/messages/mine';
 
     this.api
       .list(path)
-      .pipe(catchError(() => of(this.sampleMessages())))
-      .subscribe((rows) => this.messages.set(rows as SupportMessage[]));
+      .pipe(catchError((err) => {
+        this.status.set(this.describeError(err));
+        return of([]);
+      }))
+      .subscribe((rows) => {
+        const email = this.auth.user()?.email ?? 'guest@appit.com';
+        this.messages.set(this.normalizeMessages(rows as any[], email));
+      });
   }
 
   send(): void {
@@ -181,20 +208,15 @@ export class SupportPageComponent implements OnDestroy {
       message
     };
 
-    this.api.post('/api/support/messages', payload).pipe(catchError(() => of({}))).subscribe(() => {
-      this.messages.update((list) => [
-        ...list,
-        {
-          id: `msg-${Date.now()}`,
-          fromEmail: payload.fromEmail,
-          toEmail: payload.toEmail,
-          body: message,
-          sentAt: new Date().toISOString(),
-          author: this.auth.isSuperUser() ? 'admin' : 'user'
-        }
-      ]);
-      this.draft = '';
-      this.status.set(`Message sent to ${payload.toEmail}`);
+    this.api.post('/api/support/messages', payload).subscribe({
+      next: () => {
+        this.refresh();
+        this.draft = '';
+        this.status.set(`Message sent to ${payload.toEmail}`);
+      },
+      error: (err) => {
+        this.status.set(this.describeError(err));
+      }
     });
   }
 
@@ -202,16 +224,26 @@ export class SupportPageComponent implements OnDestroy {
     clearInterval(this.poller);
   }
 
-  private sampleMessages(): SupportMessage[] {
-    return [
-      {
-        id: 'msg-1',
-        fromEmail: 'admin@appit.com',
-        toEmail: this.auth.user()?.email ?? 'guest@appit.com',
-        body: 'Hello! How can we help you today?',
-        sentAt: new Date(Date.now() - 3600 * 1000).toISOString(),
-        author: 'admin'
-      }
-    ];
+  private normalizeMessages(rows: any[], userEmail: string): SupportMessage[] {
+    return (rows ?? []).map((row, index) => {
+      const fromEmail = String(row?.fromEmail ?? 'admin@appit.com');
+      const toEmail = String(row?.toEmail ?? userEmail);
+      const body = String(row?.body ?? row?.message ?? '');
+      const createdAt = String(row?.sentAt ?? row?.createdAt ?? new Date().toISOString());
+
+      return {
+        id: row?.id ?? `msg-${index}`,
+        fromEmail,
+        toEmail,
+        body,
+        sentAt: createdAt,
+        author: fromEmail.toLowerCase() === 'admin@appit.com' ? 'admin' : 'user'
+      } as SupportMessage;
+    });
+  }
+
+  private describeError(err: any): string {
+    const fromApi = err?.error?.error?.detail ?? err?.error?.error?.title ?? err?.error?.message ?? err?.message;
+    return fromApi ? `Support sync failed: ${fromApi}` : 'Support sync failed.';
   }
 }

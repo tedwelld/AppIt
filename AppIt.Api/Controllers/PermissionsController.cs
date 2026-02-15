@@ -1,3 +1,4 @@
+using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -16,10 +17,12 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
         {
             var permissions = await _service.GetAllAsync();
-            return Ok(permissions);
+            return Ok(permissions.ApplyQuery(query,
+                nameof(PermissionReadDto.Name),
+                nameof(PermissionReadDto.PermissionId)));
         }
 
         [HttpGet("{id}")]

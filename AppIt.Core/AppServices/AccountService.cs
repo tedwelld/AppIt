@@ -1,5 +1,6 @@
-﻿using AppIt.Core.DTOs;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
+using AppIt.Core.Services;
 using AppIt.Data;
 using AppIt.Data.EntityModels;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,17 @@ namespace AppIt.Core.AppServices
 
         public async Task<ServiceResponse<AccountDto>> CreateAsync(CreateAccountDto dto)
         {
+            var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+            var emailExists = await _db.Accounts.AnyAsync(a => a.Email.ToLower() == normalizedEmail);
+            if (emailExists)
+            {
+                return new ServiceResponse<AccountDto>
+                {
+                    Success = false,
+                    Message = "Email already exists."
+                };
+            }
+
             var roleId = await ResolveRoleIdAsync(dto.RoleId, dto.Role);
             if (roleId == null)
             {
@@ -36,7 +48,10 @@ namespace AppIt.Core.AppServices
                 
                 FirstName = dto.FirstName,
                 LastName = dto.LastName,
-                Email = dto.Email,
+                Email = normalizedEmail,
+                PasswordHash = string.IsNullOrWhiteSpace(dto.Password)
+                    ? AuthService.HashPassword(AuthService.GenerateSecureToken())
+                    : AuthService.HashPassword(dto.Password),
                 Phone = dto.Phone,
                 AvatarUrl = dto.AvatarUrl,
                 PreferredCurrency = string.IsNullOrWhiteSpace(dto.PreferredCurrency) ? "USD" : dto.PreferredCurrency,
@@ -88,6 +103,13 @@ namespace AppIt.Core.AppServices
             if (account == null)
                 return new ServiceResponse<AccountDto>(null, "Not found") { Success = false };
 
+            var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+            var emailExists = await _db.Accounts.AnyAsync(a => a.Id != id && a.Email.ToLower() == normalizedEmail);
+            if (emailExists)
+            {
+                return new ServiceResponse<AccountDto>(null, "Email already exists.") { Success = false };
+            }
+
             var roleId = await ResolveRoleIdAsync(dto.RoleId, dto.Role);
             if (roleId == null)
             {
@@ -96,11 +118,15 @@ namespace AppIt.Core.AppServices
 
             account.FirstName = dto.FirstName;
             account.LastName = dto.LastName;
-            account.Email = dto.Email;
+            account.Email = normalizedEmail;
             account.Phone = dto.Phone;
             account.AvatarUrl = dto.AvatarUrl;
             account.PreferredCurrency = string.IsNullOrWhiteSpace(dto.PreferredCurrency) ? "USD" : dto.PreferredCurrency;
             account.RoleId = roleId.Value;
+            if (!string.IsNullOrWhiteSpace(dto.Password))
+            {
+                account.PasswordHash = AuthService.HashPassword(dto.Password);
+            }
          
             account.IsActive = dto.IsActive;
             account.UpdatedDate = DateTime.UtcNow;
@@ -167,3 +193,4 @@ namespace AppIt.Core.AppServices
         }
     }
 }
+

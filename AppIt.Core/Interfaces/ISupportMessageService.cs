@@ -9,5 +9,6 @@ namespace AppIt.Core.Interfaces.Services
         Task<bool> DeleteAsync(int id);
         Task<SupportMessageReadDto?> GetByIdAsync(int id);
         Task<IEnumerable<SupportMessageReadDto>> GetAllAsync();
+        Task<IEnumerable<SupportMessageReadDto>> GetByEmailAsync(string email);
     }
 }

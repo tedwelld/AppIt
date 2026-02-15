@@ -1,4 +1,5 @@
-﻿using AppIt.Core.DTOs;
+using AppIt.Api.Infrastructure;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,7 +17,15 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll() => Ok(await _service.GetAllAsync());
+        public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
+        {
+            var items = await _service.GetAllAsync();
+            return Ok(items.ApplyQuery(query,
+                nameof(PaymentReadDto.Method),
+                nameof(PaymentReadDto.Status),
+                nameof(PaymentReadDto.TransactionReference),
+                nameof(PaymentReadDto.CurrencyCode)));
+        }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
@@ -35,6 +44,12 @@ namespace AppIt.Api.Controllers
         [HttpPost("process")]
         public async Task<IActionResult> Process([FromBody] ProcessPaymentDto dto)
         {
+            var headerKey = Request.Headers["Idempotency-Key"].FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(headerKey) && string.IsNullOrWhiteSpace(dto.IdempotencyKey))
+            {
+                dto.IdempotencyKey = headerKey.Trim();
+            }
+
             var result = await _service.ProcessAsync(dto);
             return result.Success ? Ok(result) : BadRequest(result);
         }
@@ -42,7 +57,11 @@ namespace AppIt.Api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdatePaymentDto dto)
         {
-            if (id != dto.Id) return BadRequest("ID mismatch");
+            if (id != dto.Id)
+            {
+                return BadRequest("ID mismatch");
+            }
+
             var item = await _service.UpdateAsync(dto);
             return item == null ? NotFound() : Ok(item);
         }

@@ -7,5 +7,6 @@ namespace AppIt.Core.Interfaces.Services
         Task<IEnumerable<ReportSnapshotDto>> GetByReportKeyAsync(string reportKey);
         Task<ReportSnapshotDetailDto?> GetByIdAsync(int id);
         Task<int> CreateAsync(CreateReportSnapshotDto dto);
+        Task<bool> DeleteAsync(int id);
     }
 }

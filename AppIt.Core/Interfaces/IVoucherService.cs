@@ -9,5 +9,6 @@ namespace AppIt.Core.Interfaces.Services
         Task<bool> DeleteAsync(int id);
         Task<VoucherReadDto?> GetByIdAsync(int id);
         Task<IEnumerable<VoucherReadDto>> GetAllAsync();
+        Task<IEnumerable<VoucherReadDto>> GetByAccountIdAsync(int accountId);
     }
 }

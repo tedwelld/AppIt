@@ -30,6 +30,7 @@ namespace AppIt.Core.Services
                 TotalAmount = dto.TotalAmount,
                 Status = string.IsNullOrWhiteSpace(dto.Status) ? "Pending" : dto.Status,
                 CreatedDate = DateTime.UtcNow,
+                AccountId = dto.AccountId,
                 CustomerId = dto.CustomerId,
                 CustomerEmail = dto.CustomerEmail
             };
@@ -50,6 +51,7 @@ namespace AppIt.Core.Services
             reservation.CurrencyCode = string.IsNullOrWhiteSpace(dto.Currency) ? reservation.CurrencyCode : dto.Currency;
             reservation.TotalAmount = dto.TotalAmount;
             reservation.Status = string.IsNullOrWhiteSpace(dto.Status) ? reservation.Status : dto.Status;
+            reservation.AccountId = dto.AccountId;
             reservation.CustomerId = dto.CustomerId;
             reservation.CustomerEmail = dto.CustomerEmail;
 
@@ -118,12 +120,22 @@ namespace AppIt.Core.Services
             return reservations.Select(ToReadDto);
         }
 
+        public async Task<IEnumerable<ReservationReadDto>> GetByAccountIdAsync(int accountId)
+        {
+            var reservations = await Reservations
+                .AsNoTracking()
+                .Where(r => r.AccountId == accountId)
+                .ToListAsync();
+            return reservations.Select(ToReadDto);
+        }
+
         private ReservationReadDto ToReadDto(Reservation r) => new()
         {
             ReservationId = r.ReservationId,
             Reference = r.Reference,
             VoucherCode = r.VoucherCode,
             CustomerId = r.CustomerId,
+            AccountId = r.AccountId,
             Currency = r.CurrencyCode,
             TotalAmount = r.TotalAmount,
             Status = r.Status,

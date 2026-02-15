@@ -9,6 +9,7 @@ namespace AppIt.Core.DTOs
         public string Reference { get; set; } = string.Empty;
         public string VoucherCode { get; set; } = string.Empty;
         public int? CustomerId { get; set; }
+        public int? AccountId { get; set; }
         public string Currency { get; set; } = "USD";
         public decimal TotalAmount { get; set; }
         public string Status { get; set; } = "Pending";
@@ -21,6 +22,7 @@ namespace AppIt.Core.DTOs
         public string? Reference { get; set; }
         public string? VoucherCode { get; set; }
         public int? CustomerId { get; set; }
+        public int? AccountId { get; set; }
         public string Currency { get; set; } = "USD";
         public decimal TotalAmount { get; set; }
         public string Status { get; set; } = "Pending";

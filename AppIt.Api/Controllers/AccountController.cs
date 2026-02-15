@@ -1,4 +1,5 @@
-﻿using AppIt.Core.DTOs;
+using AppIt.Api.Infrastructure;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
@@ -25,8 +26,28 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
-            => Ok(await _service.GetAllAsync());
+        public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
+        {
+            var result = await _service.GetAllAsync();
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+
+            var paged = (result.Data ?? new List<AccountDto>()).ApplyQuery(query,
+                nameof(AccountDto.FirstName),
+                nameof(AccountDto.LastName),
+                nameof(AccountDto.Email),
+                nameof(AccountDto.Role));
+
+            return Ok(new ServiceResponse<PagedResult<AccountDto>>
+            {
+                Data = paged,
+                Success = true,
+                Message = result.Message,
+                Time = result.Time
+            });
+        }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)

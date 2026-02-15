@@ -1,8 +1,7 @@
+using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace AppIt.Api.Controllers
 {
@@ -39,10 +38,25 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
         {
             var result = await _service.GetAllAsync();
-            return Ok(result);
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+
+            var paged = (result.Data ?? new List<RoleDto>()).ApplyQuery(query,
+                nameof(RoleDto.Name),
+                nameof(RoleDto.RoleId));
+
+            return Ok(new ServiceResponse<PagedResult<RoleDto>>
+            {
+                Data = paged,
+                Success = true,
+                Message = result.Message,
+                Time = result.Time
+            });
         }
 
         [HttpGet("{id}")]

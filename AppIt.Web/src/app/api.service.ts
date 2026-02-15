@@ -27,20 +27,19 @@ export class ApiService {
   }
 
   private unwrap(value: unknown): any {
-    if (value === null || value === undefined) {
-      return value;
+    let current: unknown = value;
+
+    while (current !== null && current !== undefined && typeof current === 'object') {
+      const obj = current as Record<string, unknown>;
+      if ('data' in obj) {
+        current = obj['data'];
+        continue;
+      }
+
+      break;
     }
 
-    if (typeof value !== 'object') {
-      return value;
-    }
-
-    const obj = value as Record<string, unknown>;
-    if ('data' in obj) {
-      return obj['data'];
-    }
-
-    return value;
+    return current;
   }
 
   private toArray(value: unknown): any[] {
@@ -50,6 +49,13 @@ export class ApiService {
 
     if (value === null || value === undefined) {
       return [];
+    }
+
+    if (typeof value === 'object') {
+      const obj = value as Record<string, unknown>;
+      if (Array.isArray(obj['items'])) {
+        return obj['items'] as any[];
+      }
     }
 
     return [value];

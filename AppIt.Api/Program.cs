@@ -1,16 +1,18 @@
 using AppIt.Core.AppServices;
 using AppIt.Core.Configuration;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
 using AppIt.Core.Interfaces.Services;
 using AppIt.Core.Services;
 using AppIt.Api.SeedData;
+using AppIt.Api.Infrastructure;
 using AppIt.Data;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 //using AppIt.Data.Repositories;
-// Swagger/OpenAPI
-// Note: OpenApi types are not required in this file; Swashbuckle will auto-generate documents
 using System.Net;
 using System.Text.Json.Serialization.Metadata;
 namespace AppIt.Api
@@ -63,8 +65,9 @@ namespace AppIt.Api
 
                 #region Configuration & Infrastructure
 
+                var useInMemoryDatabase = builder.Configuration.GetValue<bool>("Database:UseInMemory");
                 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-                if (string.IsNullOrWhiteSpace(connectionString))
+                if (!useInMemoryDatabase && string.IsNullOrWhiteSpace(connectionString))
                 {
                     throw new InvalidOperationException("DefaultConnection is not configured.");
                 }
@@ -75,7 +78,15 @@ namespace AppIt.Api
 
                 builder.Services.AddDbContext<AppItDbContext>(options =>
                 {
-                    options.UseSqlServer(connectionString);
+                    if (useInMemoryDatabase)
+                    {
+                        var dbName = builder.Configuration["Database:InMemoryName"] ?? "AppIt.InMemory";
+                        options.UseInMemoryDatabase(dbName);
+                    }
+                    else
+                    {
+                        options.UseSqlServer(connectionString);
+                    }
                 });
 
                 #endregion
@@ -104,11 +115,13 @@ namespace AppIt.Api
                 builder.Services.AddHttpClient<PayPalPaymentProvider>();
                 builder.Services.AddScoped<IPaymentProvider>(sp => sp.GetRequiredService<PayPalPaymentProvider>());
                 builder.Services.AddScoped<IPaymentProvider, ManualPaymentProvider>();
+                builder.Services.AddScoped<IBookingService, BookingService>();
                 builder.Services.AddScoped<IVoucherService, VoucherService>();
                 builder.Services.AddScoped<ISupportMessageService, SupportMessageService>();
                 builder.Services.AddScoped<INotificationService, NotificationService>();
                 builder.Services.AddScoped<IReportSnapshotService, ReportSnapshotService>();
                 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
+                builder.Services.AddScoped<IAuthService, AuthService>();
                 builder.Services.ConfigureHttpJsonOptions(options =>
                 {
                     // Ensure a runtime TypeInfoResolver is available so source-generation is not required
@@ -119,23 +132,32 @@ namespace AppIt.Api
 
                 #endregion
 
-                #region API & Documentation
+                #region API
 
-                builder.Services.AddControllers()
+                builder.Services.AddControllers(options =>
+                    {
+                        options.Filters.Add<ApiEnvelopeFilter>();
+                    })
                     .AddJsonOptions(opts =>
                     {
                         // Ensure runtime TypeInfoResolver for controller JSON serialization
                         opts.JsonSerializerOptions.TypeInfoResolver = new DefaultJsonTypeInfoResolver();
                     });
-                builder.Services.AddEndpointsApiExplorer();
-                // Use Swashbuckle to generate OpenAPI/Swagger documents for controllers
-                builder.Services.AddSwaggerGen(options =>
-                options.SwaggerDoc("v2", new Microsoft.OpenApi.OpenApiInfo
+                builder.Services.Configure<ApiBehaviorOptions>(options =>
                 {
-                    Title = "AppIt API",
-                    Version = "v2"
-                }));
-            
+                    options.InvalidModelStateResponseFactory = context =>
+                    {
+                        var problem = new ValidationProblemDetails(context.ModelState)
+                        {
+                            Status = StatusCodes.Status400BadRequest,
+                            Title = "Validation failed.",
+                            Detail = "One or more validation errors occurred.",
+                            Instance = context.HttpContext.Request.Path
+                        };
+
+                        return new BadRequestObjectResult(ApiEnvelope.Fail(problem));
+                    };
+                });
 
                 #endregion
 
@@ -157,23 +179,31 @@ namespace AppIt.Api
 
                         var exception = exceptionHandler?.Error;
 
-                        context.Response.StatusCode =
-                            (int)HttpStatusCode.InternalServerError;
-                        context.Response.ContentType = "application/json";
-
-                        // Build a minimal JSON string manually to avoid System.Text.Json source-generation issues
-                        string Escape(string? s)
+                        var statusCode = exception switch
                         {
-                            if (s == null) return string.Empty;
-                            return s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n");
-                        }
+                            UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
+                            InvalidOperationException invalidOp when invalidOp.Message.Contains("already", StringComparison.OrdinalIgnoreCase) => StatusCodes.Status409Conflict,
+                            InvalidOperationException => StatusCodes.Status400BadRequest,
+                            KeyNotFoundException => StatusCodes.Status404NotFound,
+                            _ => StatusCodes.Status500InternalServerError
+                        };
 
-                        var detail = app.Environment.IsDevelopment() ? Escape(exception?.Message) : null;
-                        var exceptionType = exception?.GetType().Name;
+                        context.Response.StatusCode = statusCode;
+                        context.Response.ContentType = "application/json";
+                        var detail = app.Environment.IsDevelopment() ? exception?.Message : null;
+                        var problem = new ProblemDetails
+                        {
+                            Status = statusCode,
+                            Title = statusCode == StatusCodes.Status500InternalServerError
+                                ? "An unexpected error occurred."
+                                : ReasonPhrases.GetReasonPhrase(statusCode),
+                            Detail = detail,
+                            Instance = context.Request.Path
+                        };
+                        problem.Extensions["exceptionType"] = exception?.GetType().Name;
+                        problem.Extensions["traceId"] = context.TraceIdentifier;
 
-                        var json = $"{{\"error\":\"An unexpected error occurred.\",\"detail\":{(detail == null ? "null" : "\"" + detail + "\"")},\"exceptionType\":{(exceptionType == null ? "null" : "\"" + Escape(exceptionType) + "\"")}}}";
-
-                        await context.Response.WriteAsync(json);
+                        await context.Response.WriteAsJsonAsync(ApiEnvelope.Fail(problem));
                     });
                 });
 
@@ -181,26 +211,35 @@ namespace AppIt.Api
 
                 #region Middleware Pipeline
 
-                if (app.Environment.IsDevelopment())
+                app.MapGet("/", () => Results.Ok(new
                 {
-                    // Enable middleware to serve generated Swagger as JSON endpoint.
-                    app.UseSwagger();
+                    name = "AppIt API",
+                    status = "ok"
+                })).ExcludeFromDescription();
 
-                    // Enable middleware to serve swagger-ui (HTML, JS, CSS, etc.),
-                    // specifying the Swagger JSON endpoint and route prefix.
-                    app.UseSwaggerUI(options =>
+                app.UseStatusCodePages(async statusContext =>
+                {
+                    var response = statusContext.HttpContext.Response;
+                    if (response.StatusCode < 400 || response.HasStarted)
                     {
-                        options.SwaggerEndpoint("/swagger/v1/swagger.json", "AppIt API v1");
-                        options.RoutePrefix = "swagger";
-                    });
+                        return;
+                    }
 
-                    // Provide a fallback minimal OpenAPI document at the expected Swashbuckle path
-                    // so Swagger UI can successfully load even if the OpenAPI generator fails.
-                   
-                }
+                    if (response.ContentLength.HasValue && response.ContentLength.Value > 0)
+                    {
+                        return;
+                    }
 
-                app.UseHttpsRedirection();
-                app.UseAuthorization();
+                    response.ContentType = "application/json";
+                    var problem = new ProblemDetails
+                    {
+                        Status = response.StatusCode,
+                        Title = ReasonPhrases.GetReasonPhrase(response.StatusCode),
+                        Instance = statusContext.HttpContext.Request.Path
+                    };
+
+                    await response.WriteAsJsonAsync(ApiEnvelope.Fail(problem));
+                });
 
                 app.MapControllers();
 
@@ -233,5 +272,6 @@ namespace AppIt.Api
                 throw;
             }
         }
+
     }
 }

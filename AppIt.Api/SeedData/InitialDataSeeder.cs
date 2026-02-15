@@ -1,4 +1,5 @@
 using AppIt.Data.EntityModels;
+using AppIt.Core.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace AppIt.Api.SeedData
@@ -7,7 +8,14 @@ namespace AppIt.Api.SeedData
     {
         public static async Task SeedAsync(AppItDbContext dbContext)
         {
-            await dbContext.Database.MigrateAsync();
+            if (dbContext.Database.IsRelational())
+            {
+                await dbContext.Database.MigrateAsync();
+            }
+            else
+            {
+                await dbContext.Database.EnsureCreatedAsync();
+            }
 
             await SeedRolesAsync(dbContext);
             await SeedAdminAccountAsync(dbContext);
@@ -61,9 +69,15 @@ namespace AppIt.Api.SeedData
                 return;
             }
 
-            var exists = await dbContext.Accounts.AnyAsync(a => a.Email.ToLower() == "admin@appit.com");
-            if (exists)
+            var existing = await dbContext.Accounts.FirstOrDefaultAsync(a => a.Email.ToLower() == "admin@appit.com");
+            if (existing != null)
             {
+                if (string.IsNullOrWhiteSpace(existing.PasswordHash))
+                {
+                    existing.PasswordHash = AuthService.HashPassword("Admin@2026");
+                    existing.UpdatedDate = DateTime.UtcNow;
+                    await dbContext.SaveChangesAsync();
+                }
                 return;
             }
 
@@ -72,6 +86,7 @@ namespace AppIt.Api.SeedData
                 FirstName = "System",
                 LastName = "Administrator",
                 Email = "admin@appit.com",
+                PasswordHash = AuthService.HashPassword("Admin@2026"),
                 Phone = "+263 77 000 0000",
                 PreferredCurrency = "USD",
                 RoleId = superRole.RoleId,

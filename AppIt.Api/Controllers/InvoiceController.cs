@@ -1,4 +1,5 @@
-﻿using AppIt.Core.DTOs;
+using AppIt.Api.Infrastructure;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,24 +17,35 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
         {
             var invoices = await _service.GetAllAsync();
-            return Ok(invoices);
+
+            return Ok(invoices.ApplyQuery(query,
+                nameof(InvoiceReadDto.ReservationId),
+                nameof(InvoiceReadDto.Status),
+                nameof(InvoiceReadDto.Currency)));
         }
 
         [HttpGet("mine")]
-        public async Task<IActionResult> GetMine()
+        public async Task<IActionResult> GetMine([FromQuery] ListQueryOptions query)
         {
             var invoices = await _service.GetAllAsync();
-            return Ok(invoices);
+            return Ok(invoices.ApplyQuery(query,
+                nameof(InvoiceReadDto.ReservationId),
+                nameof(InvoiceReadDto.Status),
+                nameof(InvoiceReadDto.Currency)));
         }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             var invoice = await _service.GetByIdAsync(id);
-            if (invoice == null) return NotFound();
+            if (invoice == null)
+            {
+                return NotFound();
+            }
+
             return Ok(invoice);
         }
 
@@ -47,7 +59,11 @@ namespace AppIt.Api.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateInvoiceDto dto)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var invoice = await _service.CreateAsync(dto);
             return CreatedAtAction(nameof(GetById), new { id = invoice.Id }, invoice);
         }
@@ -55,9 +71,17 @@ namespace AppIt.Api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateInvoiceDto dto)
         {
-            if (id != dto.Id) return BadRequest("ID mismatch");
+            if (id != dto.Id)
+            {
+                return BadRequest("ID mismatch");
+            }
+
             var invoice = await _service.UpdateAsync(dto);
-            if (invoice == null) return NotFound();
+            if (invoice == null)
+            {
+                return NotFound();
+            }
+
             return Ok(invoice);
         }
 
@@ -65,7 +89,11 @@ namespace AppIt.Api.Controllers
         public async Task<IActionResult> Delete(int id)
         {
             var deleted = await _service.DeleteAsync(id);
-            if (!deleted) return NotFound();
+            if (!deleted)
+            {
+                return NotFound();
+            }
+
             return NoContent();
         }
     }

@@ -1,6 +1,6 @@
-﻿using AppIt.Core.DTOs;
+using AppIt.Api.Infrastructure;
+using AppIt.Core.DTOs;
 using AppIt.Core.DTOs.Notifications;
-using AppIt.Core.Interfaces;
 using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,11 +17,22 @@ namespace AppIt.Api.Controllers
             _notificationService = notificationService;
         }
 
+        [HttpGet]
+        public async Task<IActionResult> GetMine([FromQuery] ListQueryOptions query, [FromQuery] int? userId = null)
+        {
+            var notifications = await _notificationService.GetByUserAsync(userId ?? 1);
+            return Ok(notifications.ApplyQuery(query,
+                nameof(NotificationDto.Title),
+                nameof(NotificationDto.Message)));
+        }
+
         [HttpGet("user/{userId:int}")]
-        public async Task<IActionResult> GetByUser(int userId)
+        public async Task<IActionResult> GetByUser(int userId, [FromQuery] ListQueryOptions query)
         {
             var notifications = await _notificationService.GetByUserAsync(userId);
-            return Ok(notifications);
+            return Ok(notifications.ApplyQuery(query,
+                nameof(NotificationDto.Title),
+                nameof(NotificationDto.Message)));
         }
 
         [HttpGet("{id:int}")]
@@ -30,7 +41,9 @@ namespace AppIt.Api.Controllers
             var notification = await _notificationService.GetByIdAsync(id);
 
             if (notification == null)
+            {
                 return NotFound();
+            }
 
             return Ok(notification);
         }
@@ -45,6 +58,12 @@ namespace AppIt.Api.Controllers
         [HttpPut("{id:int}/read")]
         public async Task<IActionResult> MarkAsRead(int id)
         {
+            var existing = await _notificationService.GetByIdAsync(id);
+            if (existing == null)
+            {
+                return NotFound();
+            }
+
             await _notificationService.MarkAsReadAsync(id);
             return NoContent();
         }

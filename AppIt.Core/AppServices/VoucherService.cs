@@ -80,6 +80,24 @@ namespace AppIt.Core.Services
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<VoucherReadDto>> GetByAccountIdAsync(int accountId)
+        {
+            return await _context.Vouchers.AsNoTracking()
+                .Include(v => v.Reservation)
+                .Where(v => v.Reservation != null && v.Reservation.AccountId == accountId)
+                .Select(v => new VoucherReadDto
+                {
+                    Id = v.Id,
+                    Code = v.Code,
+                    Reference = v.Reference,
+                    Type = v.Type,
+                    ComboReference = v.ComboReference,
+                    ReservationId = v.ReservationId,
+                    CreatedAt = v.CreatedDate
+                })
+                .ToListAsync();
+        }
+
         private static VoucherReadDto ToReadDto(Voucher voucher)
         {
             return new VoucherReadDto

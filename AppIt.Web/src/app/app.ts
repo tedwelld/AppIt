@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, OnDestroy, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from './auth.service';
@@ -29,9 +29,11 @@ interface NavGroup {
 export class App implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly sidebarStateKey = 'appit.ui.sidebar.open';
   readonly theme = signal<'light' | 'dark'>('light');
   readonly now = signal(new Date());
   readonly welcome = signal('');
+  readonly sidebarOpen = signal(false);
 
   readonly currentUser = computed(() => this.auth.user());
   readonly isSuperUser = computed(() => this.auth.isSuperUser());
@@ -147,6 +149,7 @@ export class App implements OnDestroy {
 
   constructor() {
     this.welcome.set(this.auth.consumeWelcomeMessage());
+    this.restoreSidebarState();
   }
 
   toggleTheme(): void {
@@ -172,5 +175,42 @@ export class App implements OnDestroy {
 
   dismissWelcome(): void {
     this.welcome.set('');
+  }
+
+  toggleSidebar(): void {
+    this.sidebarOpen.update((isOpen) => !isOpen);
+    this.persistSidebarState();
+  }
+
+  closeSidebar(): void {
+    if (!this.sidebarOpen()) {
+      return;
+    }
+
+    this.sidebarOpen.set(false);
+    this.persistSidebarState();
+  }
+
+  onNavigateFromSidebar(): void {
+    this.closeSidebar();
+  }
+
+  @HostListener('window:keydown.escape')
+  onEscape(): void {
+    this.closeSidebar();
+  }
+
+  private restoreSidebarState(): void {
+    const raw = localStorage.getItem(this.sidebarStateKey);
+    if (raw === null) {
+      this.sidebarOpen.set(false);
+      return;
+    }
+
+    this.sidebarOpen.set(raw === 'true');
+  }
+
+  private persistSidebarState(): void {
+    localStorage.setItem(this.sidebarStateKey, String(this.sidebarOpen()));
   }
 }

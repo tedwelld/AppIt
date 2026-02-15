@@ -20,6 +20,7 @@ public class AppItDbContext : DbContext
     public DbSet<Invoice> Invoices { get; set; }
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<Payment> Payments { get; set; }
+    public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
     public DbSet<Permission> Permissions { get; set; }
     public DbSet<Product> Products { get; set; }
     public DbSet<ReportSnapshot> ReportSnapshots { get; set; }
@@ -27,10 +28,12 @@ public class AppItDbContext : DbContext
     public DbSet<Role> Roles { get; set; }
     public DbSet<RoleFeature> RoleFeatures { get; set; }
     public DbSet<RoleFeaturePermission> RoleFeaturePermissions { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<Supplier> Suppliers { get; set; }
     public DbSet<SupportMessage> SupportMessages { get; set; }
     public DbSet<UserProfile> UserProfiles { get; set; }
     public DbSet<Voucher> Vouchers { get; set; }
+    public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,6 +43,7 @@ public class AppItDbContext : DbContext
         {
             b.HasKey(e => e.Id);
             b.Property(e => e.Email).IsRequired().HasMaxLength(150);
+            b.Property(e => e.PasswordHash).IsRequired().HasMaxLength(500);
             b.HasIndex(e => e.Email).IsUnique();
 
             b.HasOne(e => e.Role)
@@ -108,6 +112,7 @@ public class AppItDbContext : DbContext
         modelBuilder.Entity<Invoice>(b =>
         {
             b.HasKey(e => e.Id);
+            b.Property(e => e.TotalAmount).HasPrecision(18, 2);
 
             b.HasOne(e => e.Reservation)
                 .WithMany(r => r.Invoices)
@@ -118,6 +123,7 @@ public class AppItDbContext : DbContext
         modelBuilder.Entity<Payment>(b =>
         {
             b.HasKey(e => e.Id);
+            b.Property(e => e.Amount).HasPrecision(18, 2);
 
             b.HasOne(e => e.Invoice)
                 .WithMany()
@@ -149,6 +155,9 @@ public class AppItDbContext : DbContext
         modelBuilder.Entity<Reservation>(b =>
         {
             b.HasKey(e => e.ReservationId);
+            b.Property(e => e.TotalAmount).HasPrecision(18, 2);
+            b.Property(e => e.CurrencyExchangeRate).HasPrecision(18, 6);
+            b.Property(e => e.Vat).HasPrecision(18, 2);
 
             b.HasOne(e => e.Account)
                 .WithMany()
@@ -217,6 +226,57 @@ public class AppItDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.ReservationId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<RefreshToken>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.TokenHash).IsRequired().HasMaxLength(128);
+            b.HasIndex(e => e.TokenHash).IsUnique();
+
+            b.HasOne(e => e.Account)
+                .WithMany()
+                .HasForeignKey(e => e.AccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PasswordResetToken>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.TokenHash).IsRequired().HasMaxLength(128);
+            b.HasIndex(e => e.TokenHash).IsUnique();
+            b.HasIndex(e => new { e.AccountId, e.ExpiresAtUtc });
+
+            b.HasOne(e => e.Account)
+                .WithMany()
+                .HasForeignKey(e => e.AccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<IdempotencyRecord>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Endpoint).IsRequired().HasMaxLength(150);
+            b.Property(e => e.IdempotencyKey).IsRequired().HasMaxLength(120);
+            b.Property(e => e.RequestHash).IsRequired().HasMaxLength(128);
+            b.Property(e => e.ResponseBody).IsRequired();
+            b.HasIndex(e => new { e.Endpoint, e.IdempotencyKey }).IsUnique();
+            b.HasIndex(e => e.ExpiresAtUtc);
+        });
+
+        modelBuilder.Entity<Product>(b =>
+        {
+            b.Property(e => e.BasePriceUsd).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<Accommodation>(b =>
+        {
+            b.Property(e => e.BasePriceUsd).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<Activity>(b =>
+        {
+            b.Property(e => e.BasePriceUsd).HasPrecision(18, 2);
         });
     }
 }

@@ -1,4 +1,5 @@
-﻿using AppIt.Core.DTOs;
+using AppIt.Api.Infrastructure;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,26 +17,38 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] string? email)
+        public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
         {
             var messages = await _service.GetAllAsync();
-            if (string.IsNullOrWhiteSpace(email))
-            {
-                return Ok(messages);
-            }
 
-            var filtered = messages.Where(m =>
-                string.Equals(m.FromEmail, email, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(m.ToEmail, email, StringComparison.OrdinalIgnoreCase));
+            return Ok(messages.ApplyQuery(query,
+                nameof(SupportMessageReadDto.FromEmail),
+                nameof(SupportMessageReadDto.ToEmail),
+                nameof(SupportMessageReadDto.Subject),
+                nameof(SupportMessageReadDto.Status)));
+        }
 
-            return Ok(filtered);
+        [HttpGet("mine")]
+        public async Task<IActionResult> GetMine([FromQuery] ListQueryOptions query)
+        {
+            var messages = await _service.GetAllAsync();
+            return Ok(messages.ApplyQuery(query,
+                nameof(SupportMessageReadDto.FromEmail),
+                nameof(SupportMessageReadDto.ToEmail),
+                nameof(SupportMessageReadDto.Subject),
+                nameof(SupportMessageReadDto.Status)));
         }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             var message = await _service.GetByIdAsync(id);
-            return message == null ? NotFound() : Ok(message);
+            if (message == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(message);
         }
 
         [HttpPost]
@@ -48,7 +61,17 @@ namespace AppIt.Api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateSupportMessageDto dto)
         {
-            if (id != dto.Id) return BadRequest("ID mismatch");
+            if (id != dto.Id)
+            {
+                return BadRequest("ID mismatch");
+            }
+
+            var existing = await _service.GetByIdAsync(id);
+            if (existing == null)
+            {
+                return NotFound();
+            }
+
             var message = await _service.UpdateAsync(dto);
             return message == null ? NotFound() : Ok(message);
         }
@@ -56,6 +79,12 @@ namespace AppIt.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
+            var existing = await _service.GetByIdAsync(id);
+            if (existing == null)
+            {
+                return NotFound();
+            }
+
             var deleted = await _service.DeleteAsync(id);
             return deleted ? NoContent() : NotFound();
         }

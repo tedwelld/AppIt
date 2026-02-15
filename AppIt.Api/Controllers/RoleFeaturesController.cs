@@ -1,5 +1,6 @@
-using AppIt.Core.Interfaces;
+using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
+using AppIt.Core.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers;
@@ -12,7 +13,26 @@ public class RoleFeaturesController : ControllerBase
     public RoleFeaturesController(IRoleFeatureService service) => _service = service;
 
     [HttpGet]
-    public async Task<IActionResult> Get() => Ok(await _service.GetRoleFeaturesAsync());
+    public async Task<IActionResult> Get([FromQuery] ListQueryOptions query)
+    {
+        var result = await _service.GetRoleFeaturesAsync();
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        var paged = (result.Data ?? new List<RoleFeatureDto>()).ApplyQuery(query,
+            nameof(RoleFeatureDto.RoleId),
+            nameof(RoleFeatureDto.FeatureId));
+
+        return Ok(new ServiceResponse<PagedResult<RoleFeatureDto>>
+        {
+            Data = paged,
+            Success = true,
+            Message = result.Message,
+            Time = result.Time
+        });
+    }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] RoleFeatureDto dto) => Ok(await _service.CreateRoleFeatureAsync(dto));

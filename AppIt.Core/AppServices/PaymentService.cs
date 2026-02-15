@@ -3,7 +3,9 @@ using AppIt.Core.Interfaces.Services;
 using AppIt.Data;
 using AppIt.Data.Entities;
 using AppIt.Data.EntityModels;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace AppIt.Core.Services
 {
@@ -39,16 +41,25 @@ namespace AppIt.Core.Services
 
         public async Task<ProcessPaymentResultDto> ProcessAsync(ProcessPaymentDto dto)
         {
+            var existingResponse = await TryGetIdempotentResponseAsync(dto);
+            if (existingResponse != null)
+            {
+                return existingResponse;
+            }
+
             var invoice = await _context.Invoices.FindAsync(dto.InvoiceId);
             if (invoice == null)
             {
-                return new ProcessPaymentResultDto
+                var notFoundResult = new ProcessPaymentResultDto
                 {
                     Success = false,
                     Status = "Failed",
                     Provider = ResolveProviderName(dto.Method),
                     Message = "Invoice not found."
                 };
+
+                await SaveIdempotentResponseAsync(dto, notFoundResult, 404);
+                return notFoundResult;
             }
 
             var amount = dto.Amount > 0 ? dto.Amount : invoice.TotalAmount;
@@ -57,13 +68,15 @@ namespace AppIt.Core.Services
 
             if (!_providerMap.TryGetValue(providerName, out var provider))
             {
-                return new ProcessPaymentResultDto
+                var providerMissing = new ProcessPaymentResultDto
                 {
                     Success = false,
                     Status = "Failed",
                     Provider = providerName,
                     Message = $"No configured provider for method '{dto.Method}'."
                 };
+                await SaveIdempotentResponseAsync(dto, providerMissing, 400);
+                return providerMissing;
             }
 
             var providerRequest = new ProcessPaymentDto
@@ -73,7 +86,8 @@ namespace AppIt.Core.Services
                 Amount = amount,
                 CurrencyCode = currencyCode,
                 ReturnUrl = dto.ReturnUrl,
-                CancelUrl = dto.CancelUrl
+                CancelUrl = dto.CancelUrl,
+                IdempotencyKey = dto.IdempotencyKey
             };
 
             var providerResult = await provider.ProcessAsync(providerRequest);
@@ -89,13 +103,15 @@ namespace AppIt.Core.Services
 
             if (!providerResult.Success)
             {
-                return new ProcessPaymentResultDto
+                var failedResult = new ProcessPaymentResultDto
                 {
                     Success = false,
                     Status = "Failed",
                     Provider = activeProvider.Name,
                     Message = providerResult.Message
                 };
+                await SaveIdempotentResponseAsync(dto, failedResult, 400);
+                return failedResult;
             }
 
             var paymentStatus = providerResult.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase)
@@ -132,7 +148,7 @@ namespace AppIt.Core.Services
 
             await NotifyAdminsAsync(invoice.Id, amount, currencyCode, payment.Method, paymentStatus, payment.TransactionReference);
 
-            return new ProcessPaymentResultDto
+            var successResult = new ProcessPaymentResultDto
             {
                 Success = true,
                 Provider = activeProvider.Name,
@@ -142,6 +158,9 @@ namespace AppIt.Core.Services
                 RedirectUrl = providerResult.RedirectUrl,
                 PaymentId = payment.Id
             };
+
+            await SaveIdempotentResponseAsync(dto, successResult, 200);
+            return successResult;
         }
 
         public async Task<PaymentReadDto?> UpdateAsync(UpdatePaymentDto dto)
@@ -275,6 +294,95 @@ namespace AppIt.Core.Services
             }
 
             await _context.SaveChangesAsync();
+        }
+
+        private async Task<ProcessPaymentResultDto?> TryGetIdempotentResponseAsync(ProcessPaymentDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.IdempotencyKey))
+            {
+                return null;
+            }
+
+            var endpoint = "payments/process";
+            var key = dto.IdempotencyKey.Trim();
+            var requestHash = BuildRequestHash(dto);
+
+            var existing = await _context.IdempotencyRecords
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Endpoint == endpoint && r.IdempotencyKey == key);
+
+            if (existing == null)
+            {
+                return null;
+            }
+
+            if (existing.ExpiresAtUtc <= DateTime.UtcNow)
+            {
+                return null;
+            }
+
+            if (!string.Equals(existing.RequestHash, requestHash, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Idempotency key was reused with a different payment request.");
+            }
+
+            if (string.IsNullOrWhiteSpace(existing.ResponseBody))
+            {
+                return null;
+            }
+
+            return JsonSerializer.Deserialize<ProcessPaymentResultDto>(existing.ResponseBody);
+        }
+
+        private async Task SaveIdempotentResponseAsync(ProcessPaymentDto dto, ProcessPaymentResultDto response, int statusCode)
+        {
+            if (string.IsNullOrWhiteSpace(dto.IdempotencyKey))
+            {
+                return;
+            }
+
+            var endpoint = "payments/process";
+            var key = dto.IdempotencyKey.Trim();
+            var requestHash = BuildRequestHash(dto);
+
+            var existing = await _context.IdempotencyRecords
+                .FirstOrDefaultAsync(r => r.Endpoint == endpoint && r.IdempotencyKey == key);
+
+            if (existing != null && !string.Equals(existing.RequestHash, requestHash, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Idempotency key was reused with a different payment request.");
+            }
+
+            if (existing == null)
+            {
+                existing = new IdempotencyRecord
+                {
+                    Endpoint = endpoint,
+                    IdempotencyKey = key,
+                    RequestHash = requestHash,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+                _context.IdempotencyRecords.Add(existing);
+            }
+
+            existing.ResponseBody = JsonSerializer.Serialize(response);
+            existing.StatusCode = statusCode;
+            existing.ExpiresAtUtc = DateTime.UtcNow.AddHours(24);
+
+            await _context.SaveChangesAsync();
+        }
+
+        private static string BuildRequestHash(ProcessPaymentDto dto)
+        {
+            var normalized = string.Join("|",
+                dto.InvoiceId,
+                dto.Method.Trim().ToLowerInvariant(),
+                dto.Amount.ToString("0.########", System.Globalization.CultureInfo.InvariantCulture),
+                dto.CurrencyCode.Trim().ToUpperInvariant(),
+                dto.ReturnUrl.Trim(),
+                dto.CancelUrl.Trim());
+
+            return AuthService.HashToken(normalized);
         }
     }
 }

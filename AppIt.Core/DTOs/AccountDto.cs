@@ -25,6 +25,7 @@ namespace AppIt.Core.DTOs
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
         public string? Phone { get; set; }
         public string? AvatarUrl { get; set; }
         public string PreferredCurrency { get; set; } = "USD";
@@ -39,6 +40,7 @@ namespace AppIt.Core.DTOs
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
+        public string? Password { get; set; }
         public string? Phone { get; set; }
         public string? AvatarUrl { get; set; }
         public string PreferredCurrency { get; set; } = "USD";

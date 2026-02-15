@@ -1,4 +1,5 @@
-﻿using AppIt.Core.DTOs;
+using AppIt.Api.Infrastructure;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,10 +17,12 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
         {
             var fps = await _service.GetAllAsync();
-            return Ok(fps);
+            return Ok(fps.ApplyQuery(query,
+                nameof(FeaturePermissionReadDto.FeatureId),
+                nameof(FeaturePermissionReadDto.PermissionId)));
         }
 
         [HttpGet("{id}")]

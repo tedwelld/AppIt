@@ -14,6 +14,7 @@ namespace AppIt.Core.DTOs
         public string CurrencyCode { get; set; } = "USD";
         public string ReturnUrl { get; set; } = string.Empty;
         public string CancelUrl { get; set; } = string.Empty;
+        public string? IdempotencyKey { get; set; }
     }
 
     public class ProcessPaymentResultDto
