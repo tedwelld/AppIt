@@ -1,0 +1,21 @@
+# Git and editor state
+.git
+.github
+.vs
+
+# Build outputs
+**/bin
+**/obj
+**/out
+**/dist
+**/.angular
+
+# Node package folders
+**/node_modules
+
+# Logs and temp files
+**/*.log
+logs
+
+# Docker/local env overrides
+.env
