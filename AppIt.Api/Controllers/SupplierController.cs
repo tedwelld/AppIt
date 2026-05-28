@@ -1,13 +1,15 @@
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 
 namespace AppIt.Api.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/suppliers")]
     [ApiController]
+    [Authorize(Roles = "super,admin")]
     public class SuppliersController : ControllerBase
     {
         private readonly ISupplierService _service;

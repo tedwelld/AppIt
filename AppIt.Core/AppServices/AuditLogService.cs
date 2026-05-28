@@ -22,9 +22,16 @@ namespace AppIt.Core.AppServices
         {
             return await _context.Set<AuditLog>()
                 .AsNoTracking()
+                .OrderByDescending(a => a.PerformedAt)
+                .ThenByDescending(a => a.Id)
                 .Select(a => new AuditLogReadDto(
-                    a.Id, a.EntityName, a.EntityId,
-                    a.Action, a.Changes, a.PerformedBy, a.PerformedAt))
+                    a.Id,
+                    a.EntityName ?? string.Empty,
+                    a.EntityId ?? string.Empty,
+                    a.Action ?? string.Empty,
+                    a.Changes,
+                    a.PerformedBy,
+                    a.PerformedAt))
                 .ToListAsync();
         }
     }

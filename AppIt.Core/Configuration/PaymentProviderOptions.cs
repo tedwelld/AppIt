@@ -4,6 +4,18 @@ namespace AppIt.Core.Configuration
     {
         public StripeOptions Stripe { get; set; } = new();
         public PayPalOptions PayPal { get; set; } = new();
+        public Dictionary<string, string> MethodAliases { get; set; } = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PayPal"] = "PayPal",
+            ["Mastercard"] = "Stripe",
+            ["Visa"] = "Stripe",
+            ["Card"] = "Stripe",
+            ["Stripe"] = "Stripe",
+            ["CashApp"] = "Manual",
+            ["EcoCash"] = "Manual",
+            ["Bank Transfer"] = "Manual",
+            ["Manual"] = "Manual"
+        };
     }
 
     public class StripeOptions

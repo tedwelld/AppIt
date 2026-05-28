@@ -1,11 +1,13 @@
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers
 {
     [ApiController]
+    [Authorize]
     [Route("api/support/messages")]
     public class SupportMessagesController : ControllerBase
     {
@@ -17,6 +19,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
         {
             var messages = await _service.GetAllAsync();
@@ -59,6 +62,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateSupportMessageDto dto)
         {
             if (id != dto.Id)
@@ -77,6 +81,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> Delete(int id)
         {
             var existing = await _service.GetByIdAsync(id);

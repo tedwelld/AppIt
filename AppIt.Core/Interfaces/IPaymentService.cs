@@ -10,5 +10,7 @@ namespace AppIt.Core.Interfaces.Services
         Task<bool> DeleteAsync(int id);
         Task<PaymentReadDto?> GetByIdAsync(int id);
         Task<IEnumerable<PaymentReadDto>> GetAllAsync();
+        Task<IEnumerable<PaymentReadDto>> GetByAccountIdAsync(int accountId);
+        Task<int> DeleteExpiredPendingPaymentsAsync(TimeSpan? maxAge = null);
     }
 }

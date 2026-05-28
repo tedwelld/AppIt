@@ -1,11 +1,13 @@
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers
 {
     [ApiController]
+    [Authorize]
     [Route("api/accommodations")]
     public class AccommodationsController : ControllerBase
     {
@@ -52,6 +54,16 @@ namespace AppIt.Api.Controllers
         {
             var deleted = await _service.DeleteAsync(id);
             return deleted ? NoContent() : NotFound();
+        }
+
+        [HttpGet("availability")]
+        public async Task<IActionResult> GetAvailability([FromQuery] int year, [FromQuery] int month)
+        {
+            if (year < 2000 || year > 2100) return BadRequest("Invalid year");
+            if (month < 1 || month > 12) return BadRequest("Invalid month");
+
+            var availability = await _service.GetAvailabilityAsync(year, month);
+            return Ok(availability);
         }
     }
 }

@@ -34,8 +34,9 @@ namespace AppIt.Core.Services
                 Region = dto.Region,
                 DurationOfStayDays = dto.DurationOfStayDays,
                 LastSavedBy = dto.LastSavedBy,
-                DateUpdated = DateTime.Now,
+                DateUpdated = DateTime.UtcNow,
                 Notes = dto.Notes,
+                AgentCompanyId = dto.AgentCompanyId,
                 CustomerType = dto.CustomerTypeId.HasValue
                         ? await _context.Set<CustomerType>().FindAsync(dto.CustomerTypeId.Value)
                     : null
@@ -72,8 +73,9 @@ namespace AppIt.Core.Services
             customer.DurationOfStayDays = dto.DurationOfStayDays;
            
             customer.LastSavedBy = dto.LastSavedBy;
-            customer.DateUpdated = DateTime.Now;
+            customer.DateUpdated = DateTime.UtcNow;
             customer.Notes = dto.Notes;
+            customer.AgentCompanyId = dto.AgentCompanyId;
 
             customer.CustomerType = dto.CustomerTypeId.HasValue
                 ? await _context.Set<CustomerType>().FindAsync(dto.CustomerTypeId.Value)
@@ -137,6 +139,7 @@ namespace AppIt.Core.Services
             DateUpdated = c.DateUpdated,
             Notes = c.Notes,
             CustomerTypeId = c.CustomerType?.Id,
+            AgentCompanyId = c.AgentCompanyId,
             ReservationIds = c.Reservations?.Select(r => r.ReservationId)
         };
     }

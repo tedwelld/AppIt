@@ -1,10 +1,12 @@
 ﻿using AppIt.Core.DTOs;
 using AppIt.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace AppIt.Api.Controllers
 {
+    [Authorize(Roles = "super,admin")]
     [ApiController]
     [Route("api/admin/stats")]
     public class AdminStatsController : ControllerBase
@@ -23,20 +25,26 @@ namespace AppIt.Api.Controllers
             var (start, buckets) = ResolveRange(normalized);
 
             var reservationsQuery = _context.Reservations.AsNoTracking();
-            var paymentsQuery = _context.Payments.AsNoTracking().Where(p => p.Status == "Paid");
-            var accountsQuery = _context.Accounts.AsNoTracking();
+            var invoicesQuery = _context.Invoices
+                .AsNoTracking()
+                .Where(i => i.Status == null
+                    || (i.Status.ToLower() != "cancelled"
+                        && i.Status.ToLower() != "canceled"
+                        && i.Status.ToLower() != "void"
+                        && i.Status.ToLower() != "deleted"));
+            var customersQuery = _context.Customers.AsNoTracking();
 
             if (start.HasValue)
             {
                 reservationsQuery = reservationsQuery.Where(r => r.CreatedDate >= start.Value);
-                paymentsQuery = paymentsQuery.Where(p => p.ProcessedAt != null && p.ProcessedAt >= start.Value);
-                accountsQuery = accountsQuery.Where(a => a.CreatedDate >= start.Value);
+                invoicesQuery = invoicesQuery.Where(i => i.IssuedDate >= start.Value);
+                customersQuery = customersQuery.Where(c => c.DateUpdated >= start.Value);
             }
 
             var totalBookings = await reservationsQuery.CountAsync();
-            var totalSales = await paymentsQuery.CountAsync();
-            var totalEarnings = await paymentsQuery.SumAsync(p => (decimal?)p.Amount) ?? 0m;
-            var totalCustomers = await accountsQuery.CountAsync();
+            var totalSales = await invoicesQuery.CountAsync();
+            var totalEarnings = await invoicesQuery.SumAsync(i => (decimal?)i.TotalAmount) ?? 0m;
+            var totalCustomers = await customersQuery.CountAsync();
 
             var trend = await BuildTrendAsync(start, buckets);
 
@@ -77,17 +85,22 @@ namespace AppIt.Api.Controllers
             var rangeSeconds = (DateTime.UtcNow - start.Value).TotalSeconds;
             var bucketSeconds = Math.Max(rangeSeconds / buckets, 1);
 
-            var payments = await _context.Payments
+            var invoiceDates = await _context.Invoices
                 .AsNoTracking()
-                .Where(p => p.Status == "Paid" && p.ProcessedAt != null && p.ProcessedAt >= start.Value)
-                .Select(p => p.ProcessedAt!.Value)
+                .Where(i => i.IssuedDate >= start.Value)
+                .Where(i => i.Status == null
+                    || (i.Status.ToLower() != "cancelled"
+                        && i.Status.ToLower() != "canceled"
+                        && i.Status.ToLower() != "void"
+                        && i.Status.ToLower() != "deleted"))
+                .Select(i => i.IssuedDate)
                 .ToListAsync();
 
             for (var i = 0; i < buckets; i++)
             {
                 var bucketStart = start.Value.AddSeconds(bucketSeconds * i);
                 var bucketEnd = start.Value.AddSeconds(bucketSeconds * (i + 1));
-                var count = payments.Count(p => p >= bucketStart && p < bucketEnd);
+                var count = invoiceDates.Count(issuedAt => issuedAt >= bucketStart && issuedAt < bucketEnd);
                 trend.Add(count == 0 ? 1 : count);
             }
 

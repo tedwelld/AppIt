@@ -22,8 +22,8 @@ namespace AppIt.Core.DTOs
         public Role? Role { get; set; }
         [Required]
         public string AccountType { get; set; } = string.Empty;
-        public DateTime CreatedDate { get; set; } = DateTime.Now;
-        public DateTime UpdatedDate { get; set; } = DateTime.Now;
+        public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedDate { get; set; } = DateTime.UtcNow;
         public bool IsActive { get; set; } = true;
     }
    

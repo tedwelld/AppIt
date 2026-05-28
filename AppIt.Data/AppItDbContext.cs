@@ -25,6 +25,7 @@ public class AppItDbContext : DbContext
     public DbSet<Product> Products { get; set; }
     public DbSet<ReportSnapshot> ReportSnapshots { get; set; }
     public DbSet<Reservation> Reservations { get; set; }
+    public DbSet<ReservationServiceItem> ReservationServiceItems { get; set; }
     public DbSet<Role> Roles { get; set; }
     public DbSet<RoleFeature> RoleFeatures { get; set; }
     public DbSet<RoleFeaturePermission> RoleFeaturePermissions { get; set; }
@@ -34,6 +35,8 @@ public class AppItDbContext : DbContext
     public DbSet<UserProfile> UserProfiles { get; set; }
     public DbSet<Voucher> Vouchers { get; set; }
     public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; }
+    public DbSet<Currency> Currencies { get; set; }
+    public DbSet<ExchangeRate> ExchangeRates { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -173,6 +176,19 @@ public class AppItDbContext : DbContext
                 .WithMany(c => c.Reservations)
                 .HasForeignKey(e => e.CustomerTypeId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<ReservationServiceItem>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.UnitPrice).HasPrecision(18, 2);
+            b.Property(e => e.TotalPrice).HasPrecision(18, 2);
+            b.HasIndex(e => e.ReservationId);
+
+            b.HasOne(e => e.Reservation)
+                .WithMany(r => r.ServiceItems)
+                .HasForeignKey(e => e.ReservationId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Role>(b =>

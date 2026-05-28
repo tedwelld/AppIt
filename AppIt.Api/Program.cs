@@ -1,3 +1,4 @@
+using AppIt.Api.Services;
 using AppIt.Core.AppServices;
 using AppIt.Core.Configuration;
 using AppIt.Core.DTOs;
@@ -7,13 +8,16 @@ using AppIt.Core.Services;
 using AppIt.Api.SeedData;
 using AppIt.Api.Infrastructure;
 using AppIt.Data;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
-//using AppIt.Data.Repositories;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using System.Net;
+using System.Text;
 using System.Text.Json.Serialization.Metadata;
 namespace AppIt.Api
 {
@@ -122,6 +126,10 @@ namespace AppIt.Api
                 builder.Services.AddScoped<IReportSnapshotService, ReportSnapshotService>();
                 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
                 builder.Services.AddScoped<IAuthService, AuthService>();
+                builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+                builder.Services.AddScoped<ICurrencyService, CurrencyService>();
+                builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
+                builder.Services.AddHostedService<PendingPaymentCleanupHostedService>();
                 builder.Services.ConfigureHttpJsonOptions(options =>
                 {
                     // Ensure a runtime TypeInfoResolver is available so source-generation is not required
@@ -129,6 +137,34 @@ namespace AppIt.Api
                     options.SerializerOptions.TypeInfoResolver = new DefaultJsonTypeInfoResolver();
                 });
                 builder.Services.Configure<PaymentProviderOptions>(builder.Configuration.GetSection("Payments"));
+                builder.Services.AddScoped<JwtTokenService>();
+
+                #endregion
+
+                #region Authentication & Authorization
+
+                var jwtKey = builder.Configuration["Auth:JwtKey"]
+                    ?? throw new InvalidOperationException("Auth:JwtKey is not configured.");
+                var jwtIssuer = builder.Configuration["Auth:JwtIssuer"] ?? "AppIt";
+                var jwtAudience = builder.Configuration["Auth:JwtAudience"] ?? "AppItClient";
+
+                builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                    .AddJwtBearer(options =>
+                    {
+                        options.TokenValidationParameters = new TokenValidationParameters
+                        {
+                            ValidateIssuer = true,
+                            ValidateAudience = true,
+                            ValidateLifetime = true,
+                            ValidateIssuerSigningKey = true,
+                            ValidIssuer = jwtIssuer,
+                            ValidAudience = jwtAudience,
+                            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+                            ClockSkew = TimeSpan.Zero
+                        };
+                    });
+
+                builder.Services.AddAuthorization();
 
                 #endregion
 
@@ -158,6 +194,27 @@ namespace AppIt.Api
                         return new BadRequestObjectResult(ApiEnvelope.Fail(problem));
                     };
                 });
+                builder.Services.AddEndpointsApiExplorer();
+                builder.Services.AddSwaggerGen(options =>
+                {
+                    options.SwaggerDoc("v2", new OpenApiInfo
+                    {
+                        Title = "AppIt API",
+                        Version = "v2",
+                        Description = "AppIt service endpoints."
+                    });
+                    options.CustomSchemaIds(type => type.FullName?.Replace("+", ".") ?? type.Name);
+                    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                    {
+                        Name = "Authorization",
+                        Type = SecuritySchemeType.Http,
+                        Scheme = "bearer",
+                        BearerFormat = "JWT",
+                        In = ParameterLocation.Header,
+                        Description = "Enter your JWT token."
+                    });
+                    options.OperationFilter<BearerSecurityRequirementOperationFilter>();
+                });
 
                 #endregion
 
@@ -165,7 +222,8 @@ namespace AppIt.Api
                 using (var scope = app.Services.CreateScope())
                 {
                     var dbContext = scope.ServiceProvider.GetRequiredService<AppItDbContext>();
-                    InitialDataSeeder.SeedAsync(dbContext).GetAwaiter().GetResult();
+                    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+                    InitialDataSeeder.SeedAsync(dbContext, logger).GetAwaiter().GetResult();
                 }
 
                 #region Global Exception Handling (HTTP Pipeline)
@@ -216,6 +274,18 @@ namespace AppIt.Api
                     name = "AppIt API",
                     status = "ok"
                 })).ExcludeFromDescription();
+                app.UseSwagger(options =>
+                {
+                    options.RouteTemplate = "swagger/{documentName}/swagger.json";
+                    options.OpenApiVersion = OpenApiSpecVersion.OpenApi2_0;
+                });
+                app.UseSwaggerUI(options =>
+                {
+                    options.SwaggerEndpoint("/swagger/v2/swagger.json", "AppIt API v2");
+                    options.RoutePrefix = "swagger";
+                    options.DocumentTitle = "AppIt API Swagger";
+                    options.DisplayRequestDuration();
+                });
 
                 app.UseStatusCodePages(async statusContext =>
                 {
@@ -241,6 +311,8 @@ namespace AppIt.Api
                     await response.WriteAsJsonAsync(ApiEnvelope.Fail(problem));
                 });
 
+                app.UseAuthentication();
+                app.UseAuthorization();
                 app.MapControllers();
 
                 #endregion

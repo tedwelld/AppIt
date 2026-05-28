@@ -1,8 +1,10 @@
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
+[Authorize]
 [Route("api/user-profiles")]
 public class UserProfilesController : ControllerBase
 {

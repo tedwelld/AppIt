@@ -1,10 +1,12 @@
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/invoices")]
     public class InvoiceController : ControllerBase
@@ -22,22 +24,48 @@ namespace AppIt.Api.Controllers
             var invoices = await _service.GetAllAsync();
 
             return Ok(invoices.ApplyQuery(query,
+                nameof(InvoiceReadDto.Id),
                 nameof(InvoiceReadDto.ReservationId),
                 nameof(InvoiceReadDto.Status),
-                nameof(InvoiceReadDto.Currency)));
+                nameof(InvoiceReadDto.Currency),
+                nameof(InvoiceReadDto.IssuedAt)));
         }
 
         [HttpGet("mine")]
-        public async Task<IActionResult> GetMine([FromQuery] ListQueryOptions query)
+        public async Task<IActionResult> GetMine([FromQuery] int? accountId, [FromQuery] ListQueryOptions query)
         {
-            var invoices = await _service.GetAllAsync();
+            var invoices = accountId.HasValue && accountId.Value > 0
+                ? await _service.GetByAccountIdAsync(accountId.Value)
+                : Enumerable.Empty<InvoiceReadDto>();
+
             return Ok(invoices.ApplyQuery(query,
+                nameof(InvoiceReadDto.Id),
                 nameof(InvoiceReadDto.ReservationId),
                 nameof(InvoiceReadDto.Status),
-                nameof(InvoiceReadDto.Currency)));
+                nameof(InvoiceReadDto.Currency),
+                nameof(InvoiceReadDto.IssuedAt)));
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("reservation/{reservationId:int}")]
+        [HttpGet("by-reservation/{reservationId:int}")]
+        public async Task<IActionResult> GetByReservationId(int reservationId)
+        {
+            if (reservationId <= 0)
+            {
+                return BadRequest("Reservation ID is required.");
+            }
+
+            var invoice = await _service.GetByReservationIdAsync(reservationId);
+            return Ok(invoice);
+        }
+
+        [HttpGet("reservation")]
+        public async Task<IActionResult> GetByReservationQuery([FromQuery] int reservationId)
+        {
+            return await GetByReservationId(reservationId);
+        }
+
+        [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
             var invoice = await _service.GetByIdAsync(id);

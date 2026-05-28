@@ -5,11 +5,9 @@ AppIt includes:
 - `AppIt.Api` (.NET API)
 - `AppIt.Data` + SQL Server (EF Core migrations and seed data)
 
-## Docker Environments
+## Docker Desktop Setup
 
-This repository now includes a full Docker setup for running the system locally with isolated environments.
-
-### Files Added for Docker
+This repository already includes the Docker files needed to run the full stack locally:
 - `docker-compose.yml`
 - `.env.docker`
 - `.dockerignore`
@@ -19,42 +17,107 @@ This repository now includes a full Docker setup for running the system locally 
 - `AppIt.Web/nginx/default.conf`
 
 ### Prerequisites
-- Docker Desktop (with Compose v2)
 
-### 1. Create local Docker env file
-PowerShell:
+- Docker Desktop
+- Docker Compose v2 (`docker compose version`)
+- Docker Desktop set to Linux containers
+
+## Quick Start
+
+Run these commands from the repository root:
 
 ```powershell
 Copy-Item .env.docker .env
+docker compose build
+docker compose up -d
+docker compose ps
 ```
 
-Update `.env` values as needed, especially `MSSQL_SA_PASSWORD`.
+If you do not create `.env`, `docker-compose.yml` still has working local defaults. Copying `.env.docker` to `.env` is recommended when you want to change passwords, ports, or payment provider values.
 
-### 2. Build and start all services
+## Default Docker URLs
+
+- Web UI: `http://localhost:4200`
+- API root: `http://localhost:5175`
+- Swagger UI: `http://localhost:5175/swagger`
+- SQL Server from host tools: `localhost,1433`
+
+## Containers Created
+
+- `appit-sqlserver`
+- `appit-api`
+- `appit-web`
+
+## Exact Docker Commands
+
+### Build the images
 
 ```powershell
-docker compose up --build -d
+docker compose build
 ```
 
-### 3. Open the app
-- Web: `http://localhost:4200`
-- API: `http://localhost:5175`
+### Start the full system in the background
 
-### 4. Stop services
+```powershell
+docker compose up -d
+```
+
+### Build and start in one command
+
+```powershell
+docker compose up -d --build
+```
+
+### Check container status
+
+```powershell
+docker compose ps
+```
+
+### Follow logs
+
+```powershell
+docker compose logs -f sqlserver
+docker compose logs -f api
+docker compose logs -f web
+```
+
+### Restart a specific container
+
+```powershell
+docker compose restart api
+docker compose restart web
+docker compose restart sqlserver
+```
+
+### Rebuild only the API or web image
+
+```powershell
+docker compose up -d --build api
+docker compose up -d --build web
+```
+
+### Stop the running containers
 
 ```powershell
 docker compose down
 ```
 
-To also remove the SQL volume:
+### Stop containers and remove the SQL volume
 
 ```powershell
 docker compose down -v
 ```
 
-## Environment Variables (Docker)
+### Remove old images that were built for this stack
 
-Main values from `.env`:
+```powershell
+docker image prune -f
+```
+
+## Environment Variables Used by Docker
+
+Main values you can override in `.env`:
 - `MSSQL_SA_PASSWORD`
 - `APPIT_DB_NAME`
 - `APPIT_SQL_PORT`
@@ -66,13 +129,15 @@ Main values from `.env`:
 - `PAYPAL_CLIENT_SECRET`
 - `PAYPAL_ENVIRONMENT`
 
-## Notes
+## Runtime Notes
 
 - API runs with `ASPNETCORE_ENVIRONMENT=Docker`.
-- API DB connection is injected by Docker using `ConnectionStrings__DefaultConnection`.
+- API DB connection is injected through `ConnectionStrings__DefaultConnection`.
 - API applies migrations and seeds data automatically on startup.
-- Frontend serves via nginx and proxies `/api/*` to the API container.
+- Frontend is served by Nginx and proxies `/api/*` to the API container.
+- SQL data is persisted in the `appit_sql_data` Docker volume.
 
 ## Default Seeded Admin
+
 - Email: `admin@appit.com`
 - Password: value from `APPIT_ADMIN_PASSWORD` (default `Admin@2026`)

@@ -11,6 +11,9 @@ namespace AppIt.Data.EntityModels
         [Required, MaxLength(200)]
         public string CompanyName { get; set; } = null!;
 
+        [MaxLength(40)]
+        public string AgentType { get; set; } = "Company";
+
         [MaxLength(500)]
         public string CompanyAddress { get; set; } = null!;
 

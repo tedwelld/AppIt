@@ -1,11 +1,13 @@
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers
 {
     [ApiController]
+    [Authorize(Roles = "super,admin")]
     [Route("api/audit-logs")]
     public class AuditLogsController : ControllerBase
     {
@@ -23,7 +25,8 @@ namespace AppIt.Api.Controllers
             return Ok(logs.ApplyQuery(query,
                 nameof(AuditLogReadDto.Action),
                 nameof(AuditLogReadDto.EntityName),
-                nameof(AuditLogReadDto.PerformedBy)));
+                nameof(AuditLogReadDto.PerformedBy),
+                nameof(AuditLogReadDto.PerformedAt)));
         }
     }
 }

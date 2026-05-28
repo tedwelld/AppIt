@@ -1,9 +1,11 @@
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/bookings")]
     public class BookingController : ControllerBase
@@ -18,7 +20,12 @@ namespace AppIt.Api.Controllers
         [HttpPost("checkout")]
         public async Task<IActionResult> Checkout([FromBody] BookingCheckoutRequestDto request)
         {
-            var accountId = request.Reservation.AccountId ?? 1;
+            if (request.Reservation.AccountId == null || request.Reservation.AccountId <= 0)
+            {
+                return BadRequest("AccountId is required.");
+            }
+
+            var accountId = request.Reservation.AccountId.Value;
 
             try
             {

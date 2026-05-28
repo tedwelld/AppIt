@@ -32,6 +32,9 @@ namespace AppIt.Data.EntityModels
         public Role? Role { get; set; }
         public bool IsActive { get; set; } = true;
 
+        public int FailedLoginAttempts { get; set; } = 0;
+        public DateTime? LockoutEnd { get; set; }
+
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedDate { get; set; } = DateTime.UtcNow;
     }

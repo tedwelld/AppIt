@@ -1,12 +1,15 @@
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers
 {
     [ApiController]
+    [Authorize(Roles = "super,admin")]
     [Route("api/[controller]")]
+    [Route("api/departments")]
     public class DepartmentController : ControllerBase
     {
         private readonly IDepartmentService _service;

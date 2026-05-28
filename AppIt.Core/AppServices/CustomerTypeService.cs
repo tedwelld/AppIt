@@ -32,7 +32,7 @@ namespace AppIt.Core.Services
                 SpecialPice = dto.SpecialPrice,
                 Disability = dto.Disability,
                 LastSavedBy = dto.LastSavedBy,
-                DateUpdated = DateTime.Now,
+                DateUpdated = DateTime.UtcNow,
                 Notes = dto.Notes
             };
 
@@ -58,7 +58,7 @@ namespace AppIt.Core.Services
             customerType.SpecialPice = dto.SpecialPrice;
             customerType.Disability = dto.Disability;
             customerType.LastSavedBy = dto.LastSavedBy;
-            customerType.DateUpdated = DateTime.Now;
+            customerType.DateUpdated = DateTime.UtcNow;
             customerType.Notes = dto.Notes;
 
             await _context.SaveChangesAsync();

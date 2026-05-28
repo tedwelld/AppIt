@@ -1,10 +1,12 @@
 using AppIt.Core.DTOs;
+using AppIt.Core.Configuration;
 using AppIt.Core.Interfaces.Services;
 using AppIt.Data;
 using AppIt.Data.Entities;
 using AppIt.Data.EntityModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 
 namespace AppIt.Core.Services
@@ -13,11 +15,13 @@ namespace AppIt.Core.Services
     {
         private readonly AppItDbContext _context;
         private readonly IReadOnlyDictionary<string, IPaymentProvider> _providerMap;
+        private readonly PaymentProviderOptions _paymentOptions;
 
-        public PaymentService(AppItDbContext context, IEnumerable<IPaymentProvider> providers)
+        public PaymentService(AppItDbContext context, IEnumerable<IPaymentProvider> providers, IOptions<PaymentProviderOptions> paymentOptions)
         {
             _context = context;
             _providerMap = providers.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+            _paymentOptions = paymentOptions.Value;
         }
 
         public async Task<PaymentReadDto> CreateAsync(CreatePaymentDto dto)
@@ -34,6 +38,8 @@ namespace AppIt.Core.Services
             };
 
             _context.Payments.Add(payment);
+            await _context.SaveChangesAsync();
+            await SyncInvoicePaymentStatusAsync(payment.InvoiceId);
             await _context.SaveChangesAsync();
 
             return ToReadDto(payment);
@@ -92,14 +98,6 @@ namespace AppIt.Core.Services
 
             var providerResult = await provider.ProcessAsync(providerRequest);
             var activeProvider = provider;
-            if (!providerResult.Success
-                && provider.Name.Equals("Stripe", StringComparison.OrdinalIgnoreCase)
-                && providerResult.Message.Contains("not configured", StringComparison.OrdinalIgnoreCase)
-                && _providerMap.TryGetValue("Manual", out var manualProvider))
-            {
-                providerResult = await manualProvider.ProcessAsync(providerRequest);
-                activeProvider = manualProvider;
-            }
 
             if (!providerResult.Success)
             {
@@ -171,6 +169,7 @@ namespace AppIt.Core.Services
                 return null;
             }
 
+            var previousInvoiceId = payment.InvoiceId;
             payment.InvoiceId = dto.InvoiceId;
             payment.Method = dto.Method;
             payment.Status = dto.Status;
@@ -178,6 +177,13 @@ namespace AppIt.Core.Services
             payment.Amount = dto.Amount;
             payment.CurrencyCode = string.IsNullOrWhiteSpace(dto.CurrencyCode) ? payment.CurrencyCode : dto.CurrencyCode;
             payment.ProcessedAt = dto.ProcessedAt;
+
+            await _context.SaveChangesAsync();
+            await SyncInvoicePaymentStatusAsync(payment.InvoiceId);
+            if (previousInvoiceId != payment.InvoiceId)
+            {
+                await SyncInvoicePaymentStatusAsync(previousInvoiceId);
+            }
 
             await _context.SaveChangesAsync();
             return ToReadDto(payment);
@@ -191,7 +197,10 @@ namespace AppIt.Core.Services
                 return false;
             }
 
+            var invoiceId = payment.InvoiceId;
             _context.Payments.Remove(payment);
+            await _context.SaveChangesAsync();
+            await SyncInvoicePaymentStatusAsync(invoiceId);
             await _context.SaveChangesAsync();
             return true;
         }
@@ -219,6 +228,63 @@ namespace AppIt.Core.Services
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<PaymentReadDto>> GetByAccountIdAsync(int accountId)
+        {
+            if (accountId <= 0)
+            {
+                return Array.Empty<PaymentReadDto>();
+            }
+
+            return await _context.Payments
+                .AsNoTracking()
+                .Join(
+                    _context.Invoices.AsNoTracking(),
+                    payment => payment.InvoiceId,
+                    invoice => invoice.Id,
+                    (payment, invoice) => new { payment, invoice })
+                .Join(
+                    _context.Reservations.AsNoTracking(),
+                    joined => joined.invoice.ReservationId,
+                    reservation => reservation.ReservationId,
+                    (joined, reservation) => new { joined.payment, reservation })
+                .Where(x => x.reservation.AccountId == accountId)
+                .Select(x => new PaymentReadDto
+                {
+                    Id = x.payment.Id,
+                    InvoiceId = x.payment.InvoiceId,
+                    Method = x.payment.Method,
+                    Status = x.payment.Status,
+                    TransactionReference = x.payment.TransactionReference,
+                    Amount = x.payment.Amount,
+                    CurrencyCode = x.payment.CurrencyCode,
+                    ProcessedAt = x.payment.ProcessedAt
+                })
+                .ToListAsync();
+        }
+
+        public async Task<int> DeleteExpiredPendingPaymentsAsync(TimeSpan? maxAge = null)
+        {
+            var age = maxAge ?? TimeSpan.FromHours(24);
+            var cutoff = DateTime.UtcNow.Subtract(age);
+
+            var stalePayments = await _context.Payments
+                .Include(p => p.Invoice)
+                .Where(p => p.Status.ToLower() == "pending")
+                .Where(p =>
+                    (p.ProcessedAt.HasValue && p.ProcessedAt.Value <= cutoff)
+                    || (!p.ProcessedAt.HasValue && p.Invoice != null && p.Invoice.IssuedDate <= cutoff))
+                .ToListAsync();
+
+            if (stalePayments.Count == 0)
+            {
+                return 0;
+            }
+
+            _context.Payments.RemoveRange(stalePayments);
+            await _context.SaveChangesAsync();
+            return stalePayments.Count;
+        }
+
         private static PaymentReadDto ToReadDto(Payment payment)
         {
             return new PaymentReadDto
@@ -234,29 +300,71 @@ namespace AppIt.Core.Services
             };
         }
 
-        private static string ResolveProviderName(string method)
+        private async Task SyncInvoicePaymentStatusAsync(int invoiceId)
         {
-            if (method.Equals("PayPal", StringComparison.OrdinalIgnoreCase))
+            var invoice = await _context.Invoices
+                .Include(i => i.Payments)
+                .FirstOrDefaultAsync(i => i.Id == invoiceId);
+            if (invoice == null)
+            {
+                return;
+            }
+
+            var hasPaidPayment = invoice.Payments.Any(IsPaidStatus);
+            var hasPayment = invoice.Payments.Any();
+
+            if (hasPaidPayment)
+            {
+                invoice.Status = "Paid";
+                invoice.IsPaid = true;
+                return;
+            }
+
+            if (hasPayment)
+            {
+                invoice.Status = "Pending";
+                invoice.IsPaid = false;
+            }
+        }
+
+        private static bool IsPaidStatus(Payment payment)
+        {
+            return payment.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase)
+                || payment.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+                || payment.Status.Equals("Captured", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string ResolveProviderName(string method)
+        {
+            var normalized = method.Trim();
+            if (_paymentOptions.MethodAliases.TryGetValue(normalized, out var providerName)
+                && !string.IsNullOrWhiteSpace(providerName))
+            {
+                return providerName.Trim();
+            }
+
+            if (normalized.Equals("PayPal", StringComparison.OrdinalIgnoreCase))
             {
                 return "PayPal";
             }
 
-            if (method.Equals("Mastercard", StringComparison.OrdinalIgnoreCase)
-                || method.Equals("Visa", StringComparison.OrdinalIgnoreCase)
-                || method.Equals("Card", StringComparison.OrdinalIgnoreCase)
-                || method.Equals("Stripe", StringComparison.OrdinalIgnoreCase))
+            if (normalized.Equals("Mastercard", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("Visa", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("Card", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("Stripe", StringComparison.OrdinalIgnoreCase))
             {
                 return "Stripe";
             }
 
-            if (method.Equals("CashApp", StringComparison.OrdinalIgnoreCase)
-                || method.Equals("EcoCash", StringComparison.OrdinalIgnoreCase)
-                || method.Equals("Bank Transfer", StringComparison.OrdinalIgnoreCase))
+            if (normalized.Equals("CashApp", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("EcoCash", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("Bank Transfer", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("Manual", StringComparison.OrdinalIgnoreCase))
             {
                 return "Manual";
             }
 
-            return method;
+            return normalized;
         }
 
         private async Task NotifyAdminsAsync(int invoiceId, decimal amount, string currencyCode, string method, string paymentStatus, string txRef)
@@ -266,7 +374,7 @@ namespace AppIt.Core.Services
                 .Include(a => a.Role)
                 .Where(a => a.IsActive
                     && a.Role != null
-                    && (a.Role.Name.ToLower() == "super" || a.Role.Name.ToLower() == "admin"))
+                    && (a.Role.Name != null && (a.Role.Name.ToLower() == "super" || a.Role.Name.ToLower() == "admin")))
                 .ToListAsync();
 
             if (superUsers.Count == 0)

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace AppIt.Data.EntityModels
 {
@@ -14,6 +13,6 @@ namespace AppIt.Data.EntityModels
         public string Status { get; set; } = "Pending";
         public bool IsPaid { get; set; }
         public DateTime IssuedDate { get; set; } = DateTime.UtcNow;
+        public ICollection<Payment> Payments { get; set; } = new List<Payment>();
     }
-
 }

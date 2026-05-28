@@ -1,10 +1,12 @@
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/payments")]
     public class PaymentsController : ControllerBase
@@ -21,10 +23,28 @@ namespace AppIt.Api.Controllers
         {
             var items = await _service.GetAllAsync();
             return Ok(items.ApplyQuery(query,
+                nameof(PaymentReadDto.InvoiceId),
                 nameof(PaymentReadDto.Method),
                 nameof(PaymentReadDto.Status),
                 nameof(PaymentReadDto.TransactionReference),
-                nameof(PaymentReadDto.CurrencyCode)));
+                nameof(PaymentReadDto.CurrencyCode),
+                nameof(PaymentReadDto.ProcessedAt)));
+        }
+
+        [HttpGet("mine")]
+        public async Task<IActionResult> GetMine([FromQuery] int? accountId, [FromQuery] ListQueryOptions query)
+        {
+            var items = accountId.HasValue && accountId.Value > 0
+                ? await _service.GetByAccountIdAsync(accountId.Value)
+                : Enumerable.Empty<PaymentReadDto>();
+
+            return Ok(items.ApplyQuery(query,
+                nameof(PaymentReadDto.InvoiceId),
+                nameof(PaymentReadDto.Method),
+                nameof(PaymentReadDto.Status),
+                nameof(PaymentReadDto.TransactionReference),
+                nameof(PaymentReadDto.CurrencyCode),
+                nameof(PaymentReadDto.ProcessedAt)));
         }
 
         [HttpGet("{id}")]

@@ -84,6 +84,18 @@ namespace AppIt.Core.AppServices
             return invoice == null ? null : ToReadDto(invoice);
         }
 
+        public async Task<InvoiceReadDto?> GetByReservationIdAsync(int reservationId)
+        {
+            var invoice = await _context.Set<Invoice>()
+                .AsNoTracking()
+                .Where(i => i.ReservationId == reservationId)
+                .OrderByDescending(i => i.IssuedDate)
+                .ThenByDescending(i => i.Id)
+                .FirstOrDefaultAsync();
+
+            return invoice == null ? null : ToReadDto(invoice);
+        }
+
         public async Task<InvoicePaymentVerificationSummaryDto> VerifyPaymentsAsync(string granularity, DateTime? atUtc = null)
         {
             var (startUtc, endUtc, normalizedGranularity) = ResolveWindow(granularity, atUtc ?? DateTime.UtcNow);

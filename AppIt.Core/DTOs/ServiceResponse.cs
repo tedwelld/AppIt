@@ -5,14 +5,9 @@ namespace AppIt.Core.DTOs
     public class ServiceResponse<T>
     {
         public T? Data { get; set; }
-        public bool IsSuccess { get; set; } = true;
+        public bool Success { get; set; } = true;
         public string Message { get; set; } = string.Empty;
         public DateTime Time { get; set; } = DateTime.UtcNow;
-        public bool Success
-        {
-            get => IsSuccess;
-            set => IsSuccess = value;
-        }
 
         public ServiceResponse() { }
 
@@ -20,7 +15,7 @@ namespace AppIt.Core.DTOs
         {
             Data = data;
             Message = message;
-            IsSuccess = true;
+            Success = true;
             Time = DateTime.UtcNow;
         }
     }

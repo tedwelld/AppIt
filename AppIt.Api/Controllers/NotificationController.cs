@@ -2,12 +2,14 @@ using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.DTOs.Notifications;
 using AppIt.Core.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Authorize]
+    [Route("api/notifications")]
     public class NotificationsController : ControllerBase
     {
         private readonly INotificationService _notificationService;
@@ -27,6 +29,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet("user/{userId:int}")]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> GetByUser(int userId, [FromQuery] ListQueryOptions query)
         {
             var notifications = await _notificationService.GetByUserAsync(userId);
@@ -49,6 +52,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> Create(CreateNotificationDto dto)
         {
             var id = await _notificationService.CreateAsync(dto);

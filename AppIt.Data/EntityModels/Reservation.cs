@@ -62,5 +62,6 @@ namespace AppIt.Data.EntityModels
         public CustomerType? CustomerType { get; set; }
 
         public ICollection<Invoice> Invoices { get; set; } = new List<Invoice>();
+        public ICollection<ReservationServiceItem> ServiceItems { get; set; } = new List<ReservationServiceItem>();
     }
 }

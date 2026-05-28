@@ -4,7 +4,8 @@ namespace AppIt.Core.DTOs
     {
         private const int MaxSize = 200;
         private int _page = 1;
-        private int _pageSize = 20;
+        private const int DefaultPageSize = 10;
+        private int _pageSize = DefaultPageSize;
 
         public int Page
         {
@@ -15,12 +16,17 @@ namespace AppIt.Core.DTOs
         public int PageSize
         {
             get => _pageSize;
-            set => _pageSize = value < 1 ? 20 : Math.Min(value, MaxSize);
+            set => _pageSize = value < 1 ? DefaultPageSize : Math.Min(value, MaxSize);
         }
 
         public string? Search { get; set; }
         public string? SortBy { get; set; }
         public string SortDirection { get; set; } = "asc";
+        public string? Date { get; set; }
+        public string? Month { get; set; }
+        public string? Year { get; set; }
+        public string? DateFrom { get; set; }
+        public string? DateTo { get; set; }
     }
 
     public class PagedResult<T>

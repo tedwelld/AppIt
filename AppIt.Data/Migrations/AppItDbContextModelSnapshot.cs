@@ -143,6 +143,9 @@ namespace AppIt.Data.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<int>("FailedLoginAttempts")
+                        .HasColumnType("int");
+
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -153,6 +156,9 @@ namespace AppIt.Data.Migrations
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("LockoutEnd")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("NationalId")
                         .IsRequired()
@@ -265,6 +271,11 @@ namespace AppIt.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("AgentType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
                     b.Property<string>("CompanyAddress")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -302,6 +313,32 @@ namespace AppIt.Data.Migrations
                     b.HasKey("CompanyId");
 
                     b.ToTable("Companies");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.Currency", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Currencies");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Customer", b =>
@@ -446,6 +483,33 @@ namespace AppIt.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Departments");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.ExchangeRate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime>("EffectiveDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("Rate")
+                        .HasColumnType("decimal(18, 6)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ExchangeRates");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Feature", b =>
@@ -664,6 +728,9 @@ namespace AppIt.Data.Migrations
                     b.Property<int>("InvoiceId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("InvoiceId1")
+                        .HasColumnType("int");
+
                     b.Property<string>("Method")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -685,6 +752,8 @@ namespace AppIt.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("InvoiceId");
+
+                    b.HasIndex("InvoiceId1");
 
                     b.ToTable("Payments");
                 });
@@ -899,6 +968,53 @@ namespace AppIt.Data.Migrations
                     b.HasIndex("CustomerTypeId");
 
                     b.ToTable("Reservations");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.ReservationServiceItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReservationId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.Property<string>("ServiceType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<decimal>("TotalPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReservationId");
+
+                    b.ToTable("ReservationServiceItems");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Role", b =>
@@ -1223,6 +1339,10 @@ namespace AppIt.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("AppIt.Data.EntityModels.Invoice", null)
+                        .WithMany("Payments")
+                        .HasForeignKey("InvoiceId1");
+
                     b.Navigation("Invoice");
                 });
 
@@ -1259,6 +1379,17 @@ namespace AppIt.Data.Migrations
                     b.Navigation("Customer");
 
                     b.Navigation("CustomerType");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.ReservationServiceItem", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.Reservation", "Reservation")
+                        .WithMany("ServiceItems")
+                        .HasForeignKey("ReservationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Reservation");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.RoleFeature", b =>
@@ -1343,6 +1474,11 @@ namespace AppIt.Data.Migrations
                     b.Navigation("RoleFeatures");
                 });
 
+            modelBuilder.Entity("AppIt.Data.EntityModels.Invoice", b =>
+                {
+                    b.Navigation("Payments");
+                });
+
             modelBuilder.Entity("AppIt.Data.EntityModels.Permission", b =>
                 {
                     b.Navigation("FeaturePermissions");
@@ -1355,6 +1491,8 @@ namespace AppIt.Data.Migrations
             modelBuilder.Entity("AppIt.Data.EntityModels.Reservation", b =>
                 {
                     b.Navigation("Invoices");
+
+                    b.Navigation("ServiceItems");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Role", b =>

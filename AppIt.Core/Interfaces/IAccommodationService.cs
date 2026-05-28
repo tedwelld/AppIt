@@ -9,5 +9,6 @@ namespace AppIt.Core.Interfaces.Services
         Task<bool> DeleteAsync(int id);
         Task<AccommodationReadDto?> GetByIdAsync(int id);
         Task<IEnumerable<AccommodationReadDto>> GetAllAsync();
+        Task<AccommodationAvailabilityDto> GetAvailabilityAsync(int year, int month);
     }
 }

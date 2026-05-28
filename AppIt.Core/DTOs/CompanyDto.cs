@@ -7,6 +7,7 @@ namespace AppIt.Core.DTOs
     {
         public int CompanyId { get; set; }
         public string CompanyName { get; set; } = null!;
+        public string AgentType { get; set; } = "Company";
         public string CompanyAddress { get; set; } = null!;
         public string CompanyEmail { get; set; } = null!;
         public string CompanyPhone { get; set; } = null!;
@@ -21,6 +22,9 @@ namespace AppIt.Core.DTOs
     {
         [Required, MaxLength(200)]
         public string CompanyName { get; set; } = null!;
+
+        [MaxLength(40)]
+        public string AgentType { get; set; } = "Company";
 
         [MaxLength(500)]
         public string CompanyAddress { get; set; } = null!;

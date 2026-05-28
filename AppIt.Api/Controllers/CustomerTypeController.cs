@@ -1,12 +1,15 @@
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers
 {
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
+    [Route("api/customer-types")]
     public class CustomerTypeController : ControllerBase
     {
         private readonly ICustomerTypeService _service;

@@ -20,6 +20,7 @@ namespace AppIt.Core.Services
             var company = new Company
             {
                 CompanyName = dto.CompanyName,
+                AgentType = string.IsNullOrWhiteSpace(dto.AgentType) ? "Company" : dto.AgentType,
                 CompanyAddress = dto.CompanyAddress,
                 CompanyEmail = dto.CompanyEmail,
                 CompanyPhone = dto.CompanyPhone,
@@ -42,6 +43,7 @@ namespace AppIt.Core.Services
             if (company == null) return null;
 
             company.CompanyName = dto.CompanyName;
+            company.AgentType = string.IsNullOrWhiteSpace(dto.AgentType) ? "Company" : dto.AgentType;
             company.CompanyAddress = dto.CompanyAddress;
             company.CompanyEmail = dto.CompanyEmail;
             company.CompanyPhone = dto.CompanyPhone;
@@ -80,6 +82,7 @@ namespace AppIt.Core.Services
         {
             CompanyId = company.CompanyId,
             CompanyName = company.CompanyName,
+            AgentType = company.AgentType,
             CompanyAddress = company.CompanyAddress,
             CompanyEmail = company.CompanyEmail,
             CompanyPhone = company.CompanyPhone,

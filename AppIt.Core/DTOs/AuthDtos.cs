@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.RegularExpressions;
 
 namespace AppIt.Core.DTOs
 {
@@ -30,12 +31,14 @@ namespace AppIt.Core.DTOs
 
         [Required]
         [MinLength(8)]
+        [PasswordPolicy]
         public string Password { get; set; } = string.Empty;
     }
 
     public class AuthResponseDto
     {
         public AccountDto User { get; set; } = new();
+        public string Token { get; set; } = string.Empty;
     }
 
     public class PasswordResetRequestDto
@@ -62,6 +65,28 @@ namespace AppIt.Core.DTOs
 
         [Required]
         [MinLength(8)]
+        [PasswordPolicy]
         public string NewPassword { get; set; } = string.Empty;
+    }
+
+    public sealed partial class PasswordPolicyAttribute : ValidationAttribute
+    {
+        public PasswordPolicyAttribute()
+            : base("Password must include uppercase, lowercase, digit, and special characters.")
+        {
+        }
+
+        public override bool IsValid(object? value)
+        {
+            if (value is not string password)
+            {
+                return false;
+            }
+
+            return PasswordRegex().IsMatch(password);
+        }
+
+        [GeneratedRegex(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$")]
+        private static partial Regex PasswordRegex();
     }
 }

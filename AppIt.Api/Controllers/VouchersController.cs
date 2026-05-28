@@ -1,10 +1,12 @@
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppIt.Api.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/vouchers")]
     public class VouchersController : ControllerBase
@@ -24,17 +26,39 @@ namespace AppIt.Api.Controllers
             return Ok(vouchers.ApplyQuery(query,
                 nameof(VoucherReadDto.Code),
                 nameof(VoucherReadDto.Reference),
-                nameof(VoucherReadDto.Type)));
+                nameof(VoucherReadDto.Type),
+                nameof(VoucherReadDto.CreatedAt)));
         }
 
         [HttpGet("mine")]
-        public async Task<IActionResult> GetMine([FromQuery] ListQueryOptions query)
+        public async Task<IActionResult> GetMine([FromQuery] int? accountId, [FromQuery] ListQueryOptions query)
         {
-            var vouchers = await _service.GetAllAsync();
+            var vouchers = accountId.HasValue && accountId.Value > 0
+                ? await _service.GetByAccountIdAsync(accountId.Value)
+                : Enumerable.Empty<VoucherReadDto>();
+
             return Ok(vouchers.ApplyQuery(query,
                 nameof(VoucherReadDto.Code),
                 nameof(VoucherReadDto.Reference),
-                nameof(VoucherReadDto.Type)));
+                nameof(VoucherReadDto.Type),
+                nameof(VoucherReadDto.CreatedAt)));
+        }
+
+        [HttpGet("by-reservation/{reservationId:int}")]
+        public async Task<IActionResult> GetByReservationId(int reservationId)
+        {
+            if (reservationId <= 0)
+            {
+                return BadRequest("Invalid reservation ID.");
+            }
+
+            var voucher = await _service.GetByReservationIdAsync(reservationId);
+            if (voucher == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(voucher);
         }
 
         [HttpGet("{id}")]

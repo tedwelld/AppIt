@@ -13,8 +13,8 @@ namespace AppIt.Core.Services
             return Task.FromResult(new PaymentProviderResult
             {
                 Success = true,
-                Status = "Paid",
-                Message = "Manual payment recorded successfully.",
+                Status = "Pending",
+                Message = "Manual payment recorded. Awaiting admin confirmation.",
                 TransactionReference = reference
             });
         }

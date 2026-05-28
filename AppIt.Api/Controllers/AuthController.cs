@@ -1,3 +1,4 @@
+using AppIt.Api.Services;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -11,17 +12,20 @@ namespace AppIt.Api.Controllers
     {
         private readonly IAuthService _authService;
         private readonly IHostEnvironment _hostEnvironment;
+        private readonly JwtTokenService _jwtTokenService;
 
-        public AuthController(IAuthService authService, IHostEnvironment hostEnvironment)
+        public AuthController(IAuthService authService, IHostEnvironment hostEnvironment, JwtTokenService jwtTokenService)
         {
             _authService = authService;
             _hostEnvironment = hostEnvironment;
+            _jwtTokenService = jwtTokenService;
         }
 
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequestDto dto)
         {
             var response = await _authService.RegisterAsync(dto, HttpContext.Connection.RemoteIpAddress?.ToString());
+            response.Token = _jwtTokenService.GenerateToken(response.User);
             return Ok(response);
         }
 
@@ -29,6 +33,7 @@ namespace AppIt.Api.Controllers
         public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
         {
             var response = await _authService.LoginAsync(dto, HttpContext.Connection.RemoteIpAddress?.ToString());
+            response.Token = _jwtTokenService.GenerateToken(response.User);
             return Ok(response);
         }
 

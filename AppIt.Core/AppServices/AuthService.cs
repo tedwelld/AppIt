@@ -51,6 +51,9 @@ namespace AppIt.Core.Services
 
         public async Task<AuthResponseDto> LoginAsync(LoginRequestDto dto, string? ipAddress = null)
         {
+            const int maxAttempts = 5;
+            const int lockoutMinutes = 15;
+
             var email = dto.Email.Trim().ToLowerInvariant();
             var account = await _context.Accounts
                 .Include(a => a.Role)
@@ -59,6 +62,12 @@ namespace AppIt.Core.Services
             if (account == null)
             {
                 throw new UnauthorizedAccessException("Invalid email or password.");
+            }
+
+            if (account.LockoutEnd.HasValue && account.LockoutEnd.Value > DateTime.UtcNow)
+            {
+                var remaining = (int)Math.Ceiling((account.LockoutEnd.Value - DateTime.UtcNow).TotalMinutes);
+                throw new UnauthorizedAccessException($"Account is locked. Try again in {remaining} minute(s).");
             }
 
             var passwordVerified = VerifyPassword(dto.Password, account.PasswordHash);
@@ -70,6 +79,13 @@ namespace AppIt.Core.Services
 
             if (!passwordVerified)
             {
+                account.FailedLoginAttempts++;
+                if (account.FailedLoginAttempts >= maxAttempts)
+                {
+                    account.LockoutEnd = DateTime.UtcNow.AddMinutes(lockoutMinutes);
+                    account.FailedLoginAttempts = 0;
+                }
+                await _context.SaveChangesAsync();
                 throw new UnauthorizedAccessException("Invalid email or password.");
             }
 
@@ -77,6 +93,10 @@ namespace AppIt.Core.Services
             {
                 throw new UnauthorizedAccessException("Account is deactivated.");
             }
+
+            account.FailedLoginAttempts = 0;
+            account.LockoutEnd = null;
+            await _context.SaveChangesAsync();
 
             return await BuildAuthResponseAsync(account);
         }

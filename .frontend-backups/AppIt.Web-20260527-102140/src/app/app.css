@@ -1,0 +1,144 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+  font-family: 'Nunito', 'Sora', 'Segoe UI', sans-serif;
+}
+
+.appit-template-shell {
+  min-height: 100dvh;
+  background: #f8f9fc;
+}
+
+#wrapper {
+  min-height: 100dvh;
+}
+
+#content-wrapper {
+  min-height: 100dvh;
+}
+
+.sidebar {
+  transition: width 180ms ease, transform 180ms ease;
+}
+
+.sidebar.toggled {
+  width: 6.5rem !important;
+  overflow: hidden;
+}
+
+.sidebar.toggled .sidebar-brand-text,
+.sidebar.toggled .nav-link span,
+.sidebar.toggled .collapse-inner,
+.sidebar.toggled .nav-link .ml-auto {
+  display: none !important;
+}
+
+.group-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.collapse-inner {
+  margin: 0 1rem 0.5rem;
+  padding: 0.35rem;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.collapse-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.55rem;
+  color: #3a3b45;
+  border-radius: 0.35rem;
+  text-decoration: none;
+  font-size: 0.86rem;
+}
+
+.collapse-item:hover,
+.collapse-item.active {
+  color: #4e73df;
+  background: #eaecf4;
+  text-decoration: none;
+}
+
+.appit-view {
+  min-height: calc(100dvh - 10.4rem);
+}
+
+.appit-avatar {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #4e73df;
+  color: #fff;
+  font-weight: 800;
+}
+
+.appit-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  border: 0;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.shell[data-theme='dark'],
+.appit-template-shell[data-theme='dark'] {
+  background: #202536;
+}
+
+.appit-template-shell[data-theme='dark'] #content-wrapper,
+.appit-template-shell[data-theme='dark'] .appit-view {
+  background: #202536;
+}
+
+.appit-template-shell[data-theme='dark'] .topbar,
+.appit-template-shell[data-theme='dark'] .sticky-footer,
+.appit-template-shell[data-theme='dark'] .card,
+.appit-template-shell[data-theme='dark'] .panel,
+.appit-template-shell[data-theme='dark'] .table-panel,
+.appit-template-shell[data-theme='dark'] .auth-panel,
+.appit-template-shell[data-theme='dark'] .chat-panel {
+  background-color: #2f3548 !important;
+  color: #f8f9fc;
+}
+
+.appit-template-shell[data-theme='dark'] .text-gray-600,
+.appit-template-shell[data-theme='dark'] .text-gray-800,
+.appit-template-shell[data-theme='dark'] label,
+.appit-template-shell[data-theme='dark'] .sub,
+.appit-template-shell[data-theme='dark'] .empty {
+  color: #d1d3e2 !important;
+}
+
+@media (max-width: 767.98px) {
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 1000;
+    transform: translateX(0);
+  }
+
+  .sidebar.toggled {
+    transform: translateX(-100%);
+    width: 14rem !important;
+  }
+
+  .sidebar.toggled .sidebar-brand-text,
+  .sidebar.toggled .nav-link span,
+  .sidebar.toggled .collapse-inner,
+  .sidebar.toggled .nav-link .ml-auto {
+    display: initial !important;
+  }
+}

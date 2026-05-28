@@ -1,16 +1,17 @@
 using AppIt.Data.EntityModels;
 using AppIt.Core.Services;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace AppIt.Api.SeedData
 {
     public static class InitialDataSeeder
     {
-        public static async Task SeedAsync(AppItDbContext dbContext)
+        public static async Task SeedAsync(AppItDbContext dbContext, ILogger? logger = null)
         {
             if (dbContext.Database.IsRelational())
             {
-                await dbContext.Database.MigrateAsync();
+                await ApplyPendingMigrationsAsync(dbContext, logger);
             }
             else
             {
@@ -19,14 +20,139 @@ namespace AppIt.Api.SeedData
 
             await SeedRolesAsync(dbContext);
             await SeedAdminAccountAsync(dbContext);
-            await SeedProductsAsync(dbContext);
-            await SeedAccommodationsAsync(dbContext);
-            await SeedActivitiesAsync(dbContext);
+        }
+
+        private static async Task ApplyPendingMigrationsAsync(AppItDbContext dbContext, ILogger? logger)
+        {
+            try
+            {
+                await TryAttachLocalDbFilesAsync(dbContext, logger);
+                await LogPendingMigrationsAsync(dbContext, logger);
+                await dbContext.Database.MigrateAsync();
+            }
+            catch (SqlException ex) when (ex.Number == 5170)
+            {
+                if (!await TryAttachLocalDbFilesAsync(dbContext, logger))
+                {
+                    throw;
+                }
+
+                await LogPendingMigrationsAsync(dbContext, logger);
+                await dbContext.Database.MigrateAsync();
+            }
+        }
+
+        private static async Task LogPendingMigrationsAsync(AppItDbContext dbContext, ILogger? logger)
+        {
+            if (logger == null)
+            {
+                return;
+            }
+
+            var pendingMigrations = (await dbContext.Database.GetPendingMigrationsAsync()).ToList();
+            if (pendingMigrations.Count == 0)
+            {
+                logger.LogInformation("Database is up to date. No pending migrations found.");
+                return;
+            }
+
+            logger.LogInformation(
+                "Applying {MigrationCount} pending database migration(s): {Migrations}",
+                pendingMigrations.Count,
+                string.Join(", ", pendingMigrations));
+        }
+
+        private static async Task<bool> TryAttachLocalDbFilesAsync(AppItDbContext dbContext, ILogger? logger)
+        {
+            var connectionString = dbContext.Database.GetConnectionString();
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                return false;
+            }
+
+            var builder = new SqlConnectionStringBuilder(connectionString);
+            if (!builder.DataSource.Contains("(localdb)", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var databaseName = builder.InitialCatalog;
+            if (string.IsNullOrWhiteSpace(databaseName))
+            {
+                return false;
+            }
+
+            var dataFile = string.IsNullOrWhiteSpace(builder.AttachDBFilename)
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), $"{databaseName}.mdf")
+                : Environment.ExpandEnvironmentVariables(builder.AttachDBFilename);
+
+            if (!Path.IsPathRooted(dataFile))
+            {
+                dataFile = Path.GetFullPath(dataFile);
+            }
+
+            var logFile = Path.Combine(
+                Path.GetDirectoryName(dataFile) ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                $"{databaseName}_log.ldf");
+
+            if (!File.Exists(dataFile))
+            {
+                return false;
+            }
+
+            dbContext.Database.CloseConnection();
+
+            var masterBuilder = new SqlConnectionStringBuilder(connectionString)
+            {
+                InitialCatalog = "master",
+                AttachDBFilename = string.Empty
+            };
+
+            await using var connection = new SqlConnection(masterBuilder.ConnectionString);
+            await connection.OpenAsync();
+
+            await using (var existsCommand = connection.CreateCommand())
+            {
+                existsCommand.CommandText = "SELECT DB_ID(@databaseName);";
+                existsCommand.Parameters.AddWithValue("@databaseName", databaseName);
+                var existingDatabaseId = await existsCommand.ExecuteScalarAsync();
+                if (existingDatabaseId != DBNull.Value && existingDatabaseId != null)
+                {
+                    return true;
+                }
+            }
+
+            logger?.LogWarning(
+                "Database '{DatabaseName}' is not attached, but '{DataFile}' exists. Attaching the existing LocalDB files before applying migrations.",
+                databaseName,
+                dataFile);
+
+            var attachFiles = $"(FILENAME = {ToSqlLiteral(dataFile)})";
+            if (File.Exists(logFile))
+            {
+                attachFiles += $", (FILENAME = {ToSqlLiteral(logFile)})";
+            }
+
+            await using var attachCommand = connection.CreateCommand();
+            attachCommand.CommandText = $"CREATE DATABASE {ToSqlIdentifier(databaseName)} ON {attachFiles} FOR ATTACH;";
+            await attachCommand.ExecuteNonQueryAsync();
+            SqlConnection.ClearAllPools();
+            return true;
+        }
+
+        private static string ToSqlIdentifier(string value)
+        {
+            return $"[{value.Replace("]", "]]")}]";
+        }
+
+        private static string ToSqlLiteral(string value)
+        {
+            return $"N'{value.Replace("'", "''")}'";
         }
 
         private static async Task SeedRolesAsync(AppItDbContext dbContext)
         {
-            var roleNames = new[] { "regular", "super", "admin" };
+            var roleNames = new[] { "super" };
             var existing = await dbContext.Roles.Select(r => r.Name.ToLower()).ToListAsync();
             var missing = roleNames.Where(name => !existing.Contains(name)).Select(name => new Role { Name = name }).ToList();
 
@@ -39,28 +165,6 @@ namespace AppIt.Api.SeedData
             await dbContext.SaveChangesAsync();
         }
 
-        private static async Task SeedProductsAsync(AppItDbContext dbContext)
-        {
-            var products = new List<Product>
-            {
-                new() { Name = "Bungee", Category = "Adventure", Description = "Leap from the gorge with expert guides.", BasePriceUsd = 120m, IsActive = true, CreatedDate = DateTime.UtcNow },
-                new() { Name = "Swing", Category = "Adventure", Description = "A giant swing over the river.", BasePriceUsd = 95m, IsActive = true, CreatedDate = DateTime.UtcNow },
-                new() { Name = "Bridge Tours", Category = "Tours", Description = "Guided bridge walk and history.", BasePriceUsd = 55m, IsActive = true, CreatedDate = DateTime.UtcNow },
-                new() { Name = "View of the Falls", Category = "Scenic", Description = "Sunrise viewpoints and photo stops.", BasePriceUsd = 35m, IsActive = true, CreatedDate = DateTime.UtcNow },
-                new() { Name = "Boat Cruise", Category = "Water", Description = "Sunset cruise with refreshments.", BasePriceUsd = 80m, IsActive = true, CreatedDate = DateTime.UtcNow }
-            };
-
-            var existingNames = await dbContext.Products.Select(p => p.Name.ToLower()).ToListAsync();
-            var missing = products.Where(product => !existingNames.Contains(product.Name.ToLower())).ToList();
-            if (missing.Count == 0)
-            {
-                return;
-            }
-
-            dbContext.Products.AddRange(missing);
-            await dbContext.SaveChangesAsync();
-        }
-
         private static async Task SeedAdminAccountAsync(AppItDbContext dbContext)
         {
             var superRole = await dbContext.Roles.FirstOrDefaultAsync(r => r.Name.ToLower() == "super");
@@ -69,15 +173,19 @@ namespace AppIt.Api.SeedData
                 return;
             }
 
+            var adminPassword = Environment.GetEnvironmentVariable("APPIT_ADMIN_PASSWORD") ?? "Admin@2026";
             var existing = await dbContext.Accounts.FirstOrDefaultAsync(a => a.Email.ToLower() == "admin@appit.com");
             if (existing != null)
             {
                 if (string.IsNullOrWhiteSpace(existing.PasswordHash))
                 {
-                    existing.PasswordHash = AuthService.HashPassword("Admin@2026");
-                    existing.UpdatedDate = DateTime.UtcNow;
-                    await dbContext.SaveChangesAsync();
+                    existing.PasswordHash = AuthService.HashPassword(adminPassword);
                 }
+
+                existing.RoleId = superRole.RoleId;
+                existing.IsActive = true;
+                existing.UpdatedDate = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync();
                 return;
             }
 
@@ -86,7 +194,7 @@ namespace AppIt.Api.SeedData
                 FirstName = "System",
                 LastName = "Administrator",
                 Email = "admin@appit.com",
-                PasswordHash = AuthService.HashPassword("Admin@2026"),
+                PasswordHash = AuthService.HashPassword(adminPassword),
                 Phone = "+263 77 000 0000",
                 PreferredCurrency = "USD",
                 RoleId = superRole.RoleId,
@@ -95,49 +203,6 @@ namespace AppIt.Api.SeedData
                 UpdatedDate = DateTime.UtcNow
             });
 
-            await dbContext.SaveChangesAsync();
-        }
-
-        private static async Task SeedAccommodationsAsync(AppItDbContext dbContext)
-        {
-            var rooms = new List<Accommodation>
-            {
-                new() { Type = "Single", Description = "Cozy single room with balcony.", Capacity = 1, BasePriceUsd = 75m, IsActive = true, CreatedDate = DateTime.UtcNow },
-                new() { Type = "Double", Description = "Double room with panoramic views.", Capacity = 2, BasePriceUsd = 120m, IsActive = true, CreatedDate = DateTime.UtcNow },
-                new() { Type = "Express", Description = "Fast check-in business suite.", Capacity = 2, BasePriceUsd = 150m, IsActive = true, CreatedDate = DateTime.UtcNow },
-                new() { Type = "Standard", Description = "Classic comfort room.", Capacity = 2, BasePriceUsd = 95m, IsActive = true, CreatedDate = DateTime.UtcNow }
-            };
-
-            var existingTypes = await dbContext.Accommodations.Select(a => a.Type.ToLower()).ToListAsync();
-            var missing = rooms.Where(room => !existingTypes.Contains(room.Type.ToLower())).ToList();
-            if (missing.Count == 0)
-            {
-                return;
-            }
-
-            dbContext.Accommodations.AddRange(missing);
-            await dbContext.SaveChangesAsync();
-        }
-
-        private static async Task SeedActivitiesAsync(AppItDbContext dbContext)
-        {
-            var activities = new List<Activity>
-            {
-                new() { Name = "Bungee", Description = "High-adrenaline jump experience.", BasePriceUsd = 120m, IsActive = true, CreatedDate = DateTime.UtcNow },
-                new() { Name = "Gorge Swing", Description = "Swing over the misty gorge.", BasePriceUsd = 90m, IsActive = true, CreatedDate = DateTime.UtcNow },
-                new() { Name = "Bridge Tour", Description = "Architecture and history tour.", BasePriceUsd = 55m, IsActive = true, CreatedDate = DateTime.UtcNow },
-                new() { Name = "Falls View", Description = "Guided falls vista walk.", BasePriceUsd = 35m, IsActive = true, CreatedDate = DateTime.UtcNow },
-                new() { Name = "Boat Cruise", Description = "Sunset cruise and wildlife.", BasePriceUsd = 80m, IsActive = true, CreatedDate = DateTime.UtcNow }
-            };
-
-            var existingNames = await dbContext.Activities.Select(a => a.Name.ToLower()).ToListAsync();
-            var missing = activities.Where(activity => !existingNames.Contains(activity.Name.ToLower())).ToList();
-            if (missing.Count == 0)
-            {
-                return;
-            }
-
-            dbContext.Activities.AddRange(missing);
             await dbContext.SaveChangesAsync();
         }
     }

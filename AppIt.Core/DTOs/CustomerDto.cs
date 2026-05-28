@@ -27,6 +27,7 @@ namespace AppIt.Core.DTOs
         public string? Notes { get; set; }
 
         public int? CustomerTypeId { get; set; }
+        public int? AgentCompanyId { get; set; }
         public IEnumerable<int>? ReservationIds { get; set; }
     }
 
@@ -50,6 +51,7 @@ namespace AppIt.Core.DTOs
         public int LastSavedBy { get; set; }
         public string? Notes { get; set; }
         public int? CustomerTypeId { get; set; }
+        public int? AgentCompanyId { get; set; }
     }
 
     public class UpdateCustomerDto : CreateCustomerDto

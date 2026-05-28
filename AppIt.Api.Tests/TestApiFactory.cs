@@ -16,7 +16,7 @@ public class TestApiFactory : WebApplicationFactory<AppIt.Api.Program>
             {
                 ["Database:UseInMemory"] = "true",
                 ["Database:InMemoryName"] = _databaseName,
-                ["ConnectionStrings:DefaultConnection"] = $"Server=(localdb)\\mssqllocaldb;Database={_databaseName};Trusted_Connection=True;TrustServerCertificate=True"
+                ["ConnectionStrings:DefaultConnection"] = string.Empty
             });
         });
     }

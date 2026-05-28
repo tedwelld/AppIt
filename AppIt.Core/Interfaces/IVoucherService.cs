@@ -10,5 +10,6 @@ namespace AppIt.Core.Interfaces.Services
         Task<VoucherReadDto?> GetByIdAsync(int id);
         Task<IEnumerable<VoucherReadDto>> GetAllAsync();
         Task<IEnumerable<VoucherReadDto>> GetByAccountIdAsync(int accountId);
+        Task<VoucherReadDto?> GetByReservationIdAsync(int reservationId);
     }
 }

@@ -1,0 +1,121 @@
+<div id="wrapper" class="appit-template-shell" [attr.data-theme]="theme()">
+  <ul
+    class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion"
+    id="main-sidebar"
+    [class.toggled]="!sidebarOpen()"
+  >
+    <a class="sidebar-brand d-flex align-items-center justify-content-center" routerLink="/">
+      <div class="sidebar-brand-icon rotate-n-15">
+        <i class="fas fa-route"></i>
+      </div>
+      <div class="sidebar-brand-text mx-3">AppIt</div>
+    </a>
+
+    <hr class="sidebar-divider my-0" />
+
+    <li class="nav-item" *ngFor="let group of navGroups(); trackBy: trackByGroup">
+      <button class="nav-link group-toggle" type="button" (click)="toggleGroup(group.id)">
+        <i [class]="faIcon(group.icon)"></i>
+        <span>{{ group.name }}</span>
+        <i class="fas ml-auto" [class.fa-angle-down]="isCollapsed(group.id)" [class.fa-angle-up]="!isCollapsed(group.id)"></i>
+      </button>
+
+      <div class="collapse-inner rounded" [class.d-none]="isCollapsed(group.id)">
+        <a
+          *ngFor="let item of group.items; trackBy: trackByItem"
+          [routerLink]="item.route"
+          routerLinkActive="active"
+          class="collapse-item"
+          (click)="onNavigateFromSidebar()"
+        >
+          <i [class]="faIcon(item.icon)"></i>
+          <span>{{ item.title }}</span>
+        </a>
+      </div>
+    </li>
+
+    <hr class="sidebar-divider d-none d-md-block" />
+
+    <div class="text-center d-none d-md-inline">
+      <button class="rounded-circle border-0" id="sidebarToggle" type="button" (click)="toggleSidebar()"></button>
+    </div>
+  </ul>
+
+  <div id="content-wrapper" class="d-flex flex-column">
+    <div id="content">
+      <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+        <button
+          class="btn btn-link d-md-none rounded-circle mr-3"
+          type="button"
+          (click)="toggleSidebar()"
+          aria-controls="main-sidebar"
+          [attr.aria-expanded]="sidebarOpen()"
+        >
+          <i class="fa fa-bars"></i>
+        </button>
+
+        <div class="d-none d-sm-inline-block mr-auto ml-md-3 my-2 my-md-0">
+          <h1 class="h5 mb-0 text-gray-800">{{ panelTitle() }}</h1>
+          <small class="text-gray-600">Adventure & Hospitality Suite</small>
+        </div>
+
+        <ul class="navbar-nav ml-auto">
+          <li class="nav-item d-none d-lg-flex align-items-center mr-3">
+            <div class="text-right small text-gray-600">
+              <div>{{ now() | date: 'EEEE, MMM d, y' }}</div>
+              <strong>{{ now() | date: 'HH:mm:ss' }}</strong>
+            </div>
+          </li>
+
+          <li class="nav-item d-flex align-items-center mr-2" *ngIf="currentUser() as user">
+            <span class="mr-2 d-none d-lg-inline text-gray-600 small">{{ displayName() }}</span>
+            <div class="img-profile rounded-circle appit-avatar">
+              <span *ngIf="!user.avatarUrl">{{ initials() }}</span>
+              <img *ngIf="user.avatarUrl" [src]="user.avatarUrl" [alt]="displayName()" />
+            </div>
+          </li>
+
+          <li class="nav-item d-flex align-items-center">
+            <button class="btn btn-sm btn-outline-primary mr-2" type="button" (click)="toggleTheme()">
+              <i class="fas fa-adjust"></i>
+            </button>
+            <a class="btn btn-sm btn-primary" *ngIf="!currentUser()" routerLink="/auth">
+              <i class="fas fa-sign-in-alt mr-1"></i>
+              Sign In
+            </a>
+            <button class="btn btn-sm btn-danger" *ngIf="currentUser()" type="button" (click)="logout()">
+              <i class="fas fa-sign-out-alt mr-1"></i>
+              Sign Out
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="container-fluid appit-view">
+        <div class="alert alert-info shadow-sm" *ngIf="welcome()">
+          <span>{{ welcome() }}</span>
+          <button class="close" type="button" aria-label="Dismiss" (click)="dismissWelcome()">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <router-outlet></router-outlet>
+      </div>
+    </div>
+
+    <footer class="sticky-footer bg-white">
+      <div class="container my-auto">
+        <div class="copyright text-center my-auto">
+          <span>Powered By Tedwell (YourItGuy - 2026).</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <button
+    *ngIf="sidebarOpen()"
+    class="sidebar-backdrop d-md-none"
+    type="button"
+    aria-label="Close navigation panel"
+    (click)="closeSidebar()"
+  ></button>
+</div>
