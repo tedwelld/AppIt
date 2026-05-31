@@ -1,3 +1,5 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
@@ -34,7 +36,13 @@ namespace AppIt.Api.Controllers
         [HttpGet("mine")]
         public async Task<IActionResult> GetMine([FromQuery] ListQueryOptions query)
         {
-            var messages = await _service.GetAllAsync();
+            var email = User.FindFirstValue(ClaimTypes.Email)
+                ?? User.FindFirstValue(JwtRegisteredClaimNames.Email);
+
+            if (string.IsNullOrEmpty(email))
+                return Unauthorized();
+
+            var messages = await _service.GetByEmailAsync(email);
             return Ok(messages.ApplyQuery(query,
                 nameof(SupportMessageReadDto.FromEmail),
                 nameof(SupportMessageReadDto.ToEmail),

@@ -59,10 +59,10 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
         key: 'reservation-groups',
         group: 'Reservations',
         title: 'Trip Accounts',
-        subtitle: 'Trip account view mapped to AppIt reservation records.',
-        endpoint: '/api/reservations',
+        subtitle: 'Agent and company trip accounts registered in AppIt.',
+        endpoint: '/api/trip-accounts',
         icon: 'pi pi-users',
-        columns: ['reference', 'customerEmail', 'currency', 'totalAmount', 'status']
+        columns: ['agentName', 'agentType', 'email', 'phone', 'accountNumber']
     },
     'reservation-reports': {
         key: 'reservation-reports',
@@ -139,11 +139,11 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
     'credit-notes': {
         key: 'credit-notes',
         group: 'Accounts',
-        title: 'Manage Refunds',
-        subtitle: 'Track and manage credit notes, refunds, and red-flagged transactions.',
-        endpoint: '/api/reservations',
+        title: 'Credit Notes & Refunds',
+        subtitle: 'Track and manage credit notes and refunds.',
+        endpoint: '/api/credit-notes',
         icon: 'pi pi-undo',
-        columns: ['voucherCode', 'invoiceId', 'agent', 'agencyConsultantId', 'customer', 'totalAmount', 'invoiced', 'redFlag', 'createdAt']
+        columns: ['invoiceId', 'reservationId', 'reason', 'amount', 'currencyCode', 'status', 'createdAt']
     },
     'deposit-reports': {
         key: 'deposit-reports',
@@ -158,10 +158,10 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
         key: 'proof-of-payments',
         group: 'Accounts',
         title: 'Proof Of Payment',
-        subtitle: 'Proof-of-payment review using AppIt payment records.',
-        endpoint: '/api/payments',
+        subtitle: 'Proof-of-payment review and verification.',
+        endpoint: '/api/proof-of-payments',
         icon: 'pi pi-credit-card',
-        columns: ['invoiceId', 'method', 'status', 'transactionReference', 'amount']
+        columns: ['paymentId', 'invoiceId', 'documentUrl', 'status', 'uploadedAt', 'verifiedAt', 'verifiedBy']
     },
     'check-in': {
         key: 'check-in',
@@ -170,8 +170,7 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
         subtitle: 'Operations check-in queue from AppIt reservations and vouchers.',
         endpoint: '/api/reservations',
         icon: 'pi pi-check-circle',
-        columns: ['reference', 'voucherCode', 'customerEmail', 'status', 'totalAmount'],
-        unsupportedActions: ['Confirm Check In']
+        columns: ['reference', 'voucherCode', 'customerEmail', 'status', 'totalAmount']
     },
     'opera-management': {
         key: 'opera-management',
@@ -191,6 +190,24 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
         endpoint: '/api/audit-logs',
         icon: 'pi pi-history',
         columns: ['entityName', 'action', 'performedBy', 'performedAt', 'changes']
+    },
+    'day-end': {
+        key: 'day-end',
+        group: 'Operations',
+        title: 'Day-End Audit',
+        subtitle: 'Open and close daily audit records with revenue totals.',
+        endpoint: '/api/day-end',
+        icon: 'pi pi-sun',
+        columns: ['auditDate', 'openedBy', 'closedBy', 'openedAt', 'closedAt', 'totalRevenue', 'status']
+    },
+    'commissions': {
+        key: 'commissions',
+        group: 'Accounts',
+        title: 'Commissions',
+        subtitle: 'Track and manage consultant commissions by reservation.',
+        endpoint: '/api/commissions',
+        icon: 'pi pi-percentage',
+        columns: ['reservationId', 'consultantId', 'percentage', 'amount', 'currencyCode', 'status', 'paidAt']
     }
 };
 
@@ -208,59 +225,49 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
             </div>
 
             <article class="workspace-card" *ngIf="flowKey() === 'occupancy-calendar'">
-                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
-                    <div>
-                        <h2 class="font-display text-2xl mt-0 mb-1">Monthly Occupancy Calendar</h2>
-                        <p class="text-muted-color m-0">Confirmed and pending bookings by day with capacity usage.</p>
-                    </div>
-                    <div class="capacity-strip">
-                        <span><strong>{{ confirmedCount() }}</strong> Confirmed</span>
-                        <span><strong>{{ pendingCount() }}</strong> Pending</span>
-                        <span><strong>{{ capacityPercent() }}%</strong> Capacity</span>
-                    </div>
+                <div class="reference-calendar-toolbar">
+                    <button pButton type="button" label="< Prev" severity="success" (click)="changeOccupancyMonth(-1)"></button>
+                    <h2>{{ monthLabel(occupancyMonth()) }}</h2>
+                    <button pButton type="button" label="Next >" severity="success" (click)="changeOccupancyMonth(1)"></button>
                 </div>
 
-                <div class="occupancy-calendar-grid">
-                    <div class="calendar-weekday" *ngFor="let day of weekDays">{{ day }}</div>
-                    <div class="calendar-day" *ngFor="let day of calendarDays()" [class.calendar-day-muted]="!day.inMonth">
-                        <div class="calendar-day-head">
-                            <strong>{{ day.date.getDate() }}</strong>
-                            <span>{{ day.capacity }}%</span>
-                        </div>
-                        <div class="calendar-day-bars">
-                            <span class="calendar-bar confirmed" [style.width.%]="day.confirmedPercent"></span>
-                            <span class="calendar-bar pending" [style.width.%]="day.pendingPercent"></span>
-                        </div>
-                        <div class="calendar-day-meta">
-                            <small>{{ day.confirmed }} confirmed</small>
-                            <small>{{ day.pending }} pending</small>
+                <div class="reference-calendar-grid">
+                    <div class="reference-weekday" *ngFor="let day of weekDays">{{ day }}</div>
+                    <div class="reference-day" *ngFor="let day of calendarDays()" [class.reference-day-muted]="!day.inMonth">
+                        <strong class="reference-day-number" *ngIf="day.inMonth">{{ day.date.getDate() }}</strong>
+                        <div class="reference-line-list" *ngIf="day.inMonth">
+                            <div class="reference-line">
+                                <span>Confirmed:</span>
+                                <strong [class]="calendarValueClass(day.confirmed, day.confirmed + day.pending)">{{ day.confirmed }}</strong>
+                            </div>
+                            <div class="reference-line">
+                                <span>Pending:</span>
+                                <strong [class]="calendarValueClass(day.pending, day.confirmed + day.pending)">{{ day.pending }}</strong>
+                            </div>
+                            <div class="reference-line">
+                                <span>Occupancy:</span>
+                                <strong [class]="calendarValueClass(day.capacity, 100)">{{ day.capacity }}%</strong>
+                            </div>
                         </div>
                     </div>
                 </div>
             </article>
 
             <article class="workspace-card" *ngIf="flowKey() === 'availability-calendar'">
-                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
-                    <div>
-                        <h2 class="font-display text-2xl mt-0 mb-1">Accommodation Availability Calendar</h2>
-                        <p class="text-muted-color m-0">Available units per accommodation type by day.</p>
-                    </div>
-                    <div class="capacity-strip">
-                        <input pInputText type="month" [(ngModel)]="availMonth" (change)="loadAvailability()" />
-                        <button pButton type="button" icon="pi pi-refresh" label="Refresh" (click)="loadAvailability()"></button>
-                    </div>
+                <div class="reference-calendar-toolbar">
+                    <button pButton type="button" label="< Prev" severity="success" (click)="changeAvailabilityMonth(-1)"></button>
+                    <h2>{{ monthLabel(availMonth()) }}</h2>
+                    <button pButton type="button" label="Next >" severity="success" (click)="changeAvailabilityMonth(1)"></button>
                 </div>
 
-                <div class="occupancy-calendar-grid" *ngIf="availTypes().length">
-                    <div class="calendar-weekday" *ngFor="let day of weekDays">{{ day }}</div>
-                    <div class="avail-day" *ngFor="let day of availDays()" [class.calendar-day-muted]="!day.inMonth">
-                        <div class="calendar-day-head">
-                            <strong>{{ day.day }}</strong>
-                        </div>
-                        <div class="avail-type-list">
-                            <div class="avail-type-row" *ngFor="let ta of day.typeAvailability">
-                                <span class="avail-type-label">{{ ta.type }}:</span>
-                                <span class="avail-type-value" [class.avail-low]="ta.available <= 0" [class.avail-ok]="ta.available > 0">{{ ta.available }}</span>
+                <div class="reference-calendar-grid" *ngIf="availTypes().length">
+                    <div class="reference-weekday" *ngFor="let day of weekDays">{{ day }}</div>
+                    <div class="reference-day" *ngFor="let day of availDays()" [class.reference-day-muted]="!day.inMonth">
+                        <strong class="reference-day-number" *ngIf="day.inMonth">{{ day.day }}</strong>
+                        <div class="reference-line-list" *ngIf="day.inMonth">
+                            <div class="reference-line" *ngFor="let ta of day.typeAvailability">
+                                <span [title]="guestCapacityTitle(ta)">{{ ta.type }}:</span>
+                                <strong [class]="calendarValueClass(ta.available, ta.totalCapacity)">{{ ta.available }}</strong>
                             </div>
                         </div>
                     </div>
@@ -271,10 +278,137 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
             <article class="workspace-card" *ngIf="flowKey() === 'flow-charts'">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
                     <div>
-                        <h2 class="font-display text-2xl mt-0 mb-1">Activity Flow Charts</h2>
-                        <p class="text-muted-color m-0">Inline activity flow across confirmed, pending, completed, open, and cancelled bookings.</p>
+                        <h2 class="font-display text-2xl mt-0 mb-1">Flow Charts</h2>
+                        <p class="text-muted-color m-0">Search every service captured by the system. Use the filters to narrow the results across any date, agent, product type, or category.</p>
                     </div>
                 </div>
+
+                <div class="filter-bar">
+                    <div class="filter-field">
+                        <label>Main Filter</label>
+                        <select class="p-inputtext p-component" [(ngModel)]="statusFilter">
+                            <option value="All">All Statuses</option>
+                            <option value="Enquiry">Enquiry</option>
+                            <option value="Provisional">Provisional</option>
+                            <option value="Confirmed">Confirmed</option>
+                            <option value="Closed">Closed</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label>Date Type</label>
+                        <select class="p-inputtext p-component" [(ngModel)]="dateType">
+                            <option value="all">All Time</option>
+                            <option value="range">Date Range</option>
+                            <option value="day">Single Day</option>
+                            <option value="month">Month</option>
+                        </select>
+                    </div>
+                    <div class="filter-field" *ngIf="dateType === 'range' || dateType === 'day'">
+                        <label>Start Date</label>
+                        <input pInputText type="date" [(ngModel)]="dateFrom" />
+                    </div>
+                    <div class="filter-field" *ngIf="dateType === 'range'">
+                        <label>End Date</label>
+                        <input pInputText type="date" [(ngModel)]="dateTo" />
+                    </div>
+                    <div class="filter-field" *ngIf="dateType === 'month'">
+                        <label>Month</label>
+                        <input pInputText type="month" [(ngModel)]="monthFilter" />
+                    </div>
+                    <div class="filter-field">
+                        <label>Agent Filter</label>
+                        <select class="p-inputtext p-component" [(ngModel)]="agentFilter">
+                            <option value="All">All Agents</option>
+                            <option *ngFor="let agent of agentFilterOptions()" [value]="agent.value">{{ agent.label }}</option>
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label>Product Type</label>
+                        <select class="p-inputtext p-component" [(ngModel)]="productTypeFilter">
+                            <option value="All">All Types</option>
+                            <option value="Product">Product</option>
+                            <option value="Accommodation">Accommodation</option>
+                            <option value="Activity">Activity</option>
+                            <option value="Transfer">Transfer</option>
+                            <option value="Tour">Tour</option>
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label>Category Filter</label>
+                        <select class="p-inputtext p-component" [(ngModel)]="categoryFilter">
+                            <option value="All">All Categories</option>
+                            <option *ngFor="let cat of categoryOptions()" [value]="cat">{{ cat }}</option>
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label>Invoiced</label>
+                        <select class="p-inputtext p-component" [(ngModel)]="invoicedFilter">
+                            <option value="All">All</option>
+                            <option value="Yes">Invoiced</option>
+                            <option value="No">Not Invoiced</option>
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label>Display Currency</label>
+                        <select class="p-inputtext p-component" [(ngModel)]="displayCurrency" (ngModelChange)="onDisplayCurrencyChange($event)">
+                            <option *ngFor="let c of currencyOptions()" [value]="c.code">{{ c.code }} - {{ c.name }}</option>
+                        </select>
+                    </div>
+                    <div class="filter-field filter-field-grow">
+                        <label>Voucher Search</label>
+                        <input pInputText type="text" [(ngModel)]="voucherSearch" placeholder="Voucher or reference..." (keyup.enter)="applyFlowFilters()" />
+                    </div>
+                    <div class="filter-actions">
+                        <button pButton type="button" icon="pi pi-print" label="Print" severity="info" (click)="printFlowResults()"></button>
+                        <button pButton type="button" icon="pi pi-filter" label="Apply Filters" (click)="applyFlowFilters()"></button>
+                        <button pButton type="button" icon="pi pi-times" label="Reset" severity="danger" (click)="resetFlowFilters()"></button>
+                    </div>
+                </div>
+
+                <div class="flow-summary-strip">
+                    <span><strong>{{ flowResults().length }}</strong> results</span>
+                    <span><strong>{{ money(flowResultsTotal(), displayCurrency) }}</strong> total ({{ displayCurrency }})</span>
+                    <span *ngIf="rateNote()" class="text-muted-color text-sm">{{ rateNote() }}</span>
+                </div>
+
+                <p-table [value]="flowResults()" styleClass="p-datatable-sm mt-3" [rows]="10" [paginator]="flowResults().length > 10" [rowsPerPageOptions]="[10, 25, 50]" responsiveLayout="scroll">
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th>Voucher</th>
+                            <th>Reference</th>
+                            <th>Customer</th>
+                            <th>Agent</th>
+                            <th>Services</th>
+                            <th>Status</th>
+                            <th>Invoiced</th>
+                            <th class="text-right">Amount ({{ displayCurrency }})</th>
+                            <th>Date</th>
+                            <th class="text-right w-20">Actions</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-row>
+                        <tr>
+                            <td>{{ display(row.voucherCode) }}</td>
+                            <td>{{ display(row.reference) }}</td>
+                            <td>{{ customerName(row) }}</td>
+                            <td>{{ agentName(row) }}</td>
+                            <td>{{ serviceSummary(row) }}</td>
+                            <td><p-tag [value]="display(row.status)" [severity]="statusSeverity(row.status)"></p-tag></td>
+                            <td>{{ row.invoiceId ? 'Yes' : 'No' }}</td>
+                            <td class="text-right font-semibold">{{ money(convertAmount(row.totalAmount, row.currency), displayCurrency) }}</td>
+                            <td>{{ row.createdAt | date:'MM/dd/yyyy' }}</td>
+                            <td class="text-right">
+                                <button pButton type="button" icon="pi pi-eye" rounded text class="app-row-action" pTooltip="View" (click)="view(row)"></button>
+                            </td>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="emptymessage">
+                        <tr><td colspan="10" class="text-center text-muted-color py-6">No services match the current filters.</td></tr>
+                    </ng-template>
+                </p-table>
+
+                <h3 class="font-display text-xl mt-6 mb-3">Activity Flow Summary</h3>
                 <div class="flow-chart-inline">
                     <div class="flow-card" *ngFor="let flow of activityFlow()">
                         <div class="flow-card-head">
@@ -311,7 +445,7 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
                         <input pInputText type="date" [ngModel]="exchangeRateDate()" (ngModelChange)="onExchangeRateDateChange($event)" class="w-44" />
                         <button pButton type="button" icon="pi pi-plus" label="Add Rate" (click)="addExchangeRate()"></button>
                         <button pButton type="button" icon="pi pi-save" label="Save All" (click)="saveExchangeRates()" severity="success"></button>
-                        <button pButton type="button" icon="pi pi-refresh" (click)="loadExchangeRates()" severity="secondary"></button>
+                        <button pButton type="button" icon="pi pi-refresh" (click)="loadExchangeRates()" severity="warn"></button>
                     </div>
                 </div>
 
@@ -378,8 +512,8 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
                         </select>
                         <input pInputText type="text" [(ngModel)]="invoicingVoucher" placeholder="Voucher No..." class="w-40" />
                         <input pInputText type="date" [(ngModel)]="invoicingDate" class="w-40" />
-                        <button pButton type="button" icon="pi pi-search" (click)="loadInvoicing()" severity="secondary"></button>
-                        <button pButton type="button" icon="pi pi-refresh" (click)="clearInvoicingFilters()" severity="secondary"></button>
+                        <button pButton type="button" icon="pi pi-search" (click)="loadInvoicing()" severity="info"></button>
+                        <button pButton type="button" icon="pi pi-refresh" (click)="clearInvoicingFilters()" severity="warn"></button>
                     </div>
                 </div>
 
@@ -443,78 +577,229 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
                     <div class="flex items-center gap-3">
                         <i class="pi pi-undo text-2xl text-primary"></i>
                         <div>
-                            <h2 class="font-display text-2xl mt-0 mb-1">Manage Refunds</h2>
-                            <p class="text-muted-color m-0">Track and manage credit notes, refunds, and red-flagged transactions.</p>
+                            <h2 class="font-display text-2xl mt-0 mb-1">Credit Notes &amp; Refunds</h2>
+                            <p class="text-muted-color m-0">Track and manage credit notes and refund records.</p>
                         </div>
                     </div>
                     <div class="flex items-center gap-2 flex-wrap">
-                        <button pButton type="button" icon="pi pi-plus" label="Create Refund" (click)="cnCreateRefund()"></button>
-                        <input pInputText type="text" [ngModel]="cnVoucher()" (ngModelChange)="cnVoucher.set($event)" placeholder="Search by voucher..." class="w-48" />
-                        <button pButton type="button" icon="pi pi-search" (click)="loadCreditNotes()" severity="secondary"></button>
+                        <button pButton type="button" icon="pi pi-plus" label="New Credit Note" (click)="cnCreateRefund()"></button>
+                        <input pInputText type="text" [ngModel]="cnVoucher()" (ngModelChange)="cnVoucher.set($event)" placeholder="Search..." class="w-44" />
+                        <button pButton type="button" icon="pi pi-search" (click)="loadCreditNotes()" severity="info"></button>
+                        <button pButton type="button" icon="pi pi-refresh" (click)="clearCnFilters()" severity="warn" rounded text></button>
                     </div>
                 </div>
 
-                <div class="workspace-card p-3 mb-4 flex flex-wrap items-center gap-3 bg-surface-ground">
-                    <button pButton type="button" [label]="cnFilterMode() === 'All' ? '• All' : 'All'" severity="secondary" [text]="cnFilterMode() !== 'All'" (click)="cnSetFilter('All')"></button>
-                    <button pButton type="button" [label]="cnFilterMode() === 'Today' ? '• Today' : 'Today'" severity="secondary" [text]="cnFilterMode() !== 'Today'" (click)="cnSetFilter('Today')"></button>
-                    <label class="flex items-center gap-1 text-sm">
-                        Date:
-                        <input pInputText type="date" [ngModel]="cnDate()" (ngModelChange)="cnDate.set($event); cnSetFilter('Date')" class="w-36" />
-                    </label>
-                    <label class="flex items-center gap-1 text-sm">
-                        From:
-                        <input pInputText type="date" [ngModel]="cnDateFrom()" (ngModelChange)="cnDateFrom.set($event); cnSetFilter('DateRange')" class="w-36" />
-                    </label>
-                    <label class="flex items-center gap-1 text-sm">
-                        To:
-                        <input pInputText type="date" [ngModel]="cnDateTo()" (ngModelChange)="cnDateTo.set($event); cnSetFilter('DateRange')" class="w-36" />
-                    </label>
-                    <label class="flex items-center gap-1 text-sm">
-                        Month:
-                        <input pInputText type="month" [ngModel]="cnMonth()" (ngModelChange)="cnMonth.set($event); cnSetFilter('Month')" class="w-36" />
-                    </label>
-                    <button pButton type="button" icon="pi pi-refresh" (click)="clearCnFilters()" severity="secondary" rounded text></button>
-                </div>
-
-                <p-table [value]="cnRows()" responsiveLayout="scroll" styleClass="p-datatable-sm" [loading]="loading()">
+                <p-table [value]="cnRows()" responsiveLayout="scroll" styleClass="p-datatable-sm" [loading]="loading()" [paginator]="cnRows().length > 10" [rows]="10">
                     <ng-template pTemplate="header">
                         <tr>
-                            <th>Voucher No</th>
-                            <th>Invoice No</th>
-                            <th>Agent</th>
-                            <th>Agent Consultant</th>
-                            <th>Customer</th>
-                            <th>Amount</th>
-                            <th>Invoiced</th>
-                            <th>Red Flag</th>
-                            <th>Date</th>
-                            <th class="text-right w-48">Actions</th>
+                            <th>Invoice</th>
+                            <th>Reservation</th>
+                            <th>Reason</th>
+                            <th class="text-right">Amount</th>
+                            <th>Currency</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th class="text-right w-40">Actions</th>
                         </tr>
                     </ng-template>
                     <ng-template pTemplate="body" let-row>
                         <tr>
-                            <td>{{ row.voucherCode || '-' }}</td>
-                            <td>{{ row.invoiceId || '-' }}</td>
-                            <td>{{ agentName(row) }}</td>
-                            <td>{{ row.agencyConsultantId || '-' }}</td>
-                            <td>{{ customerName(row) }}</td>
-                            <td class="text-right font-semibold" [class.text-red-600]="cnAmount(row) < 0">{{ cnAmountDisplay(row) }}</td>
                             <td>{{ cnInvoiced(row) }}</td>
-                            <td>{{ cnRedFlag(row) }}</td>
-                            <td>{{ row.createdAt | date:'MMM d, yyyy, h:mm:ss a' }}</td>
+                            <td>{{ row.reservationId || '-' }}</td>
+                            <td>{{ row.reason || '-' }}</td>
+                            <td class="text-right font-semibold">{{ cnAmountDisplay(row) }}</td>
+                            <td>{{ row.currencyCode || '-' }}</td>
+                            <td><p-tag [value]="display(row.status)" [severity]="statusSeverity(row.status)"></p-tag></td>
+                            <td>{{ row.createdAt | date:'MM/dd/yyyy' }}</td>
                             <td class="text-right">
                                 <div class="flex justify-end gap-1">
                                     <button pButton type="button" icon="pi pi-eye" rounded text class="app-row-action" pTooltip="View" (click)="view(row)"></button>
-                                    <button pButton type="button" icon="pi pi-undo" rounded text class="app-row-action" severity="warn" pTooltip="Issue Refund" (click)="issueRefund(row)"></button>
-                                    <button pButton type="button" icon="pi pi-flag" rounded text class="app-row-action" severity="danger" pTooltip="Red Flag" (click)="toggleRedFlag(row)"></button>
+                                    <button pButton type="button" icon="pi pi-undo" rounded text class="app-row-action" severity="warn" pTooltip="Issue Refund" (click)="issueRefund(row)" [disabled]="row.status === 'Refunded'"></button>
+                                    <button pButton type="button" icon="pi pi-flag" rounded text class="app-row-action" severity="danger" pTooltip="Toggle Flag" (click)="toggleRedFlag(row)"></button>
                                 </div>
                             </td>
                         </tr>
                     </ng-template>
                     <ng-template pTemplate="emptymessage">
+                        <tr><td colspan="8" class="text-center text-muted-color py-6">No credit notes found.</td></tr>
+                    </ng-template>
+                </p-table>
+            </article>
+
+            <article class="workspace-card" *ngIf="flowKey() === 'check-in'">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+                    <div class="flex items-center gap-3">
+                        <i class="pi pi-check-circle text-2xl text-primary"></i>
+                        <div>
+                            <h2 class="font-display text-2xl mt-0 mb-1">Check In Queue</h2>
+                            <p class="text-muted-color m-0">Confirm guest arrivals against active reservations.</p>
+                        </div>
+                    </div>
+                </div>
+                <p-table [value]="rows()" [lazy]="true" [paginator]="true" [rows]="pageSize" [first]="first()" [totalRecords]="totalRecords()" [loading]="loading()" [rowsPerPageOptions]="[10]" responsiveLayout="scroll" styleClass="p-datatable-sm" (onLazyLoad)="onLazyLoad($event)">
+                    <ng-template pTemplate="header">
                         <tr>
-                            <td colspan="10" class="text-center text-muted-color py-6">No credit notes found for the selected filters.</td>
+                            <th>Reference</th>
+                            <th>Voucher</th>
+                            <th>Customer Email</th>
+                            <th>Status</th>
+                            <th class="text-right">Total</th>
+                            <th class="text-right w-44">Actions</th>
                         </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-row>
+                        <tr>
+                            <td>{{ display(row.reference) }}</td>
+                            <td>{{ display(row.voucherCode) }}</td>
+                            <td>{{ display(row.customerEmail) }}</td>
+                            <td><p-tag [value]="display(row.status)" [severity]="statusSeverity(row.status)"></p-tag></td>
+                            <td class="text-right">{{ display(row.totalAmount) }}</td>
+                            <td class="text-right">
+                                <div class="flex justify-end gap-1">
+                                    <button pButton type="button" icon="pi pi-eye" rounded text class="app-row-action" pTooltip="View" (click)="view(row)"></button>
+                                    <button pButton type="button" icon="pi pi-check" rounded text class="app-row-action" severity="success" pTooltip="Confirm Check In" (click)="confirmCheckIn(row)" [disabled]="row.status === 'CheckedIn'"></button>
+                                </div>
+                            </td>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="emptymessage">
+                        <tr><td colspan="6" class="text-center text-muted-color py-6">No reservations in check-in queue.</td></tr>
+                    </ng-template>
+                </p-table>
+            </article>
+
+            <article class="workspace-card" *ngIf="flowKey() === 'day-end'">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+                    <div class="flex items-center gap-3">
+                        <i class="pi pi-sun text-2xl text-primary"></i>
+                        <div>
+                            <h2 class="font-display text-2xl mt-0 mb-1">Day-End Audit</h2>
+                            <p class="text-muted-color m-0">Open and close daily audit records with revenue totals.</p>
+                        </div>
+                    </div>
+                    <button pButton type="button" icon="pi pi-plus" label="Open Today" (click)="openDayEnd()"></button>
+                </div>
+                <p-table [value]="rows()" [lazy]="true" [paginator]="true" [rows]="pageSize" [first]="first()" [totalRecords]="totalRecords()" [loading]="loading()" [rowsPerPageOptions]="[10]" responsiveLayout="scroll" styleClass="p-datatable-sm" (onLazyLoad)="onLazyLoad($event)">
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th>Audit Date</th>
+                            <th>Opened By</th>
+                            <th>Closed By</th>
+                            <th class="text-right">Revenue</th>
+                            <th>Status</th>
+                            <th class="text-right w-36">Actions</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-row>
+                        <tr>
+                            <td>{{ row.auditDate | date:'MM/dd/yyyy' }}</td>
+                            <td>{{ display(row.openedBy) }}</td>
+                            <td>{{ display(row.closedBy) }}</td>
+                            <td class="text-right font-semibold">{{ display(row.totalRevenue) }}</td>
+                            <td><p-tag [value]="display(row.status)" [severity]="statusSeverity(row.status)"></p-tag></td>
+                            <td class="text-right">
+                                <div class="flex justify-end gap-1">
+                                    <button pButton type="button" icon="pi pi-eye" rounded text class="app-row-action" pTooltip="View" (click)="view(row)"></button>
+                                    <button pButton type="button" icon="pi pi-lock" rounded text class="app-row-action" severity="warn" pTooltip="Close Day" (click)="closeDayEnd(row)" [disabled]="row.status === 'Closed'"></button>
+                                </div>
+                            </td>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="emptymessage">
+                        <tr><td colspan="6" class="text-center text-muted-color py-6">No day-end records. Click "Open Today" to begin.</td></tr>
+                    </ng-template>
+                </p-table>
+            </article>
+
+            <article class="workspace-card" *ngIf="flowKey() === 'proof-of-payments'">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+                    <div class="flex items-center gap-3">
+                        <i class="pi pi-credit-card text-2xl text-primary"></i>
+                        <div>
+                            <h2 class="font-display text-2xl mt-0 mb-1">Proof Of Payment</h2>
+                            <p class="text-muted-color m-0">Upload and verify payment proof documents.</p>
+                        </div>
+                    </div>
+                    <button pButton type="button" icon="pi pi-upload" label="Upload Proof" (click)="uploadProofOfPayment()"></button>
+                </div>
+                <p-table [value]="rows()" [lazy]="true" [paginator]="true" [rows]="pageSize" [first]="first()" [totalRecords]="totalRecords()" [loading]="loading()" [rowsPerPageOptions]="[10]" responsiveLayout="scroll" styleClass="p-datatable-sm" (onLazyLoad)="onLazyLoad($event)">
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th>Payment</th>
+                            <th>Invoice</th>
+                            <th>Document</th>
+                            <th>Status</th>
+                            <th>Uploaded</th>
+                            <th>Verified By</th>
+                            <th class="text-right w-44">Actions</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-row>
+                        <tr>
+                            <td>{{ display(row.paymentId) }}</td>
+                            <td>{{ display(row.invoiceId) }}</td>
+                            <td class="max-w-xs truncate"><a [href]="row.documentUrl" target="_blank" class="text-primary underline">{{ row.documentUrl || '-' }}</a></td>
+                            <td><p-tag [value]="display(row.status)" [severity]="statusSeverity(row.status)"></p-tag></td>
+                            <td>{{ row.uploadedAt | date:'MM/dd/yyyy' }}</td>
+                            <td>{{ display(row.verifiedBy) }}</td>
+                            <td class="text-right">
+                                <div class="flex justify-end gap-1">
+                                    <button pButton type="button" icon="pi pi-eye" rounded text class="app-row-action" pTooltip="View" (click)="view(row)"></button>
+                                    <button pButton type="button" icon="pi pi-check-circle" rounded text class="app-row-action" severity="success" pTooltip="Verify" (click)="verifyProofOfPayment(row)" [disabled]="row.status === 'Verified'"></button>
+                                </div>
+                            </td>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="emptymessage">
+                        <tr><td colspan="7" class="text-center text-muted-color py-6">No proof of payment records.</td></tr>
+                    </ng-template>
+                </p-table>
+            </article>
+
+            <article class="workspace-card" *ngIf="flowKey() === 'commissions'">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+                    <div class="flex items-center gap-3">
+                        <i class="pi pi-percentage text-2xl text-primary"></i>
+                        <div>
+                            <h2 class="font-display text-2xl mt-0 mb-1">Commissions</h2>
+                            <p class="text-muted-color m-0">Track and manage consultant commissions by reservation.</p>
+                        </div>
+                    </div>
+                    <button pButton type="button" icon="pi pi-plus" label="New Commission" (click)="openCreateCommission()"></button>
+                </div>
+                <p-table [value]="rows()" [lazy]="true" [paginator]="true" [rows]="pageSize" [first]="first()" [totalRecords]="totalRecords()" [loading]="loading()" [rowsPerPageOptions]="[10]" responsiveLayout="scroll" styleClass="p-datatable-sm" (onLazyLoad)="onLazyLoad($event)">
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th>Reservation</th>
+                            <th>Consultant</th>
+                            <th class="text-right">%</th>
+                            <th class="text-right">Amount</th>
+                            <th>Currency</th>
+                            <th>Status</th>
+                            <th>Paid At</th>
+                            <th class="text-right w-40">Actions</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-row>
+                        <tr>
+                            <td>{{ display(row.reservationId) }}</td>
+                            <td>{{ display(row.consultantId) }}</td>
+                            <td class="text-right">{{ display(row.percentage) }}</td>
+                            <td class="text-right font-semibold">{{ display(row.amount) }}</td>
+                            <td>{{ display(row.currencyCode) }}</td>
+                            <td><p-tag [value]="display(row.status)" [severity]="statusSeverity(row.status)"></p-tag></td>
+                            <td>{{ row.paidAt ? (row.paidAt | date:'MM/dd/yyyy') : '-' }}</td>
+                            <td class="text-right">
+                                <div class="flex justify-end gap-1">
+                                    <button pButton type="button" icon="pi pi-eye" rounded text class="app-row-action" pTooltip="View" (click)="view(row)"></button>
+                                    <button pButton type="button" icon="pi pi-pencil" rounded text class="app-row-action" severity="info" pTooltip="Edit" (click)="openEditCommission(row)"></button>
+                                    <button pButton type="button" icon="pi pi-trash" rounded text class="app-row-action" severity="danger" pTooltip="Delete" (click)="deleteCommission(row)"></button>
+                                </div>
+                            </td>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="emptymessage">
+                        <tr><td colspan="8" class="text-center text-muted-color py-6">No commissions recorded.</td></tr>
                     </ng-template>
                 </p-table>
             </article>
@@ -539,8 +824,67 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
                     </label>
                 </div>
                 <div class="flex justify-end gap-2 pt-4">
-                    <button pButton type="button" label="Cancel" severity="secondary" (click)="cancelEditDialog()"></button>
+                    <button pButton type="button" label="Cancel" severity="contrast" (click)="cancelEditDialog()"></button>
                     <button pButton type="button" label="Save" (click)="saveEditDialog()"></button>
+                </div>
+            </p-dialog>
+
+            <p-dialog header="New Credit Note" [(visible)]="cnCreateDialogVisible" [modal]="true" [style]="{ width: 'min(480px, 94vw)' }" [draggable]="false">
+                <div class="grid gap-4" *ngIf="cnCreateDialogData">
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Invoice ID</span><input pInputText type="number" [(ngModel)]="cnCreateDialogData.invoiceId" /></label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Reservation ID</span><input pInputText type="number" [(ngModel)]="cnCreateDialogData.reservationId" /></label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Reason *</span><input pInputText [(ngModel)]="cnCreateDialogData.reason" /></label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Amount *</span><input pInputText type="number" step="0.01" [(ngModel)]="cnCreateDialogData.amount" /></label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Currency</span>
+                        <select class="p-inputtext p-component" [(ngModel)]="cnCreateDialogData.currencyCode">
+                            <option *ngFor="let c of currencyOptions()" [value]="c.code">{{ c.code }}</option>
+                        </select>
+                    </label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Notes</span><input pInputText [(ngModel)]="cnCreateDialogData.notes" /></label>
+                </div>
+                <div class="flex justify-end gap-2 pt-4">
+                    <button pButton label="Cancel" severity="contrast" (click)="cnCreateDialogVisible.set(false)"></button>
+                    <button pButton label="Save" (click)="saveCreditNote()"></button>
+                </div>
+            </p-dialog>
+
+            <p-dialog header="Upload Proof Of Payment" [(visible)]="popDialogVisible" [modal]="true" [style]="{ width: 'min(480px, 94vw)' }" [draggable]="false">
+                <div class="grid gap-4" *ngIf="popDialogData">
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Payment ID</span><input pInputText type="number" [(ngModel)]="popDialogData.paymentId" /></label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Invoice ID</span><input pInputText type="number" [(ngModel)]="popDialogData.invoiceId" /></label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Document URL *</span><input pInputText [(ngModel)]="popDialogData.documentUrl" placeholder="https://..." /></label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Notes</span><input pInputText [(ngModel)]="popDialogData.notes" /></label>
+                </div>
+                <div class="flex justify-end gap-2 pt-4">
+                    <button pButton label="Cancel" severity="contrast" (click)="popDialogVisible.set(false)"></button>
+                    <button pButton label="Upload" (click)="saveProofOfPayment()"></button>
+                </div>
+            </p-dialog>
+
+            <p-dialog [header]="commDialogMode === 'create' ? 'New Commission' : 'Edit Commission'" [(visible)]="commDialogVisible" [modal]="true" [style]="{ width: 'min(480px, 94vw)' }" [draggable]="false">
+                <div class="grid gap-4" *ngIf="commDialogData">
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Reservation ID</span><input pInputText type="number" [(ngModel)]="commDialogData.reservationId" /></label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Consultant ID</span><input pInputText type="number" [(ngModel)]="commDialogData.consultantId" /></label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Percentage</span><input pInputText type="number" step="0.01" [(ngModel)]="commDialogData.percentage" /></label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Amount</span><input pInputText type="number" step="0.01" [(ngModel)]="commDialogData.amount" /></label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Currency</span>
+                        <select class="p-inputtext p-component" [(ngModel)]="commDialogData.currencyCode">
+                            <option *ngFor="let c of currencyOptions()" [value]="c.code">{{ c.code }}</option>
+                        </select>
+                    </label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Status</span>
+                        <select class="p-inputtext p-component" [(ngModel)]="commDialogData.status">
+                            <option value="Pending">Pending</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </label>
+                    <label class="grid gap-1"><span class="text-sm text-muted-color">Notes</span><input pInputText [(ngModel)]="commDialogData.notes" /></label>
+                </div>
+                <div class="flex justify-end gap-2 pt-4">
+                    <button pButton label="Cancel" severity="contrast" (click)="commDialogVisible.set(false)"></button>
+                    <button pButton label="Save" (click)="saveCommission()"></button>
                 </div>
             </p-dialog>
 
@@ -560,7 +904,7 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
                             *ngFor="let action of config().unsupportedActions"
                             icon="pi pi-lock"
                             [label]="action"
-                            severity="secondary"
+                            severity="danger"
                             outlined
                             (click)="showUnavailable(action)"
                         ></button>
@@ -622,7 +966,7 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
                     </div>
                 </dl>
                 <div class="flex justify-end pt-4">
-                    <button pButton type="button" label="Close" severity="secondary" (click)="detailVisible = false"></button>
+                    <button pButton type="button" label="Close" severity="contrast" (click)="detailVisible = false"></button>
                 </div>
             </p-dialog>
 
@@ -640,6 +984,62 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
             align-items: center;
         }
 
+        .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.85rem;
+            align-items: flex-end;
+            padding: 1rem;
+            border: 1px solid var(--surface-border);
+            border-radius: 0.75rem;
+            background: var(--surface-ground);
+            margin-bottom: 1rem;
+        }
+
+        .filter-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            min-width: 11rem;
+        }
+
+        .filter-field-grow {
+            flex: 1 1 16rem;
+        }
+
+        .filter-field label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-color-secondary);
+        }
+
+        .filter-field .p-inputtext,
+        .filter-field select {
+            width: 100%;
+        }
+
+        .filter-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: flex-end;
+            margin-left: auto;
+        }
+
+        .flow-summary-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.25rem;
+            align-items: center;
+            padding: 0.6rem 0.25rem;
+        }
+
+        .flow-summary-strip > span:not(.text-muted-color) strong {
+            color: var(--primary-color);
+        }
+
         .operation-filter-row > * {
             min-width: 9.5rem;
         }
@@ -649,6 +1049,103 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
             border: 1px solid var(--surface-border);
             border-radius: 0.5rem;
             background: var(--surface-ground);
+        }
+
+        .reference-calendar-toolbar {
+            display: grid;
+            grid-template-columns: 7rem 1fr 7rem;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .reference-calendar-toolbar h2 {
+            margin: 0;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .reference-calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            overflow: hidden;
+            border: 1px solid var(--surface-border);
+            border-radius: 0.5rem;
+            background: var(--surface-card);
+            box-shadow: 0 0.5rem 1.25rem rgba(15, 23, 42, 0.08);
+        }
+
+        .reference-weekday {
+            padding: 0.9rem 0.5rem;
+            text-align: center;
+            font-weight: 700;
+            background: var(--surface-ground);
+            border-bottom: 1px solid var(--surface-border);
+        }
+
+        .reference-day {
+            min-height: 8.9rem;
+            padding: 0.6rem 0.65rem;
+            border-right: 1px solid var(--surface-border);
+            border-bottom: 1px solid var(--surface-border);
+            background: #fff;
+            overflow: hidden;
+        }
+
+        .reference-day:nth-child(7n) {
+            border-right: 0;
+        }
+
+        .reference-day-muted {
+            background: #fafafa;
+        }
+
+        .reference-day-number {
+            display: block;
+            margin-bottom: 0.55rem;
+            color: #111827;
+            font-size: 1rem;
+        }
+
+        .reference-line-list {
+            display: grid;
+            gap: 0.2rem;
+        }
+
+        .reference-line {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 0.5rem;
+            align-items: baseline;
+            border-bottom: 1px dotted #e5e7eb;
+            font-size: 0.72rem;
+            line-height: 1.25;
+        }
+
+        .reference-line span {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #374151;
+        }
+
+        .reference-value-empty {
+            color: #ef4444;
+        }
+
+        .reference-value-low {
+            color: #f97316;
+        }
+
+        .reference-value-mid {
+            color: #0284c7;
+        }
+
+        .reference-value-good {
+            color: #16a34a;
         }
 
         .occupancy-calendar-grid {
@@ -783,8 +1280,13 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
         }
 
         @media (max-width: 760px) {
-            .occupancy-calendar-grid {
+            .occupancy-calendar-grid,
+            .reference-calendar-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .reference-calendar-toolbar {
+                grid-template-columns: 1fr;
             }
         }
     `]
@@ -813,7 +1315,19 @@ export class OperationalFlowPage {
     dateFilter = '';
     dateFrom = '';
     dateTo = '';
+    // Flow-charts shared filter bar
+    dateType: 'all' | 'range' | 'day' | 'month' = 'all';
+    monthFilter = '';
+    productTypeFilter = 'All';
+    categoryFilter = 'All';
+    invoicedFilter = 'All';
+    voucherSearch = '';
+    displayCurrency = 'USD';
+    private ratesMap: Record<string, number> = { USD: 1 };
+    readonly categories = signal<any[]>([]);
+    readonly rateNote = signal('');
     readonly weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    readonly occupancyMonth = signal(this.defaultAvailMonth());
     readonly availMonth = signal(this.defaultAvailMonth());
     readonly availData = signal<any[]>([]);
     readonly availTypes = signal<string[]>([]);
@@ -837,6 +1351,16 @@ export class OperationalFlowPage {
     readonly cnDateTo = signal('');
     readonly cnMonth = signal('');
     readonly cnRows = signal<any[]>([]);
+    readonly cnCreateDialogVisible = signal(false);
+    cnCreateDialogData: any = null;
+
+    readonly commDialogVisible = signal(false);
+    commDialogMode: 'create' | 'edit' = 'create';
+    commDialogData: any = null;
+
+    readonly popDialogVisible = signal(false);
+    popDialogData: any = null;
+
     readonly editDialogVisible = signal(false);
     editDialogMode: 'add' | 'edit' = 'edit';
     editRowData: any = null;
@@ -895,9 +1419,43 @@ export class OperationalFlowPage {
                 this.loadInvoicing();
             } else if (data['flowKey'] === 'credit-notes') {
                 this.loadCreditNotes();
+            } else if (data['flowKey'] === 'commissions') {
+                this.load(1);
+            } else if (data['flowKey'] === 'day-end') {
+                this.load(1);
+            } else if (data['flowKey'] === 'proof-of-payments') {
+                this.load(1);
+            } else if (data['flowKey'] === 'check-in') {
+                this.load(1);
             } else {
                 this.refreshAnalytics();
+                if (data['flowKey'] === 'flow-charts') {
+                    this.loadFlowChartMeta();
+                }
             }
+        });
+    }
+
+    private loadFlowChartMeta(): void {
+        const today = this.toInputDate(new Date());
+        this.api.list('/api/product-categories').subscribe({
+            next: (rows) => this.categories.set(rows ?? []),
+            error: () => this.categories.set([])
+        });
+        forkJoin({
+            currencies: this.api.list('/api/currencies'),
+            rates: this.api.get(`/api/exchange-rates/effective?date=${today}`)
+        }).subscribe({
+            next: (result: any) => {
+                this.currenciesList.set(result.currencies ?? []);
+                const map: Record<string, number> = { USD: 1 };
+                (Array.isArray(result.rates) ? result.rates : []).forEach((r: any) => {
+                    if (r.currencyCode && Number(r.rate) > 0) map[r.currencyCode] = Number(r.rate);
+                });
+                this.ratesMap = map;
+                this.rateNote.set(`Converted using rates effective ${today}`);
+            },
+            error: () => { this.ratesMap = { USD: 1 }; }
         });
     }
 
@@ -987,9 +1545,54 @@ export class OperationalFlowPage {
         });
     }
 
+    changeAvailabilityMonth(delta: number): void {
+        this.availMonth.set(this.shiftMonth(this.availMonth(), delta));
+        this.loadAvailability();
+    }
+
+    changeOccupancyMonth(delta: number): void {
+        this.occupancyMonth.set(this.shiftMonth(this.occupancyMonth(), delta));
+        this.dateFilter = this.occupancyMonth();
+        this.refreshAnalytics();
+    }
+
+    monthLabel(value: string): string {
+        const [year, month] = value.split('-').map(Number);
+        if (!year || !month) return value;
+        return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1));
+    }
+
+    calendarValueClass(value: number, total: number): string {
+        const numeric = Number(value) || 0;
+        const denominator = Number(total) || 0;
+        if (numeric <= 0) return 'reference-value-empty';
+        if (!denominator) return 'reference-value-low';
+        const ratio = numeric / denominator;
+        if (ratio < 0.25) return 'reference-value-low';
+        if (ratio < 0.6) return 'reference-value-mid';
+        return 'reference-value-good';
+    }
+
+    guestCapacityLabel(row: any): string {
+        const min = Number(row?.minGuestCapacity ?? 0);
+        const max = Number(row?.maxGuestCapacity ?? 0);
+        if (!min && !max) return '-';
+        return min === max || !max ? String(min || max) : `${min}-${max}`;
+    }
+
+    guestCapacityTitle(row: any): string {
+        return `${row?.available ?? 0} available of ${row?.totalCapacity ?? 0} rooms, sleeps ${this.guestCapacityLabel(row)}`;
+    }
+
     private defaultAvailMonth(): string {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    private shiftMonth(value: string, delta: number): string {
+        const [year, month] = value.split('-').map(Number);
+        const date = new Date(year || new Date().getFullYear(), (month || 1) - 1 + delta, 1);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     }
 
     private toInputDate(d: Date): string {
@@ -1007,7 +1610,7 @@ export class OperationalFlowPage {
 
         forkJoin({
             currencies: this.api.list('/api/currencies'),
-            rates: this.api.get(`/api/exchange-rates/by-date?date=${date}`)
+            rates: this.api.get(`/api/exchange-rates/effective?date=${date}`)
         }).subscribe({
             next: (result) => {
                 this.currenciesList.set(result.currencies ?? []);
@@ -1030,15 +1633,26 @@ export class OperationalFlowPage {
                     id: existing?.id ?? 0,
                     currencyCode: c.code,
                     rate: existing?.rate ?? 0,
-                    effectiveDate: existing?.effectiveDate ?? this.exchangeRateDate()
+                    // The editor date is the date a change would take effect from.
+                    effectiveDate: this.exchangeRateDate(),
+                    // The date the currently-applicable rate was actually set (may be earlier).
+                    rateEffectiveDate: existing?.effectiveDate ?? null
                 };
             });
         rates.forEach((r: any) => {
             if (!this.currenciesList().some((c: any) => c.code === r.currencyCode)) {
-                merged.push({ ...r });
+                merged.push({ id: r.id ?? 0, currencyCode: r.currencyCode, rate: r.rate, effectiveDate: this.exchangeRateDate(), rateEffectiveDate: r.effectiveDate ?? null });
             }
         });
         this.exchangeRateRows.set(merged);
+    }
+
+    /** A change should POST a new forward-dated rate unless we're correcting a rate that was set on this exact editor date. */
+    private shouldCreateNewRate(row: any): boolean {
+        if (!row.id) return true;
+        const setOn = (row.rateEffectiveDate ?? '').toString().slice(0, 10);
+        const editorDate = (this.exchangeRateDate() ?? '').toString().slice(0, 10);
+        return setOn !== editorDate;
     }
 
     saveExchangeRates(): void {
@@ -1052,10 +1666,10 @@ export class OperationalFlowPage {
         }
 
         const obs = rows.map((r: any) => {
-            if (r.id) {
-                return this.api.put(`/api/exchange-rates/${r.id}`, { rate: r.rate, effectiveDate: date });
+            if (this.shouldCreateNewRate(r)) {
+                return this.api.post('/api/exchange-rates', { currencyCode: r.currencyCode, rate: r.rate, effectiveDate: date });
             }
-            return this.api.post('/api/exchange-rates', { currencyCode: r.currencyCode, rate: r.rate, effectiveDate: date });
+            return this.api.put(`/api/exchange-rates/${r.id}`, { rate: r.rate, effectiveDate: date });
         });
 
         forkJoin(obs).subscribe({
@@ -1101,7 +1715,7 @@ export class OperationalFlowPage {
         const row = this.editRowData;
         const date = row.effectiveDate || this.exchangeRateDate();
 
-        if (this.editDialogMode === 'edit' && row.id) {
+        if (this.editDialogMode === 'edit' && row.id && !this.shouldCreateNewRate(row)) {
             this.api.put(`/api/exchange-rates/${row.id}`, { rate: row.rate, effectiveDate: date }).subscribe({
                 next: () => {
                     this.editDialogVisible.set(false);
@@ -1193,6 +1807,10 @@ export class OperationalFlowPage {
         this.loadInvoicing();
     }
 
+    money(value: number, currency = 'USD'): string {
+        return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(Number(value) || 0);
+    }
+
     agentName(row: any): string {
         const first = row.accountFirstName;
         const last = row.accountLastName;
@@ -1263,25 +1881,9 @@ export class OperationalFlowPage {
     }
 
     loadCreditNotes(): void {
-        const searchParts: string[] = [];
-        const mode = this.cnFilterMode();
-        const voucher = this.cnVoucher();
-
-        if (voucher.trim()) searchParts.push(`search=${encodeURIComponent(voucher.trim())}`);
-        if (mode === 'Today') {
-            const today = this.toInputDate(new Date());
-            searchParts.push(`date=${today}`);
-        } else if (mode === 'Date' && this.cnDate()) {
-            searchParts.push(`date=${this.cnDate()}`);
-        } else if (mode === 'DateRange' && this.cnDateFrom() && this.cnDateTo()) {
-            searchParts.push(`dateFrom=${this.cnDateFrom()}&dateTo=${this.cnDateTo()}`);
-        } else if (mode === 'Month' && this.cnMonth()) {
-            searchParts.push(`month=${this.cnMonth()}`);
-        }
-
-        const query = searchParts.length ? `?${searchParts.join('&')}` : '';
+        const search = this.cnVoucher().trim();
         this.loading.set(true);
-        this.api.listPage(`/api/reservations${query}`, 1, 500, '').subscribe({
+        this.api.listPage('/api/credit-notes', 1, 500, search).subscribe({
             next: (result) => {
                 this.cnRows.set(result.items ?? []);
                 this.loading.set(false);
@@ -1309,20 +1911,37 @@ export class OperationalFlowPage {
     }
 
     cnCreateRefund(): void {
-        this.messages.add({ severity: 'info', summary: 'Create Refund', detail: 'Refund creation dialog coming soon.' });
+        this.cnCreateDialogData = { invoiceId: null, reservationId: null, reason: '', amount: null, currencyCode: 'USD', status: 'Pending', notes: '' };
+        this.cnCreateDialogVisible.set(true);
+    }
+
+    saveCreditNote(): void {
+        const data = this.cnCreateDialogData;
+        if (!data?.reason?.trim()) {
+            this.messages.add({ severity: 'warn', summary: 'Required', detail: 'Reason is required.' });
+            return;
+        }
+        this.api.post('/api/credit-notes', data).subscribe({
+            next: () => {
+                this.cnCreateDialogVisible.set(false);
+                this.cnCreateDialogData = null;
+                this.messages.add({ severity: 'success', summary: 'Created', detail: 'Credit note created.' });
+                this.loadCreditNotes();
+            },
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Failed', detail: this.describeError(err) })
+        });
     }
 
     cnAmount(row: any): number {
-        return -(Number(row.totalAmount ?? 0));
+        return Number(row.amount ?? 0);
     }
 
     cnAmountDisplay(row: any): string {
-        const neg = -(Number(row.totalAmount ?? 0));
-        return `${neg.toFixed(2)}`;
+        return `${this.cnAmount(row).toFixed(2)} ${row.currencyCode ?? ''}`.trim();
     }
 
     cnInvoiced(row: any): string {
-        return row.invoiceId ? 'Yes' : 'No';
+        return row.invoiceId ? `#${row.invoiceId}` : '-';
     }
 
     cnRedFlag(row: any): string {
@@ -1331,38 +1950,141 @@ export class OperationalFlowPage {
     }
 
     issueRefund(row: any): void {
-        const id = row.reservationId ?? row.id;
-        if (!id) {
-            this.messages.add({ severity: 'warn', summary: 'Cannot refund', detail: 'No reservation ID available.' });
+        if (!row.id) {
+            this.messages.add({ severity: 'warn', summary: 'Cannot refund', detail: 'No credit note ID available.' });
             return;
         }
-        this.api.put(`/api/reservations/${id}`, { status: 'Refunded' }).subscribe({
+        this.api.put(`/api/credit-notes/${row.id}`, { ...row, status: 'Refunded' }).subscribe({
             next: () => {
-                this.messages.add({ severity: 'success', summary: 'Refund issued', detail: `Refund for ${row.voucherCode || id} processed.` });
+                this.messages.add({ severity: 'success', summary: 'Refund issued', detail: `Credit note #${row.id} marked as Refunded.` });
                 this.loadCreditNotes();
             },
-            error: (err) => this.messages.add({
-                severity: 'error', summary: 'Refund failed', detail: this.describeError(err)
-            })
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Refund failed', detail: this.describeError(err) })
         });
     }
 
     toggleRedFlag(row: any): void {
-        const id = row.reservationId ?? row.id;
-        if (!id) {
-            this.messages.add({ severity: 'warn', summary: 'Cannot flag', detail: 'No reservation ID available.' });
+        if (!row.id) {
+            this.messages.add({ severity: 'warn', summary: 'Cannot flag', detail: 'No credit note ID available.' });
             return;
         }
-        const current = String(row.status ?? '');
-        const newStatus = current === 'Cancelled' ? 'Pending' : 'Cancelled';
-        this.api.put(`/api/reservations/${id}`, { status: newStatus }).subscribe({
+        const newStatus = String(row.status ?? '') === 'Cancelled' ? 'Pending' : 'Cancelled';
+        this.api.put(`/api/credit-notes/${row.id}`, { ...row, status: newStatus }).subscribe({
             next: () => {
-                this.messages.add({ severity: 'success', summary: 'Updated', detail: `Reservation ${row.voucherCode || id} status changed to ${newStatus}.` });
+                this.messages.add({ severity: 'success', summary: 'Updated', detail: `Credit note #${row.id} status: ${newStatus}.` });
                 this.loadCreditNotes();
             },
-            error: (err) => this.messages.add({
-                severity: 'error', summary: 'Update failed', detail: this.describeError(err)
-            })
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Update failed', detail: this.describeError(err) })
+        });
+    }
+
+    confirmCheckIn(row: any): void {
+        const id = row.reservationId ?? row.id;
+        if (!id) {
+            this.messages.add({ severity: 'warn', summary: 'No ID', detail: 'Reservation ID not found.' });
+            return;
+        }
+        this.api.post(`/api/reservations/${id}/check-in`, {}).subscribe({
+            next: () => {
+                this.messages.add({ severity: 'success', summary: 'Checked In', detail: `Reservation #${id} checked in.` });
+                this.load(this.currentPage());
+            },
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Failed', detail: this.describeError(err) })
+        });
+    }
+
+    openDayEnd(): void {
+        const today = this.toInputDate(new Date());
+        this.api.post('/api/day-end/open', { auditDate: today }).subscribe({
+            next: () => {
+                this.messages.add({ severity: 'success', summary: 'Day Opened', detail: `Day-end opened for ${today}.` });
+                this.load(1);
+            },
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Failed', detail: this.describeError(err) })
+        });
+    }
+
+    closeDayEnd(row: any): void {
+        if (!row.id) return;
+        this.api.post('/api/day-end/close', { id: row.id }).subscribe({
+            next: () => {
+                this.messages.add({ severity: 'success', summary: 'Day Closed', detail: `Day-end #${row.id} closed.` });
+                this.load(this.currentPage());
+            },
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Failed', detail: this.describeError(err) })
+        });
+    }
+
+    verifyProofOfPayment(row: any): void {
+        if (!row.id) return;
+        this.api.post(`/api/proof-of-payments/${row.id}/verify`, {}).subscribe({
+            next: () => {
+                this.messages.add({ severity: 'success', summary: 'Verified', detail: `Proof of payment #${row.id} verified.` });
+                this.load(this.currentPage());
+            },
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Failed', detail: this.describeError(err) })
+        });
+    }
+
+    uploadProofOfPayment(): void {
+        this.popDialogData = { paymentId: null, invoiceId: null, documentUrl: '', notes: '' };
+        this.popDialogVisible.set(true);
+    }
+
+    saveProofOfPayment(): void {
+        const data = this.popDialogData;
+        if (!data?.documentUrl?.trim()) {
+            this.messages.add({ severity: 'warn', summary: 'Required', detail: 'Document URL is required.' });
+            return;
+        }
+        this.api.post('/api/proof-of-payments', data).subscribe({
+            next: () => {
+                this.popDialogVisible.set(false);
+                this.popDialogData = null;
+                this.messages.add({ severity: 'success', summary: 'Uploaded', detail: 'Proof of payment uploaded.' });
+                this.load(this.currentPage());
+            },
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Failed', detail: this.describeError(err) })
+        });
+    }
+
+    openCreateCommission(): void {
+        this.commDialogMode = 'create';
+        this.commDialogData = { reservationId: null, consultantId: null, percentage: null, amount: null, currencyCode: 'USD', status: 'Pending', notes: '' };
+        this.commDialogVisible.set(true);
+    }
+
+    openEditCommission(row: any): void {
+        this.commDialogMode = 'edit';
+        this.commDialogData = { ...row };
+        this.commDialogVisible.set(true);
+    }
+
+    saveCommission(): void {
+        const data = this.commDialogData;
+        if (!data) return;
+        const obs = this.commDialogMode === 'edit' && data.id
+            ? this.api.put(`/api/commissions/${data.id}`, data)
+            : this.api.post('/api/commissions', data);
+        obs.subscribe({
+            next: () => {
+                this.commDialogVisible.set(false);
+                this.commDialogData = null;
+                this.messages.add({ severity: 'success', summary: 'Saved', detail: 'Commission saved.' });
+                this.load(this.currentPage());
+            },
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Failed', detail: this.describeError(err) })
+        });
+    }
+
+    deleteCommission(row: any): void {
+        if (!row.id) return;
+        this.api.delete(`/api/commissions/${row.id}`).subscribe({
+            next: () => {
+                this.messages.add({ severity: 'success', summary: 'Deleted', detail: 'Commission removed.' });
+                this.load(this.currentPage());
+            },
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Failed', detail: this.describeError(err) })
         });
     }
 
@@ -1426,7 +2148,7 @@ export class OperationalFlowPage {
     }
 
     isReservationOperationsView(): boolean {
-        return ['occupancy-calendar', 'availability-calendar', 'flow-charts', 'exchange-rates', 'invoicing', 'credit-notes'].includes(this.flowKey());
+        return ['occupancy-calendar', 'availability-calendar', 'flow-charts', 'exchange-rates', 'invoicing', 'credit-notes', 'check-in', 'day-end', 'proof-of-payments', 'commissions'].includes(this.flowKey());
     }
 
     confirmedCount(): number {
@@ -1458,7 +2180,8 @@ export class OperationalFlowPage {
     }
 
     calendarDays(): Array<{ date: Date; inMonth: boolean; confirmed: number; pending: number; capacity: number; confirmedPercent: number; pendingPercent: number }> {
-        const anchor = this.selectedDate();
+        const [year, month] = this.occupancyMonth().split('-').map(Number);
+        const anchor = new Date(year, month - 1, 1);
         const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
         const start = new Date(first);
         start.setDate(first.getDate() - first.getDay());
@@ -1559,6 +2282,128 @@ export class OperationalFlowPage {
             const matchesActivity = this.activityFilter === 'All' || services.some((item) => item.serviceType === 'Activity' && item.serviceName === this.activityFilter);
             const matchesDate = this.matchesDateWindow(date);
             return matchesStatus && matchesAgent && matchesActivity && matchesDate;
+        });
+    }
+
+    // ---- Flow-charts shared filter bar ----
+    flowResults(): any[] {
+        const voucher = this.voucherSearch.trim().toLowerCase();
+        return this.allRows().filter((row) => {
+            const status = this.normalizedStatus(row);
+            const services = this.servicesFor(row);
+            const matchesStatus = this.statusFilter === 'All' || status.includes(this.statusFilter.toLowerCase());
+            const matchesAgent = this.agentFilter === 'All' || String(row.accountId ?? 'Unassigned') === this.agentFilter;
+            const matchesType = this.productTypeFilter === 'All' || services.some((s) => String(s.serviceType).toLowerCase() === this.productTypeFilter.toLowerCase());
+            const matchesCategory = this.categoryFilter === 'All' || services.some((s) => String(s.serviceName ?? '').toLowerCase().includes(this.categoryFilter.toLowerCase()));
+            const matchesInvoiced = this.invoicedFilter === 'All'
+                || (this.invoicedFilter === 'Yes' && !!row.invoiceId)
+                || (this.invoicedFilter === 'No' && !row.invoiceId);
+            const matchesVoucher = !voucher
+                || String(row.voucherCode ?? '').toLowerCase().includes(voucher)
+                || String(row.reference ?? '').toLowerCase().includes(voucher);
+            const matchesDate = this.matchesFlowDate(this.rowDate(row));
+            return matchesStatus && matchesAgent && matchesType && matchesCategory && matchesInvoiced && matchesVoucher && matchesDate;
+        });
+    }
+
+    flowResultsTotal(): number {
+        return this.flowResults().reduce((sum, row) => sum + this.convertAmount(Number(row.totalAmount ?? 0), row.currency), 0);
+    }
+
+    private matchesFlowDate(date: Date): boolean {
+        if (Number.isNaN(date.getTime())) return true;
+        if (this.dateType === 'all') return true;
+        if (this.dateType === 'range') {
+            if (this.dateFrom && date < new Date(`${this.dateFrom}T00:00:00`)) return false;
+            if (this.dateTo && date > new Date(`${this.dateTo}T23:59:59`)) return false;
+            return true;
+        }
+        if (this.dateType === 'day') {
+            if (!this.dateFrom) return true;
+            return this.sameDay(date, new Date(`${this.dateFrom}T00:00:00`));
+        }
+        if (this.dateType === 'month') {
+            if (!this.monthFilter) return true;
+            const [y, m] = this.monthFilter.split('-').map(Number);
+            return date.getFullYear() === y && date.getMonth() === (m - 1);
+        }
+        return true;
+    }
+
+    convertAmount(amount: number, fromCurrency?: string): number {
+        const value = Number(amount ?? 0);
+        const from = (fromCurrency || 'USD').toUpperCase();
+        const to = (this.displayCurrency || 'USD').toUpperCase();
+        if (from === to) return value;
+        const rateFrom = this.ratesMap[from] ?? 1;
+        const rateTo = this.ratesMap[to] ?? 1;
+        const usd = rateFrom > 0 ? value / rateFrom : value;
+        return usd * rateTo;
+    }
+
+    categoryOptions(): string[] {
+        return this.categories()
+            .map((c: any) => String(c.name ?? '').trim())
+            .filter((name) => !!name);
+    }
+
+    agentFilterOptions(): Array<{ label: string; value: string }> {
+        return this.agentOptions().filter((a) => a.value !== 'All');
+    }
+
+    serviceSummary(row: any): string {
+        const services = this.servicesFor(row);
+        if (!services.length) return '-';
+        if (services.length === 1) return String(services[0].serviceName ?? services[0].serviceType ?? '-');
+        return `${services[0].serviceName ?? services[0].serviceType} +${services.length - 1} more`;
+    }
+
+    onDisplayCurrencyChange(code: string): void {
+        this.displayCurrency = (code || 'USD').toUpperCase();
+    }
+
+    applyFlowFilters(): void {
+        this.refreshAnalytics();
+    }
+
+    resetFlowFilters(): void {
+        this.statusFilter = 'All';
+        this.agentFilter = 'All';
+        this.productTypeFilter = 'All';
+        this.categoryFilter = 'All';
+        this.invoicedFilter = 'All';
+        this.voucherSearch = '';
+        this.dateType = 'all';
+        this.dateFrom = '';
+        this.dateTo = '';
+        this.monthFilter = '';
+        this.displayCurrency = 'USD';
+        this.refreshAnalytics();
+    }
+
+    printFlowResults(): void {
+        const rows = this.flowResults().map((row) => ({
+            voucherCode: row.voucherCode,
+            reference: row.reference,
+            customer: this.customerName(row),
+            agent: this.agentName(row),
+            status: row.status,
+            invoiced: row.invoiceId ? 'Yes' : 'No',
+            amount: this.convertAmount(Number(row.totalAmount ?? 0), row.currency).toFixed(2),
+            currency: this.displayCurrency,
+            date: row.createdAt
+        }));
+        if (!rows.length) {
+            this.messages.add({ severity: 'warn', summary: 'Nothing to print', detail: 'No results match the current filters.' });
+            return;
+        }
+        this.api.postBlob('/api/exports/operational-row/pdf', {
+            title: `Flow Charts Report (${this.displayCurrency})`,
+            columns: ['voucherCode', 'reference', 'customer', 'agent', 'status', 'invoiced', 'amount', 'currency', 'date'],
+            rows
+        }).subscribe({
+            next: (blob) => this.saveBlob(blob, 'flow-charts-report.pdf'),
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Print failed', detail: this.describeError(err) })
         });
     }
 

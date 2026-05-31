@@ -34,6 +34,20 @@ namespace AppIt.Core.AppServices
                     a.PerformedAt))
                 .ToListAsync();
         }
+
+        public async Task<AuditLogReadDto?> GetByIdAsync(int id)
+        {
+            var a = await _context.Set<AuditLog>().AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+            if (a == null) return null;
+            return new AuditLogReadDto(
+                a.Id,
+                a.EntityName ?? string.Empty,
+                a.EntityId ?? string.Empty,
+                a.Action ?? string.Empty,
+                a.Changes,
+                a.PerformedBy,
+                a.PerformedAt);
+        }
     }
 
 }

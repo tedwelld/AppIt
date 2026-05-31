@@ -28,5 +28,12 @@ namespace AppIt.Api.Controllers
                 nameof(AuditLogReadDto.PerformedBy),
                 nameof(AuditLogReadDto.PerformedAt)));
         }
+
+        [HttpGet("{id:int}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var log = await _service.GetByIdAsync(id);
+            return log == null ? NotFound() : Ok(log);
+        }
     }
 }

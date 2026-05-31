@@ -52,5 +52,42 @@ namespace AppIt.Core.DTOs
 
         public decimal TotalPrice { get; set; }
         public string Currency { get; set; } = "USD";
+
+        public int? SupplierId { get; set; }
+        public int? AdultPax { get; set; }
+        public int? ChildPax { get; set; }
+        public int? CompPax { get; set; }
+        public int? Rooms { get; set; }
+        public int? Nights { get; set; }
+        public string? PickupLocation { get; set; }
+        public string? DropoffLocation { get; set; }
+        public DateTime? ActivityDate { get; set; }
+        public decimal? DiscountPercent { get; set; }
+        public decimal? VatPercent { get; set; }
+        public decimal? CostOfSale { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    public class CloseBookingDto
+    {
+        [Required]
+        public int ReservationId { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    public class CancelBookingDto
+    {
+        [Required]
+        public int ReservationId { get; set; }
+        public string? Reason { get; set; }
+    }
+
+    public class ReservationSnapshotDto
+    {
+        public int Id { get; set; }
+        public int ReservationId { get; set; }
+        public string SnapshotType { get; set; } = string.Empty;
+        public string? CreatedBy { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 }

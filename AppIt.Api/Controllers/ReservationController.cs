@@ -2,6 +2,7 @@ using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using AppIt.Data;
+using AppIt.Data.EntityModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -152,6 +153,150 @@ namespace AppIt.Api.Controllers
             }
 
             return NoContent();
+        }
+
+        [HttpPost("{id}/service-items")]
+        public async Task<IActionResult> AddServiceItem(int id, [FromBody] BookingServiceItemDto dto)
+        {
+            var reservation = await _context.Reservations.FindAsync(id);
+            if (reservation == null) return NotFound();
+
+            var item = new ReservationServiceItem
+            {
+                ReservationId = id,
+                ServiceType = dto.ServiceType ?? "Product",
+                ServiceId = dto.ServiceId,
+                ServiceName = dto.ServiceName ?? string.Empty,
+                Quantity = dto.Quantity < 1 ? 1 : dto.Quantity,
+                UnitPrice = dto.UnitPrice,
+                TotalPrice = dto.TotalPrice > 0 ? dto.TotalPrice : dto.Quantity * dto.UnitPrice,
+                Currency = string.IsNullOrWhiteSpace(dto.Currency) ? reservation.CurrencyCode : dto.Currency,
+                SupplierId = dto.SupplierId,
+                AdultPax = dto.AdultPax,
+                ChildPax = dto.ChildPax,
+                CompPax = dto.CompPax,
+                Rooms = dto.Rooms,
+                Nights = dto.Nights,
+                PickupLocation = dto.PickupLocation,
+                DropoffLocation = dto.DropoffLocation,
+                ActivityDate = dto.ActivityDate,
+                DiscountPercent = dto.DiscountPercent,
+                VatPercent = dto.VatPercent,
+                CostOfSale = dto.CostOfSale,
+                Notes = dto.Notes
+            };
+
+            _context.ReservationServiceItems.Add(item);
+
+            var items = await _context.ReservationServiceItems
+                .Where(i => i.ReservationId == id)
+                .ToListAsync();
+            items.Add(item);
+            reservation.TotalAmount = items.Sum(i => i.TotalPrice);
+
+            await _context.SaveChangesAsync();
+            return Ok(new { item.Id, item.ReservationId, item.ServiceType, item.ServiceName, item.Quantity, item.UnitPrice, item.TotalPrice, item.Currency });
+        }
+
+        [HttpDelete("{id}/service-items/{itemId}")]
+        public async Task<IActionResult> RemoveServiceItem(int id, int itemId)
+        {
+            var item = await _context.ReservationServiceItems
+                .FirstOrDefaultAsync(i => i.Id == itemId && i.ReservationId == id);
+            if (item == null) return NotFound();
+
+            _context.ReservationServiceItems.Remove(item);
+
+            var reservation = await _context.Reservations.FindAsync(id);
+            if (reservation != null)
+            {
+                var remaining = await _context.ReservationServiceItems
+                    .Where(i => i.ReservationId == id && i.Id != itemId)
+                    .SumAsync(i => (decimal?)i.TotalPrice) ?? 0m;
+                reservation.TotalAmount = remaining;
+            }
+
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        [HttpPost("{id}/close")]
+        [Authorize(Roles = "super,admin")]
+        public async Task<IActionResult> CloseBooking(int id, [FromBody] CloseBookingDto? dto = null)
+        {
+            var closedBy = User.FindFirstValue(ClaimTypes.Email)
+                ?? User.FindFirstValue(JwtRegisteredClaimNames.Email)
+                ?? User.Identity?.Name ?? "Unknown";
+            var result = await _service.CloseBookingAsync(id, closedBy);
+            return result == null ? NotFound() : Ok(result);
+        }
+
+        [HttpPost("{id}/cancel")]
+        [Authorize(Roles = "super,admin")]
+        public async Task<IActionResult> CancelBooking(int id, [FromBody] CancelBookingDto? dto = null)
+        {
+            var result = await _service.CancelBookingAsync(id, dto?.Reason);
+            return result == null ? NotFound() : Ok(result);
+        }
+
+        [HttpPost("{id}/open")]
+        [Authorize(Roles = "super,admin")]
+        public async Task<IActionResult> OpenBooking(int id)
+        {
+            var result = await _service.OpenBookingAsync(id);
+            return result == null ? NotFound() : Ok(result);
+        }
+
+        [HttpPost("{id}/clone")]
+        public async Task<IActionResult> CloneBooking(int id)
+        {
+            var clonedBy = User.FindFirstValue(ClaimTypes.Email)
+                ?? User.FindFirstValue(JwtRegisteredClaimNames.Email)
+                ?? User.Identity?.Name ?? "Unknown";
+            var result = await _service.CloneBookingAsync(id, clonedBy);
+            return result == null ? NotFound() : Ok(result);
+        }
+
+        [HttpGet("{id}/snapshots")]
+        public async Task<IActionResult> GetSnapshots(int id)
+        {
+            var snapshots = await _service.GetSnapshotsAsync(id);
+            return Ok(snapshots);
+        }
+
+        [HttpGet("occupancy")]
+        [Authorize(Roles = "super,admin")]
+        public async Task<IActionResult> GetOccupancy([FromQuery] int year, [FromQuery] int month)
+        {
+            if (year < 2000 || year > 2100) return BadRequest("Invalid year");
+            if (month < 1 || month > 12) return BadRequest("Invalid month");
+
+            var start = new DateTime(year, month, 1);
+            var end = start.AddMonths(1);
+            var daysInMonth = DateTime.DaysInMonth(year, month);
+
+            var reservations = await _context.Reservations
+                .AsNoTracking()
+                .Where(r => r.CreatedDate >= start && r.CreatedDate < end)
+                .Select(r => new { r.ReservationId, r.Status, r.CreatedDate, r.TotalAmount, r.CurrencyCode })
+                .ToListAsync();
+
+            var days = Enumerable.Range(1, daysInMonth).Select(day =>
+            {
+                var date = new DateTime(year, month, day);
+                var dayReservations = reservations.Where(r => r.CreatedDate.Date == date).ToList();
+                return new
+                {
+                    day,
+                    date = date.ToString("yyyy-MM-dd"),
+                    count = dayReservations.Count,
+                    revenue = dayReservations.Sum(r => r.TotalAmount),
+                    statuses = dayReservations.GroupBy(r => r.Status)
+                        .Select(g => new { status = g.Key, count = g.Count() })
+                };
+            }).ToList();
+
+            return Ok(new { year, month, totalReservations = reservations.Count, days });
         }
 
         private async Task<(int? Id, string DisplayName)> ResolveCurrentUserAsync()

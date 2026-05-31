@@ -22,6 +22,7 @@ namespace AppIt.Core.Services
                 Type = dto.Type,
                 Description = dto.Description,
                 Capacity = dto.Capacity,
+                GuestCapacity = dto.GuestCapacity,
                 BasePriceUsd = dto.BasePriceUsd,
                 IsActive = dto.IsActive,
                 CreatedDate = DateTime.UtcNow
@@ -29,8 +30,9 @@ namespace AppIt.Core.Services
 
             _context.Accommodations.Add(accommodation);
             await _context.SaveChangesAsync();
+            await EnsureUsdPriceAsync(accommodation.Id, accommodation.BasePriceUsd);
 
-            return ToReadDto(accommodation);
+            return await ToReadDtoAsync(accommodation);
         }
 
         public async Task<AccommodationReadDto?> UpdateAsync(UpdateAccommodationDto dto)
@@ -41,11 +43,13 @@ namespace AppIt.Core.Services
             accommodation.Type = dto.Type;
             accommodation.Description = dto.Description;
             accommodation.Capacity = dto.Capacity;
+            accommodation.GuestCapacity = dto.GuestCapacity;
             accommodation.BasePriceUsd = dto.BasePriceUsd;
             accommodation.IsActive = dto.IsActive;
 
             await _context.SaveChangesAsync();
-            return ToReadDto(accommodation);
+            await EnsureUsdPriceAsync(accommodation.Id, accommodation.BasePriceUsd);
+            return await ToReadDtoAsync(accommodation);
         }
 
         public async Task<bool> DeleteAsync(int id)
@@ -61,23 +65,14 @@ namespace AppIt.Core.Services
         public async Task<AccommodationReadDto?> GetByIdAsync(int id)
         {
             var accommodation = await _context.Accommodations.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
-            return accommodation == null ? null : ToReadDto(accommodation);
+            return accommodation == null ? null : await ToReadDtoAsync(accommodation);
         }
 
         public async Task<IEnumerable<AccommodationReadDto>> GetAllAsync()
         {
-            return await _context.Accommodations.AsNoTracking()
-                .Select(a => new AccommodationReadDto
-                {
-                    Id = a.Id,
-                    Type = a.Type,
-                    Description = a.Description,
-                    Capacity = a.Capacity,
-                    BasePriceUsd = a.BasePriceUsd,
-                    IsActive = a.IsActive,
-                    CreatedDate = a.CreatedDate
-                })
-                .ToListAsync();
+            var accommodations = await _context.Accommodations.AsNoTracking().ToListAsync();
+            var prices = await PricesForAsync(accommodations.Select(a => a.Id));
+            return accommodations.Select(a => ToReadDto(a, prices));
         }
 
         public async Task<AccommodationAvailabilityDto> GetAvailabilityAsync(int year, int month)
@@ -86,11 +81,19 @@ namespace AppIt.Core.Services
                 .AsNoTracking()
                 .Where(a => a.IsActive)
                 .GroupBy(a => a.Type)
-                .Select(g => new { Type = g.Key, TotalCapacity = g.Sum(a => a.Capacity) })
+                .Select(g => new
+                {
+                    Type = g.Key,
+                    TotalCapacity = g.Sum(a => a.Capacity),
+                    MinGuestCapacity = g.Min(a => a.GuestCapacity),
+                    MaxGuestCapacity = g.Max(a => a.GuestCapacity)
+                })
                 .ToListAsync();
 
             var typeNames = accommodationTypes.Select(t => t.Type).ToList();
             var typeCapacityMap = accommodationTypes.ToDictionary(t => t.Type, t => t.TotalCapacity);
+            var typeMinGuestCapacityMap = accommodationTypes.ToDictionary(t => t.Type, t => t.MinGuestCapacity);
+            var typeMaxGuestCapacityMap = accommodationTypes.ToDictionary(t => t.Type, t => t.MaxGuestCapacity);
 
             var monthStart = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
             var monthEnd = monthStart.AddMonths(1).AddDays(-1).AddDays(1).AddTicks(-1);
@@ -138,6 +141,8 @@ namespace AppIt.Core.Services
                     {
                         Type = t,
                         TotalCapacity = typeCapacityMap[t],
+                        MinGuestCapacity = typeMinGuestCapacityMap[t],
+                        MaxGuestCapacity = typeMaxGuestCapacityMap[t],
                         Booked = 0,
                         Available = typeCapacityMap[t]
                     }).ToList()
@@ -160,6 +165,8 @@ namespace AppIt.Core.Services
                         {
                             Type = t,
                             TotalCapacity = total,
+                            MinGuestCapacity = typeMinGuestCapacityMap[t],
+                            MaxGuestCapacity = typeMaxGuestCapacityMap[t],
                             Booked = booked,
                             Available = total - booked
                         };
@@ -180,6 +187,8 @@ namespace AppIt.Core.Services
                     {
                         Type = t,
                         TotalCapacity = typeCapacityMap[t],
+                        MinGuestCapacity = typeMinGuestCapacityMap[t],
+                        MaxGuestCapacity = typeMaxGuestCapacityMap[t],
                         Booked = 0,
                         Available = typeCapacityMap[t]
                     }).ToList()
@@ -195,7 +204,37 @@ namespace AppIt.Core.Services
             };
         }
 
-        private static AccommodationReadDto ToReadDto(Accommodation accommodation)
+        private async Task EnsureUsdPriceAsync(int accommodationId, decimal basePriceUsd)
+        {
+            var price = await _context.ServicePrices
+                .FirstOrDefaultAsync(p => p.ServiceType == "Accommodation" && p.ServiceId == accommodationId && p.CurrencyCode == "USD" && p.IsActive);
+            if (price == null)
+            {
+                _context.ServicePrices.Add(new ServicePrice
+                {
+                    ServiceType = "Accommodation",
+                    ServiceId = accommodationId,
+                    CurrencyCode = "USD",
+                    UnitPrice = basePriceUsd,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                price.UnitPrice = basePriceUsd;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        private async Task<AccommodationReadDto> ToReadDtoAsync(Accommodation accommodation)
+        {
+            var prices = await PricesForAsync(new[] { accommodation.Id });
+            return ToReadDto(accommodation, prices);
+        }
+
+        private static AccommodationReadDto ToReadDto(Accommodation accommodation, ILookup<int, ServicePriceReadDto> prices)
         {
             return new AccommodationReadDto
             {
@@ -203,10 +242,33 @@ namespace AppIt.Core.Services
                 Type = accommodation.Type,
                 Description = accommodation.Description,
                 Capacity = accommodation.Capacity,
+                GuestCapacity = accommodation.GuestCapacity,
                 BasePriceUsd = accommodation.BasePriceUsd,
                 IsActive = accommodation.IsActive,
-                CreatedDate = accommodation.CreatedDate
+                CreatedDate = accommodation.CreatedDate,
+                Prices = prices[accommodation.Id].ToList()
             };
+        }
+
+        private async Task<ILookup<int, ServicePriceReadDto>> PricesForAsync(IEnumerable<int> accommodationIds)
+        {
+            var ids = accommodationIds.ToList();
+            var prices = await _context.ServicePrices
+                .AsNoTracking()
+                .Where(p => p.ServiceType == "Accommodation" && ids.Contains(p.ServiceId) && p.IsActive)
+                .OrderBy(p => p.CurrencyCode)
+                .Select(p => new ServicePriceReadDto
+                {
+                    Id = p.Id,
+                    ServiceType = p.ServiceType,
+                    ServiceId = p.ServiceId,
+                    CurrencyCode = p.CurrencyCode,
+                    UnitPrice = p.UnitPrice,
+                    IsActive = p.IsActive,
+                    CreatedAt = p.CreatedAt
+                })
+                .ToListAsync();
+            return prices.ToLookup(p => p.ServiceId);
         }
     }
 }

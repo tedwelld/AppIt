@@ -16,6 +16,8 @@ namespace AppIt.Data.EntityModels
 
         public int Capacity { get; set; } = 1;
 
+        public int GuestCapacity { get; set; } = 1;
+
         public decimal BasePriceUsd { get; set; }
 
         public bool IsActive { get; set; } = true;

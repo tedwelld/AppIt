@@ -104,6 +104,9 @@ namespace AppIt.Api
                 builder.Services.AddScoped<IProductService, ProductService>();
                 builder.Services.AddScoped<IAccommodationService, AccommodationService>();
                 builder.Services.AddScoped<IActivityService, ActivityService>();
+                builder.Services.AddScoped<ITransferService, TransferService>();
+                builder.Services.AddScoped<ITourService, TourService>();
+                builder.Services.AddScoped<IServicePriceService, ServicePriceService>();
                 builder.Services.AddScoped<IRoleService, RoleService>();
                 builder.Services.AddScoped<IRoleFeatureService, RoleFeatureService>();
                 builder.Services.AddScoped<ICompanyService, CompanyService>();
@@ -129,6 +132,15 @@ namespace AppIt.Api
                 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
                 builder.Services.AddScoped<ICurrencyService, CurrencyService>();
                 builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
+                builder.Services.AddScoped<ICreditNoteService, CreditNoteService>();
+                builder.Services.AddScoped<IRefundService, RefundService>();
+                builder.Services.AddScoped<IProofOfPaymentService, ProofOfPaymentService>();
+                builder.Services.AddScoped<ICommissionService, CommissionService>();
+                builder.Services.AddScoped<IDayEndService, DayEndService>();
+                builder.Services.AddScoped<IConsultantService, ConsultantService>();
+                builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
+                builder.Services.AddScoped<IProductSubCategoryService, ProductSubCategoryService>();
+                builder.Services.AddScoped<ISpecialProductPriceService, SpecialProductPriceService>();
                 builder.Services.AddHostedService<PendingPaymentCleanupHostedService>();
                 builder.Services.ConfigureHttpJsonOptions(options =>
                 {

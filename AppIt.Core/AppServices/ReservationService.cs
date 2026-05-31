@@ -1,4 +1,5 @@
-﻿using AppIt.Core.DTOs;
+﻿using System.Text.Json;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using AppIt.Data;
 using AppIt.Data.EntityModels;
@@ -19,8 +20,12 @@ namespace AppIt.Core.Services
 
         public async Task<ReservationReadDto> CreateAsync(CreateReservationDto dto)
         {
-            var reference = string.IsNullOrWhiteSpace(dto.Reference) ? await BuildUniqueReferenceAsync("RES") : dto.Reference!;
-            var voucher = string.IsNullOrWhiteSpace(dto.VoucherCode) ? await BuildUniqueVoucherAsync("RES") : dto.VoucherCode!;
+            var reference = !string.IsNullOrWhiteSpace(dto.Reference)
+                ? dto.Reference!.Trim()
+                : !string.IsNullOrWhiteSpace(dto.AgencyVoucherReference)
+                    ? dto.AgencyVoucherReference!.Trim()
+                    : await BuildUniqueReferenceAsync("RES");
+            var voucher = string.IsNullOrWhiteSpace(dto.VoucherCode) ? await BuildUniqueVoucherAsync() : dto.VoucherCode!.Trim();
 
             var reservation = new Reservation
             {
@@ -32,13 +37,18 @@ namespace AppIt.Core.Services
                 CreatedDate = DateTime.UtcNow,
                 AccountId = dto.AccountId,
                 AgencyId = dto.AgencyId,
+                AgencyConsultantId = dto.AgencyConsultantId,
+                AgencyVoucherReference = dto.AgencyVoucherReference,
                 CustomerId = dto.CustomerId,
-                CustomerEmail = dto.CustomerEmail
+                CustomerEmail = dto.CustomerEmail,
+                Country = dto.Country,
+                Notes = dto.Notes
             };
 
             Reservations.Add(reservation);
             await _context.SaveChangesAsync();
 
+            await WriteSnapshotAsync(reservation.ReservationId, "Created", null);
             return ToReadDto(reservation);
         }
 
@@ -66,6 +76,7 @@ namespace AppIt.Core.Services
             }
 
             await _context.SaveChangesAsync();
+            await WriteSnapshotAsync(reservation.ReservationId, "Updated", dto.ClosingByUserName);
             return ToReadDto(reservation);
         }
 
@@ -203,6 +214,7 @@ namespace AppIt.Core.Services
 
                 PaymentStatus = paymentStatus,
                 PaymentAmount = paidAmount,
+                TravelStatus = r.TravelStatus,
 
                 ServiceItems = r.ServiceItems.Select(item => new BookingServiceItemDto
                 {
@@ -213,29 +225,35 @@ namespace AppIt.Core.Services
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice,
                     TotalPrice = item.TotalPrice,
-                    Currency = item.Currency
+                    Currency = item.Currency,
+                    SupplierId = item.SupplierId,
+                    AdultPax = item.AdultPax,
+                    ChildPax = item.ChildPax,
+                    CompPax = item.CompPax,
+                    Rooms = item.Rooms,
+                    Nights = item.Nights,
+                    PickupLocation = item.PickupLocation,
+                    DropoffLocation = item.DropoffLocation,
+                    ActivityDate = item.ActivityDate,
+                    DiscountPercent = item.DiscountPercent,
+                    VatPercent = item.VatPercent,
+                    CostOfSale = item.CostOfSale,
+                    Notes = item.Notes
                 }).ToList()
             };
         }
 
-        private static string? ResolvePaymentStatus(Invoice? invoice, Payment? payment)
+        private static string ResolvePaymentStatus(Invoice? invoice, Payment? latestPayment)
         {
-            if (payment != null)
-            {
-                return payment.Status;
-            }
+            if (invoice == null) return "NotPaid";
+            if (latestPayment == null) return "NotPaid";
 
-            if (invoice == null)
-            {
-                return null;
-            }
+            var paid = latestPayment.Amount;
+            var total = invoice.TotalAmount;
 
-            if (invoice.IsPaid || invoice.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Paid";
-            }
-
-            return string.IsNullOrWhiteSpace(invoice.Status) ? "Pending" : invoice.Status;
+            if (paid <= 0) return "NotPaid";
+            if (paid >= total) return paid > total ? "Shortfall" : "FullyPaid";
+            return "Deposited";
         }
 
         private async Task<string> BuildUniqueReferenceAsync(string prefix)
@@ -252,24 +270,23 @@ namespace AppIt.Core.Services
             throw new InvalidOperationException("Could not generate a unique reservation reference.");
         }
 
-        private async Task<string> BuildUniqueVoucherAsync(string prefix)
+        private async Task<string> BuildUniqueVoucherAsync()
         {
-            var pattern = $"VCH-{prefix}-";
             var existing = await Reservations
-                .Where(r => r.VoucherCode != null && r.VoucherCode.StartsWith(pattern))
+                .Where(r => r.VoucherCode != null)
                 .Select(r => r.VoucherCode!)
                 .ToListAsync();
 
             var maxSeq = 0;
             foreach (var code in existing)
             {
-                var suffix = code[pattern.Length..];
-                if (int.TryParse(suffix, out var n) && n > maxSeq)
+                var digits = new string(code.Where(char.IsDigit).ToArray());
+                if (int.TryParse(digits, out var n) && n > maxSeq)
                     maxSeq = n;
             }
 
             var next = maxSeq + 1;
-            return $"VCH-{prefix}-{next:D6}";
+            return $"{next:D5}";
         }
 
         private static string BuildReference(string prefix)
@@ -277,6 +294,187 @@ namespace AppIt.Core.Services
             var stamp = DateTime.UtcNow.ToString("yyyyMMdd");
             var unique = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(4));
             return $"APP-{prefix}-{stamp}-{unique}";
+        }
+
+        public async Task<ReservationReadDto?> CloseBookingAsync(int id, string closedBy)
+        {
+            var reservation = await Reservations
+                .Include(r => r.Invoices)
+                .Include(r => r.ServiceItems)
+                .FirstOrDefaultAsync(r => r.ReservationId == id);
+            if (reservation == null) return null;
+
+            reservation.Status = "Closed";
+            reservation.TravelStatus = "Travelled";
+            reservation.IsInvoiced = true;
+            reservation.ClosingDate = DateTime.UtcNow;
+            reservation.ClosingByUserName = closedBy;
+
+            if (!reservation.Invoices.Any())
+            {
+                _context.Invoices.Add(new Invoice
+                {
+                    ReservationId = id,
+                    TotalAmount = reservation.TotalAmount,
+                    CurrencyCode = reservation.CurrencyCode,
+                    Status = "Pending",
+                    IssuedDate = DateTime.UtcNow
+                });
+            }
+
+            await _context.SaveChangesAsync();
+            await WriteSnapshotAsync(id, "Closed", closedBy);
+            return await GetByIdAsync(id);
+        }
+
+        public async Task<ReservationReadDto?> CancelBookingAsync(int id, string? reason = null)
+        {
+            var reservation = await Reservations.FindAsync(id);
+            if (reservation == null) return null;
+
+            var alreadyPaid = reservation.PaymentStatus == "FullyPaid";
+            reservation.Status = "Cancelled";
+            if (!alreadyPaid) reservation.PaymentStatus = "NotPaid";
+            if (!string.IsNullOrWhiteSpace(reason)) reservation.Notes = reason;
+
+            await _context.SaveChangesAsync();
+            await WriteSnapshotAsync(id, "Cancelled", reason);
+            return await GetByIdAsync(id);
+        }
+
+        public async Task<ReservationReadDto?> OpenBookingAsync(int id)
+        {
+            var reservation = await Reservations.FindAsync(id);
+            if (reservation == null) return null;
+
+            reservation.Status = "Confirmed";
+            reservation.TravelStatus = "NotCheckedIn";
+            reservation.IsInvoiced = false;
+            reservation.ClosingDate = null;
+            reservation.ClosingByUserName = null;
+
+            await _context.SaveChangesAsync();
+            await WriteSnapshotAsync(id, "Opened", null);
+            return await GetByIdAsync(id);
+        }
+
+        public async Task<ReservationReadDto?> CloneBookingAsync(int id, string clonedBy)
+        {
+            var source = await Reservations
+                .Include(r => r.ServiceItems)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.ReservationId == id);
+            if (source == null) return null;
+
+            var reference = await BuildUniqueReferenceAsync("RES");
+            var voucher = await BuildUniqueVoucherAsync();
+
+            var clone = new Reservation
+            {
+                Reference = reference,
+                VoucherCode = voucher,
+                CurrencyCode = source.CurrencyCode,
+                TotalAmount = source.TotalAmount,
+                Status = "Enquiry",
+                PaymentStatus = "NotPaid",
+                TravelStatus = "NotCheckedIn",
+                CreatedDate = DateTime.UtcNow,
+                AccountId = source.AccountId,
+                AgencyId = source.AgencyId,
+                AgencyConsultantId = source.AgencyConsultantId,
+                CustomerId = source.CustomerId,
+                CustomerEmail = source.CustomerEmail,
+                NumberOfPeople = source.NumberOfPeople,
+                Notes = source.Notes,
+                Country = source.Country
+            };
+
+            Reservations.Add(clone);
+            await _context.SaveChangesAsync();
+
+            var clonedItems = source.ServiceItems.Select(item => new ReservationServiceItem
+            {
+                ReservationId = clone.ReservationId,
+                ServiceType = item.ServiceType,
+                ServiceId = item.ServiceId,
+                ServiceName = item.ServiceName,
+                Quantity = item.Quantity,
+                UnitPrice = item.UnitPrice,
+                TotalPrice = item.TotalPrice,
+                Currency = item.Currency,
+                SupplierId = item.SupplierId,
+                AdultPax = item.AdultPax,
+                ChildPax = item.ChildPax,
+                CompPax = item.CompPax,
+                Rooms = item.Rooms,
+                Nights = item.Nights,
+                PickupLocation = item.PickupLocation,
+                DropoffLocation = item.DropoffLocation,
+                ActivityDate = item.ActivityDate,
+                DiscountPercent = item.DiscountPercent,
+                VatPercent = item.VatPercent,
+                CostOfSale = item.CostOfSale,
+                Notes = item.Notes
+            }).ToList();
+
+            _context.ReservationServiceItems.AddRange(clonedItems);
+            await _context.SaveChangesAsync();
+
+            await WriteSnapshotAsync(id, "Cloned", clonedBy);
+            await WriteSnapshotAsync(clone.ReservationId, "Created", clonedBy);
+            return await GetByIdAsync(clone.ReservationId);
+        }
+
+        public async Task<IEnumerable<ReservationSnapshotDto>> GetSnapshotsAsync(int id)
+        {
+            return await _context.ReservationSnapshots
+                .AsNoTracking()
+                .Where(s => s.ReservationId == id)
+                .OrderByDescending(s => s.CreatedAt)
+                .Select(s => new ReservationSnapshotDto
+                {
+                    Id = s.Id,
+                    ReservationId = s.ReservationId,
+                    SnapshotType = s.SnapshotType,
+                    CreatedBy = s.CreatedBy,
+                    CreatedAt = s.CreatedAt
+                })
+                .ToListAsync();
+        }
+
+        private async Task WriteSnapshotAsync(int reservationId, string snapshotType, string? createdBy)
+        {
+            var reservation = await Reservations
+                .AsNoTracking()
+                .Include(r => r.ServiceItems)
+                .FirstOrDefaultAsync(r => r.ReservationId == reservationId);
+
+            var json = reservation == null ? "{}" : JsonSerializer.Serialize(new
+            {
+                reservation.ReservationId,
+                reservation.Reference,
+                reservation.VoucherCode,
+                reservation.Status,
+                reservation.PaymentStatus,
+                reservation.TravelStatus,
+                reservation.TotalAmount,
+                reservation.CurrencyCode,
+                reservation.IsInvoiced,
+                reservation.ClosingDate,
+                reservation.AccountId,
+                reservation.CustomerId
+            });
+
+            _context.ReservationSnapshots.Add(new ReservationSnapshot
+            {
+                ReservationId = reservationId,
+                SnapshotType = snapshotType,
+                SnapshotJson = json,
+                CreatedBy = createdBy,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
         }
     }
 }

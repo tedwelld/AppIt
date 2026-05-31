@@ -10,7 +10,7 @@ namespace AppIt.Api.Controllers
 {
     [Route("api/exchange-rates")]
     [ApiController]
-    [Authorize(Roles = "super,admin")]
+    [Authorize]
     public class ExchangeRatesController : ControllerBase
     {
         private readonly IExchangeRateService _service;
@@ -43,7 +43,23 @@ namespace AppIt.Api.Controllers
             return Ok(rates);
         }
 
+        [HttpGet("effective")]
+        public async Task<IActionResult> GetEffective([FromQuery] DateTime? date)
+        {
+            var rates = await _service.GetEffectiveRatesAsync(date ?? DateTime.UtcNow);
+            return Ok(rates);
+        }
+
+        [HttpGet("effective-rate")]
+        public async Task<IActionResult> GetEffectiveRate([FromQuery] string currencyCode, [FromQuery] DateTime? date)
+        {
+            var rate = await _service.GetEffectiveRateAsync(currencyCode, date ?? DateTime.UtcNow);
+            if (rate == null) return NotFound();
+            return Ok(rate);
+        }
+
         [HttpPost]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> Create(CreateExchangeRateDto dto)
         {
             var rate = await _service.CreateExchangeRateAsync(dto);
@@ -51,6 +67,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> Update(int id, UpdateExchangeRateDto dto)
         {
             var rate = await _service.UpdateExchangeRateAsync(id, dto);
@@ -59,6 +76,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> Delete(int id)
         {
             var success = await _service.DeleteExchangeRateAsync(id);

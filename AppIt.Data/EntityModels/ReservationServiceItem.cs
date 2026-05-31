@@ -22,5 +22,26 @@ namespace AppIt.Data.EntityModels
 
         [MaxLength(10)]
         public string Currency { get; set; } = "USD";
+
+        public int? SupplierId { get; set; }
+        public int? AdultPax { get; set; }
+        public int? ChildPax { get; set; }
+        public int? CompPax { get; set; }
+        public int? Rooms { get; set; }
+        public int? Nights { get; set; }
+
+        [MaxLength(200)]
+        public string? PickupLocation { get; set; }
+
+        [MaxLength(200)]
+        public string? DropoffLocation { get; set; }
+
+        public DateTime? ActivityDate { get; set; }
+        public decimal? DiscountPercent { get; set; }
+        public decimal? VatPercent { get; set; }
+        public decimal? CostOfSale { get; set; }
+
+        [MaxLength(200)]
+        public string? Notes { get; set; }
     }
 }

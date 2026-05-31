@@ -51,8 +51,7 @@ export const appRoutes: Routes = [
             { path: 'operations/opera-management', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'opera-management' } },
             { path: 'setup/manage-companies', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'companies' } },
             { path: 'setup/manage-products', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'products' } },
-            { path: 'setup/manage-accommodations', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'accommodations' } },
-            { path: 'setup/manage-activities', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'activities' } },
+            { path: 'setup/manage-service-prices', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'service-prices' } },
             { path: 'setup/manage-departments', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'departments' } },
             { path: 'setup/manage-suppliers', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'suppliers' } },
             { path: 'setup/manage-currencies', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'currencies' } },
@@ -61,6 +60,13 @@ export const appRoutes: Routes = [
             { path: 'administration/users', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'accounts' } },
             { path: 'administration/roles', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'roles' } },
             { path: 'administration/user-activity', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'user-activity' } },
+            { path: 'accounts/commissions', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'commissions' } },
+            { path: 'accounts/refunds', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'refunds' } },
+            { path: 'operations/day-end', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'day-end' } },
+            { path: 'setup/manage-consultants', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'consultants' } },
+            { path: 'setup/manage-product-categories', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'product-categories' } },
+            { path: 'setup/manage-product-sub-categories', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'product-sub-categories' } },
+            { path: 'setup/manage-special-prices', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'special-product-prices' } },
             { path: 'support', loadComponent: () => import('./app/pages/appit/support.page').then((m) => m.SupportPage) },
             { path: 'settings', loadComponent: () => import('./app/pages/appit/settings.page').then((m) => m.SettingsPage) }
         ]

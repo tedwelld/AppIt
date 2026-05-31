@@ -18,6 +18,7 @@ export class AuthService {
     readonly user = computed(() => this.userState());
     readonly token = computed(() => localStorage.getItem(AUTH_TOKEN_KEY));
     readonly role = computed<AppItRole | null>(() => this.normalizeRole(this.userState()?.role));
+    readonly roleName = computed<string>(() => String(this.userState()?.role ?? '').trim().toLowerCase());
     readonly displayName = computed(() => {
         const user = this.userState();
         return user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email : 'Guest';
@@ -85,6 +86,14 @@ export class AuthService {
         return value;
     }
 
+    patchUser(partial: Partial<AppItUser>): void {
+        const current = this.userState();
+        if (!current) return;
+        const updated = { ...current, ...partial };
+        this.userState.set(updated);
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updated));
+    }
+
     private saveSession(response: AuthResponse): void {
         if (!response?.user) {
             throw new Error('Invalid auth response.');
@@ -120,16 +129,12 @@ export class AuthService {
     }
 
     private normalizeRole(role: unknown): AppItRole | null {
-        const value = String(role ?? '').toLowerCase();
-        if (value === 'super') {
-            return 'super';
-        }
-        if (value === 'admin') {
-            return 'admin';
-        }
-        if (value === 'regular') {
-            return 'regular';
-        }
-        return null;
+        const value = String(role ?? '').trim().toLowerCase();
+        if (!value) return null;
+        if (value === 'super') return 'super';
+        if (value === 'regular' || value === 'customer' || value === 'guest' || value === 'user') return 'regular';
+        // Every named back-office / staff role operates at the admin tier; the specific
+        // role name (roleName()) is what drives finer-grained menu visibility.
+        return 'admin';
     }
 }

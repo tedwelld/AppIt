@@ -20,7 +20,10 @@ import { AuthService } from '../../core/auth/auth.service';
                     <label class="grid gap-2">Email<input class="p-inputtext p-component" [(ngModel)]="profile.email" name="email" /></label>
                     <label class="grid gap-2">Phone<input class="p-inputtext p-component" [(ngModel)]="profile.phone" name="phone" /></label>
                 </div>
-                <button class="p-button p-component w-fit" type="submit"><span class="p-button-label">Save Profile</span></button>
+                <button class="p-button p-component w-fit" type="submit" [disabled]="saving()">
+                    <i class="pi pi-spin pi-spinner mr-2" *ngIf="saving()"></i>
+                    <span class="p-button-label">{{ saving() ? 'Saving...' : 'Save Profile' }}</span>
+                </button>
                 <p class="text-primary" *ngIf="status()">{{ status() }}</p>
             </form>
         </section>
@@ -30,14 +33,27 @@ export class SettingsPage {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
     readonly status = signal('');
+    readonly saving = signal(false);
     profile = { ...(this.auth.user() ?? {}) } as any;
 
     save(): void {
         const id = this.auth.user()?.id;
         if (!id) return;
+        this.saving.set(true);
+        this.status.set('');
         this.api.put(`/api/accounts/${id}`, this.profile).subscribe({
-            next: () => this.status.set('Profile saved. Sign in again to refresh the local session.'),
-            error: (err) => this.status.set(err?.error?.message ?? err?.message ?? 'Profile update failed.')
+            next: (updated: any) => {
+                this.saving.set(false);
+                this.status.set('Profile saved successfully.');
+                const data = updated?.data ?? updated;
+                if (data) {
+                    this.auth.patchUser(data);
+                }
+            },
+            error: (err) => {
+                this.saving.set(false);
+                this.status.set(err?.error?.message ?? err?.message ?? 'Profile update failed.');
+            }
         });
     }
 }

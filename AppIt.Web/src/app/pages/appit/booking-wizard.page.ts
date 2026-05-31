@@ -7,6 +7,7 @@ import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { forkJoin } from 'rxjs';
@@ -15,17 +16,20 @@ import { BookingCheckoutRequest, BookingCheckoutResult, BookingServiceItem, Cust
 import { AuthService } from '../../core/auth/auth.service';
 
 interface ServiceOption {
-    serviceType: 'Product' | 'Accommodation' | 'Activity';
+    serviceType: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour';
     serviceId: number;
     serviceName: string;
     description: string;
     unitPrice: number;
     currency: string;
+    serviceLabel: string;
+    hasSelectedCurrencyPrice: boolean;
+    prices: Array<{ currencyCode: string; unitPrice: number; isActive?: boolean }>;
 }
 
 interface ServiceTypeOption {
     label: string;
-    value: 'Product' | 'Accommodation' | 'Activity';
+    value: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour';
     endpoint: string;
 }
 
@@ -41,6 +45,13 @@ interface TripAccountOption {
     agentType: string;
     email?: string;
     phone?: string;
+}
+
+interface SupplierOption {
+    supplierId: number;
+    name: string;
+    contactEmail?: string;
+    contactPhone?: string;
 }
 
 interface InvoiceForm {
@@ -63,11 +74,17 @@ interface BookingForm {
     totalAmount: number;
     status: string;
     closingByUserName: string;
+    agencyConsultantId: number | null;
+    agencyVoucherReference: string;
+    country: string;
+    paymentStatus: string;
+    travelStatus: string;
+    notes: string;
 }
 
 @Component({
     standalone: true,
-    imports: [CommonModule, FormsModule, ButtonModule, DialogModule, SelectModule, InputTextModule, TableModule, TagModule],
+    imports: [CommonModule, FormsModule, ButtonModule, DialogModule, SelectModule, MultiSelectModule, InputTextModule, TableModule, TagModule],
     template: `
         <section class="grid gap-5">
             <div class="workspace-card flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
@@ -78,8 +95,16 @@ interface BookingForm {
                 </div>
                 <div class="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
                     <input pInputText class="w-full xl:w-80" [(ngModel)]="bookingSearch" (keyup.enter)="loadBookings(1)" placeholder="Search bookings..." />
-                    <button pButton type="button" icon="pi pi-search" label="Search" severity="secondary" (click)="loadBookings(1)"></button>
-                    <button pButton type="button" icon="pi pi-refresh" label="Refresh" severity="secondary" (click)="loadBookings(currentBookingPage())"></button>
+                    <select class="p-inputtext p-component w-44" [(ngModel)]="bookingStatusFilter" (ngModelChange)="loadBookings(1)">
+                        <option value="">All Statuses</option>
+                        <option value="Enquiry">Enquiry</option>
+                        <option value="Provisional">Provisional</option>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Closed">Closed</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                    <button pButton type="button" icon="pi pi-search" label="Search" severity="info" (click)="loadBookings(1)"></button>
+                    <button pButton type="button" icon="pi pi-refresh" label="Refresh" severity="warn" (click)="loadBookings(currentBookingPage())"></button>
                     <button pButton type="button" icon="pi pi-plus" label="New Booking" (click)="openBookingModal()"></button>
                 </div>
             </div>
@@ -100,61 +125,39 @@ interface BookingForm {
                 >
                     <ng-template pTemplate="header">
                         <tr>
-                            <th class="text-right w-20">Action</th>
+                            <th class="text-right w-28">Actions</th>
                             <th>Voucher No</th>
                             <th>Voucher Ref</th>
                             <th>Agent</th>
                             <th>Customer</th>
                             <th>Status</th>
                             <th>Payment</th>
+                            <th>Travel</th>
                             <th>Inv Amt</th>
                             <th>Due</th>
                             <th>Booked At</th>
-                            <th>Closing</th>
                             <th>Closed By</th>
                         </tr>
                     </ng-template>
                     <ng-template pTemplate="body" let-booking>
                         <tr>
                             <td class="text-right whitespace-nowrap">
-                                <button pButton type="button" icon="pi pi-eye" rounded text class="app-row-action" aria-label="View booking" (click)="viewBooking(booking)"></button>
-                                <button
-                                    pButton
-                                    type="button"
-                                    icon="pi pi-trash"
-                                    rounded
-                                    text
-                                    severity="danger"
-                                    class="app-row-action"
-                                    aria-label="Delete booking"
-                                    [title]="canDeleteBooking(booking) ? 'Delete booking' : 'Paid or invoiced-paid bookings cannot be hard deleted'"
-                                    [disabled]="!canDeleteBooking(booking)"
-                                    (click)="deleteBooking(booking)"
-                                ></button>
-                                <button
-                                    pButton
-                                    type="button"
-                                    icon="pi pi-ban"
-                                    rounded
-                                    text
-                                    severity="warn"
-                                    class="app-row-action"
-                                    aria-label="Cancel booking"
-                                    title="Cancel booking"
-                                    (click)="cancelBooking(booking)"
-                                ></button>
-                                <button pButton type="button" icon="pi pi-info-circle" rounded text severity="info" class="app-row-action" aria-label="Check status" (click)="checkStatus(booking)"></button>
+                                <button pButton type="button" icon="pi pi-eye" rounded text class="app-row-action" pTooltip="View" (click)="viewBooking(booking)"></button>
+                                <button pButton type="button" icon="pi pi-lock" rounded text severity="danger" class="app-row-action" pTooltip="Close Booking" [disabled]="booking.status === 'Closed'" (click)="closeBookingFromTable(booking)"></button>
+                                <button pButton type="button" icon="pi pi-ban" rounded text severity="warn" class="app-row-action" pTooltip="Cancel" [disabled]="booking.status === 'Cancelled'" (click)="cancelBookingFromTable(booking)"></button>
+                                <button pButton type="button" icon="pi pi-refresh" rounded text severity="info" class="app-row-action" pTooltip="Re-open" [disabled]="booking.status !== 'Closed'" (click)="openBookingFromTable(booking)"></button>
+                                <button pButton type="button" icon="pi pi-copy" rounded text severity="help" class="app-row-action" pTooltip="Clone" (click)="cloneBookingFromTable(booking)"></button>
                             </td>
                             <td>{{ booking.voucherCode ?? '-' }}</td>
                             <td>{{ booking.reference ?? '-' }}</td>
                             <td>{{ accountName(booking) }}</td>
                             <td>{{ customerName(booking) }}</td>
                             <td><p-tag [value]="booking.status ?? '-'" [severity]="statusSeverity(booking.status)"></p-tag></td>
-                            <td><p-tag [value]="booking.paymentStatus ?? '-'" [severity]="statusSeverity(booking.paymentStatus)"></p-tag></td>
+                            <td><p-tag [value]="booking.paymentStatus ?? 'NotPaid'" [severity]="paymentStatusSeverity(booking.paymentStatus)"></p-tag></td>
+                            <td><p-tag [value]="booking.travelStatus ?? 'NotCheckedIn'" [severity]="travelStatusSeverity(booking.travelStatus)"></p-tag></td>
                             <td>{{ money($any(booking.invoiceTotalAmount) ?? 0, booking.invoiceCurrency ?? 'USD') }}</td>
                             <td>{{ amountDue(booking) }}</td>
                             <td>{{ display(booking.createdAt) }}</td>
-                            <td>{{ display(booking.closingDate) }}</td>
                             <td>{{ booking.closingByUserName ?? '-' }}</td>
                         </tr>
                     </ng-template>
@@ -176,9 +179,9 @@ interface BookingForm {
                 <div class="booking-modal-shell">
                     <div class="booking-modal-intro">
                         <div>
-                            <p class="text-primary font-bold uppercase tracking-[0.25em] m-0">Booking Wizard</p>
+                            <p class="text-primary font-bold uppercase tracking-[0.25em] m-0">SWA VCH N#{{ previewVoucherNumber() }}</p>
                             <h2 class="font-display text-3xl mt-2 mb-1">Capture Client Booking</h2>
-                            <p class="text-muted-color m-0">Move through client details, services, and payment without leaving the bookings table.</p>
+                            <p class="text-muted-color m-0">Booking Details, Product Details, and Payment Details follow the same capture structure.</p>
                         </div>
                         <div class="booking-total-chip">
                             <span>Total</span>
@@ -231,6 +234,24 @@ interface BookingForm {
                                     ></p-select>
                                 </label>
                                 <label class="booking-inline-field">
+                                    <span class="font-semibold">Agency Voucher Ref</span>
+                                    <input pInputText [(ngModel)]="agencyVoucherRef" name="agencyVoucherRef" placeholder="Agent's own voucher number" />
+                                </label>
+                                <label class="booking-inline-field">
+                                    <span class="font-semibold">Consultant</span>
+                                    <p-select
+                                        [options]="consultants()"
+                                        [(ngModel)]="selectedConsultantId"
+                                        name="selectedConsultantId"
+                                        optionLabel="fullName"
+                                        optionValue="id"
+                                        placeholder="Select consultant"
+                                        [showClear]="true"
+                                        [filter]="true"
+                                        appendTo="body"
+                                    ></p-select>
+                                </label>
+                                <label class="booking-inline-field">
                                     <span class="font-semibold">First Name</span>
                                     <input pInputText [(ngModel)]="client.firstName" name="firstName" />
                                 </label>
@@ -247,6 +268,10 @@ interface BookingForm {
                                     <input pInputText [(ngModel)]="client.phoneNumber" name="phoneNumber" />
                                 </label>
                                 <label class="booking-inline-field">
+                                    <span class="font-semibold">Country</span>
+                                    <input pInputText [(ngModel)]="clientCountry" name="country" placeholder="Country of origin" />
+                                </label>
+                                <label class="booking-inline-field">
                                     <span class="font-semibold">Nationality</span>
                                     <input pInputText [(ngModel)]="client.nationality" name="nationality" />
                                 </label>
@@ -255,8 +280,8 @@ interface BookingForm {
                                     <input pInputText type="number" min="0" [(ngModel)]="client.durationOfStayDays" name="durationOfStayDays" />
                                 </label>
                                 <label class="booking-inline-field booking-inline-field-wide">
-                                    <span class="font-semibold">Notes</span>
-                                    <input pInputText [(ngModel)]="client.notes" name="notes" />
+                                    <span class="font-semibold">Booking Notes</span>
+                                    <input pInputText [(ngModel)]="bookingNotes" name="bookingNotes" placeholder="Special instructions or notes" />
                                 </label>
                             </form>
                         </div>
@@ -266,60 +291,119 @@ interface BookingForm {
                         <div class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
                             <div>
                                 <h2 class="font-display text-2xl mt-0">Services</h2>
-                                <p class="text-muted-color m-0">Add products, accommodations, and activities to this booking.</p>
+                                <p class="text-muted-color m-0">Choose from the services created under each setup page, grouped by service type/category.</p>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-2 w-full xl:w-auto">
-                                <p-select [options]="serviceTypeOptions()" [(ngModel)]="selectedType" optionLabel="label" optionValue="value" (onChange)="selectedService = null" appendTo="body"></p-select>
-                                <p-select [options]="filteredServices()" [(ngModel)]="selectedService" optionLabel="serviceName" placeholder="Select service" [filter]="true" appendTo="body"></p-select>
-                                <input pInputText type="number" min="1" [(ngModel)]="selectedQuantity" placeholder="Qty" />
-                                <button pButton type="button" icon="pi pi-plus" label="Add" (click)="addService()"></button>
+                            <div class="grid grid-cols-1 md:grid-cols-6 gap-3 w-full xl:w-auto">
+                                <label class="grid gap-1 text-sm"><span class="font-semibold">Currency</span>
+                                    <p-select [options]="currencyOptions()" [(ngModel)]="currency" optionLabel="code" optionValue="code" (onChange)="onCurrencyChange(currency)" appendTo="body"></p-select>
+                                </label>
+                                <label class="grid gap-1 text-sm"><span class="font-semibold">Service Type / Category</span>
+                                    <p-select [options]="serviceTypeOptions()" [(ngModel)]="selectedType" optionLabel="label" optionValue="value" (onChange)="onServiceTypeChange()" appendTo="body"></p-select>
+                                </label>
+                                <label class="grid gap-1 text-sm"><span class="font-semibold">Service ({{ filteredServices().length }})</span>
+                                    <p-multiSelect [options]="filteredServices()" [(ngModel)]="selectedServices" optionLabel="serviceLabel" placeholder="Select one or more" [filter]="true" display="chip" appendTo="body"></p-multiSelect>
+                                </label>
+                                <label class="grid gap-1 text-sm"><span class="font-semibold">Supplier</span>
+                                    <p-select [options]="suppliers()" [(ngModel)]="lineSupplierId" optionLabel="name" optionValue="supplierId" placeholder="Optional" [showClear]="true" [filter]="true" appendTo="body"></p-select>
+                                </label>
+                                <label class="grid gap-1 text-sm"><span class="font-semibold">Quantity</span>
+                                    <input pInputText type="number" min="1" [(ngModel)]="selectedQuantity" placeholder="Qty" />
+                                </label>
+                                <label class="grid gap-1 text-sm"><span class="font-semibold">&nbsp;</span>
+                                    <button pButton type="button" icon="pi pi-plus" label="Add" (click)="addService()"></button>
+                                </label>
+                            </div>
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mt-2" *ngIf="selectedServices.length">
+                                <label class="grid gap-1 text-sm"><span>Adults</span><input pInputText type="number" min="0" [(ngModel)]="lineAdultPax" placeholder="0" /></label>
+                                <label class="grid gap-1 text-sm"><span>Children</span><input pInputText type="number" min="0" [(ngModel)]="lineChildPax" placeholder="0" /></label>
+                                <label class="grid gap-1 text-sm"><span>Comps</span><input pInputText type="number" min="0" [(ngModel)]="lineCompPax" placeholder="0" /></label>
+                                <label class="grid gap-1 text-sm" *ngIf="selectedType === 'Accommodation'"><span>Rooms</span><input pInputText type="number" min="1" [(ngModel)]="lineRooms" placeholder="1" /></label>
+                                <label class="grid gap-1 text-sm" *ngIf="selectedType === 'Accommodation'"><span>Nights</span><input pInputText type="number" min="1" [(ngModel)]="lineNights" placeholder="1" /></label>
+                                <label class="grid gap-1 text-sm" *ngIf="selectedType === 'Activity' || selectedType === 'Transfer' || selectedType === 'Tour'"><span>Pickup</span><input pInputText [(ngModel)]="linePickup" placeholder="Pickup location" /></label>
+                                <label class="grid gap-1 text-sm" *ngIf="selectedType === 'Activity' || selectedType === 'Transfer' || selectedType === 'Tour'"><span>Dropoff</span><input pInputText [(ngModel)]="lineDropoff" placeholder="Dropoff location" /></label>
+                                <label class="grid gap-1 text-sm" *ngIf="selectedType !== 'Product'"><span>Date</span><input pInputText type="date" [(ngModel)]="lineActivityDate" /></label>
+                                <label class="grid gap-1 text-sm"><span>Discount %</span><input pInputText type="number" min="0" max="100" step="0.01" [(ngModel)]="lineDiscountPercent" placeholder="0" /></label>
                             </div>
                         </div>
 
                         <p-table [value]="serviceItems()" styleClass="p-datatable-sm mt-4 booking-display-table" [tableStyle]="{ 'min-width': '100%' }" [rows]="10" [paginator]="serviceItems().length > 10">
                             <ng-template pTemplate="header">
-                                <tr><th>Type</th><th>Service</th><th>Qty</th><th>Unit</th><th>Total</th><th class="text-right">Actions</th></tr>
+                                <tr><th>Category</th><th>Service</th><th>Supplier</th><th>Qty</th><th>Adults</th><th>Children</th><th>Rooms</th><th>Nights</th><th>Disc%</th><th>Unit</th><th>Total</th><th class="text-right">Actions</th></tr>
                             </ng-template>
                             <ng-template pTemplate="body" let-item let-index="rowIndex">
                                 <tr>
-                                    <td>{{ item.serviceType }}</td>
+                                    <td>{{ serviceTypeLabel(item.serviceType) }}</td>
                                     <td>{{ item.serviceName }}</td>
+                                    <td>{{ supplierName(item.supplierId) }}</td>
                                     <td>{{ item.quantity }}</td>
+                                    <td>{{ item.adultPax ?? '-' }}</td>
+                                    <td>{{ item.childPax ?? '-' }}</td>
+                                    <td>{{ item.rooms ?? '-' }}</td>
+                                    <td>{{ item.nights ?? '-' }}</td>
+                                    <td>{{ item.discountPercent != null ? item.discountPercent + '%' : '-' }}</td>
                                     <td>{{ money(item.unitPrice, item.currency) }}</td>
-                                    <td>{{ money(item.totalPrice || 0, item.currency) }}</td>
+                                    <td class="font-semibold">{{ money(effectiveTotal(item), item.currency) }}</td>
                                     <td class="text-right">
                                         <button pButton type="button" icon="pi pi-trash" severity="danger" rounded text class="app-row-action" aria-label="Remove service" (click)="removeService(index)"></button>
                                     </td>
                                 </tr>
                             </ng-template>
                             <ng-template pTemplate="emptymessage">
-                                <tr><td colspan="6" class="text-center text-muted-color py-4">No services selected.</td></tr>
+                                <tr><td colspan="12" class="text-center text-muted-color py-4">No services selected.</td></tr>
                             </ng-template>
                         </p-table>
+                        <div class="flex justify-end gap-6 pt-2 text-sm font-semibold" *ngIf="serviceItems().length > 0">
+                            <span>Gross: {{ money(total(), currency) }}</span>
+                            <span *ngIf="totalDiscount() > 0" class="text-green-600">Discount: -{{ money(totalDiscount(), currency) }}</span>
+                            <span>Net: {{ money(netTotal(), currency) }}</span>
+                        </div>
                     </article>
 
                     <article class="booking-modal-panel" *ngIf="activeStep() === 2">
                         <h2 class="font-display text-2xl mt-0">Payment And Review</h2>
                         <div class="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-5">
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <label class="grid gap-2">
                                     <span class="font-semibold">Payment Method</span>
                                     <p-select [options]="paymentMethods()" [(ngModel)]="paymentMethod" optionLabel="label" optionValue="value" placeholder="Select method" appendTo="body"></p-select>
                                 </label>
                                 <label class="grid gap-2">
                                     <span class="font-semibold">Currency</span>
-                                    <input pInputText [(ngModel)]="currency" />
+                                    <p-select [options]="currencyOptions()" [(ngModel)]="currency" optionLabel="code" optionValue="code" (onChange)="onCurrencyChange(currency)" appendTo="body"></p-select>
                                 </label>
                                 <label class="grid gap-2">
-                                    <span class="font-semibold">Amount</span>
-                                    <input pInputText type="number" [ngModel]="total()" name="amount" readonly />
+                                    <span class="font-semibold">Bank / Transaction Reference</span>
+                                    <input pInputText [(ngModel)]="transactionReference" placeholder="Bank reference or receipt number" />
+                                </label>
+                                <label class="grid gap-2">
+                                    <span class="font-semibold">Proof Of Payment URL</span>
+                                    <input pInputText [(ngModel)]="proofOfPaymentUrl" placeholder="https://..." />
+                                </label>
+                                <label class="grid gap-2 md:col-span-2">
+                                    <span class="font-semibold">Payment Status</span>
+                                    <select class="p-inputtext p-component" [(ngModel)]="bookingPaymentStatus">
+                                        <option value="NotPaid">Not Paid</option>
+                                        <option value="Deposited">Deposited</option>
+                                        <option value="FullyPaid">Fully Paid</option>
+                                    </select>
                                 </label>
                             </div>
 
-                            <aside class="rounded-xl border border-surface-200 dark:border-surface-700 p-4">
-                                <p class="text-muted-color text-sm m-0">Booking Total</p>
-                                <p class="font-display text-4xl font-bold my-2">{{ money(total(), currency) }}</p>
-                                <p class="m-0 text-sm">{{ serviceItems().length }} service rows selected</p>
+                            <aside class="rounded-xl border border-surface-200 dark:border-surface-700 p-4 grid gap-3">
+                                <div>
+                                    <p class="text-muted-color text-sm m-0">Gross Total</p>
+                                    <p class="font-display text-3xl font-bold my-1">{{ money(total(), currency) }}</p>
+                                </div>
+                                <div *ngIf="totalDiscount() > 0">
+                                    <p class="text-muted-color text-sm m-0">Discount</p>
+                                    <p class="font-semibold text-green-600 my-1">-{{ money(totalDiscount(), currency) }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-muted-color text-sm m-0">Net Total</p>
+                                    <p class="font-display text-xl font-bold my-1">{{ money(netTotal(), currency) }}</p>
+                                </div>
+                                <p class="m-0 text-sm text-muted-color">{{ serviceItems().length }} service rows</p>
+                                <p-tag [value]="bookingPaymentStatus" [severity]="paymentStatusSeverity(bookingPaymentStatus)"></p-tag>
                             </aside>
                         </div>
                     </article>
@@ -327,9 +411,11 @@ interface BookingForm {
                     <div class="booking-modal-footer">
                         <p class="text-red-500 m-0" *ngIf="status()">{{ status() }}</p>
                         <div class="booking-modal-actions">
-                            <button pButton type="button" label="Back" icon="pi pi-arrow-left" severity="secondary" (click)="back()" [disabled]="activeStep() === 0"></button>
+                            <button pButton type="button" label="Back" icon="pi pi-arrow-left" severity="contrast" (click)="back()" [disabled]="activeStep() === 0"></button>
                             <button pButton type="button" label="Next" icon="pi pi-arrow-right" iconPos="right" (click)="next()" *ngIf="activeStep() < 2"></button>
-                            <button pButton type="button" label="Submit Booking" icon="pi pi-check" [loading]="submitting()" (click)="submit()" *ngIf="activeStep() === 2"></button>
+                            <button pButton type="button" label="Save Enquiry" icon="pi pi-pencil" severity="info" [loading]="submitting()" (click)="submitWithStatus('Enquiry')" *ngIf="activeStep() === 2"></button>
+                            <button pButton type="button" label="Provisional" icon="pi pi-clock" severity="warn" [loading]="submitting()" (click)="submitWithStatus('Provisional')" *ngIf="activeStep() === 2"></button>
+                            <button pButton type="button" label="Confirm Booking" icon="pi pi-check" [loading]="submitting()" (click)="submitWithStatus('Confirmed')" *ngIf="activeStep() === 2"></button>
                         </div>
                     </div>
                 </div>
@@ -345,9 +431,10 @@ interface BookingForm {
                 styleClass="booking-action-modal"
             >
                 <div class="booking-action-tabs">
-                    <button pButton type="button" label="Booking Details" icon="pi pi-calendar" [severity]="bookingDetailTab === 'booking' ? 'primary' : 'secondary'" (click)="bookingDetailTab = 'booking'"></button>
-                    <button pButton type="button" label="Product Details" icon="pi pi-box" [severity]="bookingDetailTab === 'products' ? 'primary' : 'secondary'" (click)="bookingDetailTab = 'products'"></button>
-                    <button pButton type="button" label="Payment Details" icon="pi pi-receipt" [severity]="bookingDetailTab === 'payment' ? 'primary' : 'secondary'" (click)="bookingDetailTab = 'payment'"></button>
+                    <button pButton type="button" label="Booking Details" icon="pi pi-calendar" [severity]="bookingDetailTab === 'booking' ? 'primary' : 'contrast'" (click)="bookingDetailTab = 'booking'"></button>
+                    <button pButton type="button" label="Product Details" icon="pi pi-box" [severity]="bookingDetailTab === 'products' ? 'primary' : 'contrast'" (click)="bookingDetailTab = 'products'"></button>
+                    <button pButton type="button" label="Payment Details" icon="pi pi-receipt" [severity]="bookingDetailTab === 'payment' ? 'primary' : 'contrast'" (click)="bookingDetailTab = 'payment'"></button>
+                    <button pButton type="button" label="History" icon="pi pi-history" [severity]="bookingDetailTab === 'history' ? 'primary' : 'contrast'" (click)="bookingDetailTab = 'history'; loadSnapshots()"></button>
                 </div>
 
                 <article class="booking-invoice-panel" *ngIf="selectedBooking && bookingDetailTab === 'booking'">
@@ -357,9 +444,9 @@ interface BookingForm {
                             <p class="text-muted-color m-0">Review the actual booking row first, then edit or clone it into the extension fields.</p>
                         </div>
                         <div class="booking-invoice-actions">
-                            <button pButton type="button" icon="pi pi-pencil" label="Edit" severity="secondary" (click)="editBooking()" [disabled]="bookingActionSaving()"></button>
-                            <button pButton type="button" icon="pi pi-copy" label="Clone" severity="secondary" (click)="cloneBooking()" [disabled]="bookingActionSaving()"></button>
-                            <button pButton type="button" icon="pi pi-refresh" label="Refresh" severity="secondary" (click)="refreshBooking()" [disabled]="bookingActionSaving()"></button>
+                            <button pButton type="button" icon="pi pi-pencil" label="Edit" severity="info" (click)="editBooking()" [disabled]="bookingActionSaving()"></button>
+                            <button pButton type="button" icon="pi pi-copy" label="Clone" severity="help" (click)="cloneBooking()" [disabled]="bookingActionSaving()"></button>
+                            <button pButton type="button" icon="pi pi-refresh" label="Refresh" severity="warn" (click)="refreshBooking()" [disabled]="bookingActionSaving()"></button>
                         </div>
                     </div>
 
@@ -463,9 +550,18 @@ interface BookingForm {
                 <article class="booking-invoice-panel" *ngIf="bookingDetailTab === 'products'">
                     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
                         <div>
-                            <h3 class="font-display text-2xl mt-0 mb-1">Product Details</h3>
-                            <p class="text-muted-color m-0">Products, accommodations, and activities captured against this booking.</p>
+                            <h3 class="font-display text-2xl mt-0 mb-1">Service Details</h3>
+                            <p class="text-muted-color m-0">Add, view, or remove services under one service type/category on this booking.</p>
                         </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-6 gap-2 mb-3">
+                        <p-select [options]="serviceTypeOptions()" [(ngModel)]="detailSelectedType" optionLabel="label" optionValue="value" placeholder="Service Type / Category" (onChange)="detailSelectedService = null" appendTo="body"></p-select>
+                        <p-select [options]="detailFilteredServices()" [(ngModel)]="detailSelectedService" optionLabel="serviceLabel" placeholder="Select service" [filter]="true" appendTo="body"></p-select>
+                        <p-select [options]="suppliers()" [(ngModel)]="detailSupplierId" optionLabel="name" optionValue="supplierId" placeholder="Supplier" [showClear]="true" [filter]="true" appendTo="body"></p-select>
+                        <input pInputText type="number" min="1" [(ngModel)]="detailSelectedQty" placeholder="Qty" />
+                        <input pInputText type="number" min="0" max="100" step="0.01" [(ngModel)]="detailDiscountPct" placeholder="Disc %" />
+                        <button pButton type="button" icon="pi pi-plus" label="Add Service" severity="success" (click)="addServiceToExistingBooking()" [loading]="productSaving()"></button>
                     </div>
 
                     <div class="booking-voucher-section" *ngIf="selectedVoucher() as voucher">
@@ -493,21 +589,31 @@ interface BookingForm {
                         </div>
                     </div>
 
+                    <p class="text-red-500 mb-2" *ngIf="productStatus()">{{ productStatus() }}</p>
+
                     <p-table [value]="selectedBookingServices()" styleClass="p-datatable-sm booking-display-table" [tableStyle]="{ 'min-width': '100%' }" [rows]="10" [paginator]="selectedBookingServices().length > 10">
                         <ng-template pTemplate="header">
-                            <tr><th>Type</th><th>Service</th><th>Qty</th><th>Unit</th><th>Total</th></tr>
+                            <tr><th>Category</th><th>Service</th><th>Supplier</th><th>Qty</th><th>Adults</th><th>Rooms</th><th>Nights</th><th>Disc%</th><th>Unit</th><th>Total</th><th class="text-right w-20">Actions</th></tr>
                         </ng-template>
                         <ng-template pTemplate="body" let-item>
                             <tr>
-                                <td>{{ display(item.serviceType) }}</td>
+                                <td>{{ serviceTypeLabel(item.serviceType) }}</td>
                                 <td>{{ display(item.serviceName) }}</td>
+                                <td>{{ supplierName(item.supplierId) }}</td>
                                 <td>{{ display(item.quantity) }}</td>
+                                <td>{{ display(item.adultPax) }}</td>
+                                <td>{{ display(item.rooms) }}</td>
+                                <td>{{ display(item.nights) }}</td>
+                                <td>{{ item.discountPercent != null ? item.discountPercent + '%' : '-' }}</td>
                                 <td>{{ money(item.unitPrice || 0, item.currency || bookingForm.currency) }}</td>
-                                <td>{{ money(item.totalPrice || 0, item.currency || bookingForm.currency) }}</td>
+                                <td class="font-semibold">{{ money(effectiveTotal(item), item.currency || bookingForm.currency) }}</td>
+                                <td class="text-right">
+                                    <button pButton type="button" icon="pi pi-trash" severity="danger" rounded text class="app-row-action" pTooltip="Remove" (click)="removeServiceFromExistingBooking(item)" [loading]="productSaving()"></button>
+                                </td>
                             </tr>
                         </ng-template>
                         <ng-template pTemplate="emptymessage">
-                            <tr><td colspan="5" class="text-center text-muted-color py-4">No product rows were captured for this booking.</td></tr>
+                            <tr><td colspan="11" class="text-center text-muted-color py-4">No service rows captured. Use the form above to add services.</td></tr>
                         </ng-template>
                     </p-table>
                 </article>
@@ -520,8 +626,8 @@ interface BookingForm {
                             <p class="text-muted-color m-0" *ngIf="!invoiceForm.id">No invoice was found for this booking. Create one from the reservation details.</p>
                         </div>
                         <div class="booking-invoice-actions">
-                            <button pButton type="button" icon="pi pi-refresh" label="Refresh" severity="secondary" (click)="refreshInvoice()" [disabled]="invoiceLoading()"></button>
-                            <button pButton type="button" icon="pi pi-plus" label="New" severity="secondary" (click)="prepareNewInvoice()"></button>
+                            <button pButton type="button" icon="pi pi-refresh" label="Refresh" severity="warn" (click)="refreshInvoice()" [disabled]="invoiceLoading()"></button>
+                            <button pButton type="button" icon="pi pi-plus" label="New" (click)="prepareNewInvoice()"></button>
                         </div>
                     </div>
 
@@ -555,15 +661,25 @@ interface BookingForm {
                     <p class="text-red-500 mt-3 mb-0" *ngIf="invoiceStatus()">{{ invoiceStatus() }}</p>
                 </article>
 
+                <article class="booking-invoice-panel" *ngIf="bookingDetailTab === 'history'">
+                    <h3 class="font-display text-2xl mt-0 mb-3">Booking History</h3>
+                    <div *ngIf="bookingHistoryLoading()" class="flex justify-center py-6"><i class="pi pi-spin pi-spinner text-3xl text-primary"></i></div>
+                    <div *ngIf="!bookingHistoryLoading() && snapshots().length === 0" class="text-muted-color text-center py-4">No history snapshots found.</div>
+                    <div class="grid gap-3" *ngIf="!bookingHistoryLoading() && snapshots().length > 0">
+                        <div *ngFor="let snap of snapshots()" class="flex gap-3 items-start border border-surface rounded-lg p-3">
+                            <i class="pi pi-history text-primary mt-1"></i>
+                            <div>
+                                <strong>{{ snap.snapshotType }}</strong>
+                                <span class="text-muted-color text-sm ml-2">{{ snap.createdAt | date:'MM/dd/yyyy HH:mm' }}</span>
+                                <p class="m-0 text-sm" *ngIf="snap.createdBy">by {{ snap.createdBy }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
                 <ng-template pTemplate="footer">
                     <div class="booking-detail-footer">
-                        <button pButton type="button" label="Close" severity="secondary" (click)="bookingDetailVisible = false"></button>
-                        <div class="booking-detail-invoice-actions" *ngIf="bookingDetailTab === 'booking'">
-                            <button pButton type="button" label="Edit" icon="pi pi-pencil" severity="secondary" (click)="editBooking()" [disabled]="bookingActionSaving()"></button>
-                            <button pButton type="button" label="Clone" icon="pi pi-copy" severity="secondary" (click)="cloneBooking()" [disabled]="bookingActionSaving()"></button>
-                            <button pButton type="button" label="Save Update" icon="pi pi-save" (click)="saveBooking()" [loading]="bookingActionSaving()" [disabled]="!bookingEditMode()"></button>
-                            <button pButton type="button" label="Close Booking" icon="pi pi-lock" severity="danger" (click)="closeBooking()" [disabled]="!bookingEditMode() || bookingActionSaving()"></button>
-                        </div>
+                        <button pButton type="button" label="Close" severity="contrast" (click)="bookingDetailVisible = false"></button>
                         <div class="booking-detail-invoice-actions" *ngIf="bookingDetailTab === 'payment'">
                             <button pButton type="button" label="Delete" icon="pi pi-trash" severity="danger" (click)="deleteInvoice()" [disabled]="!invoiceForm.id || invoiceSaving()"></button>
                             <button pButton type="button" label="Save Updates" icon="pi pi-save" (click)="saveInvoice()" [loading]="invoiceSaving()"></button>
@@ -581,7 +697,7 @@ interface BookingForm {
                 </div>
                 <ng-template pTemplate="footer">
                     <button pButton type="button" label="Close" (click)="resultVisible = false"></button>
-                    <button pButton type="button" label="View Dashboard" severity="secondary" (click)="goDashboard()"></button>
+                    <button pButton type="button" label="View Dashboard" severity="info" (click)="goDashboard()"></button>
                 </ng-template>
             </p-dialog>
         </section>
@@ -897,19 +1013,66 @@ export class BookingWizardPage {
     readonly bookingEditMode = signal(false);
     readonly total = computed(() => this.serviceItems().reduce((sum, item) => sum + Number(item.totalPrice ?? 0), 0));
     readonly filteredServices = computed(() => this.services().filter((item) => item.serviceType === this.selectedType));
+    readonly groupedServiceOptions = computed(() => this.serviceTypeOptions().map((type) => ({
+        label: type.label,
+        value: type.value,
+        items: this.services().filter((item) => item.serviceType === type.value)
+    })));
     readonly pageSize = SYSTEM_PAGE_SIZE;
 
     readonly serviceTypeOptions = signal<ServiceTypeOption[]>([]);
     readonly paymentMethods = signal<PaymentMethodOption[]>([]);
     readonly tripAccounts = signal<TripAccountOption[]>([]);
+    readonly consultants = signal<any[]>([]);
+    readonly suppliers = signal<SupplierOption[]>([]);
+    readonly currencyOptions = signal<Array<{ code: string; name: string }>>([
+        { code: 'USD', name: 'US Dollar' }, { code: 'EUR', name: 'Euro' }, { code: 'GBP', name: 'British Pound' },
+        { code: 'ZAR', name: 'South African Rand' }, { code: 'BWP', name: 'Botswana Pula' }, { code: 'ZMW', name: 'Zambian Kwacha' }
+    ]);
+    readonly snapshots = signal<any[]>([]);
+    readonly bookingHistoryLoading = signal(false);
+    readonly productSaving = signal(false);
+    readonly productStatus = signal('');
+    readonly detailFilteredServices = computed(() => this.services().filter((item) => item.serviceType === this.detailSelectedType));
+    readonly totalDiscount = computed(() =>
+        this.serviceItems().reduce((sum, item) => {
+            const gross = Number(item.unitPrice) * Number(item.quantity);
+            const disc = Number(item.discountPercent ?? 0);
+            return sum + (gross * disc / 100);
+        }, 0)
+    );
+    readonly netTotal = computed(() => this.total() - this.totalDiscount());
 
     customerSearch = '';
     selectedCustomer: Customer | null = null;
     client: Customer = { durationOfStayDays: 0 };
-    selectedType: 'Product' | 'Accommodation' | 'Activity' = 'Product';
-    selectedService: ServiceOption | null = null;
+    selectedType: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour' = 'Product';
+    selectedServices: ServiceOption[] = [];
     selectedQuantity = 1;
     selectedTripAccountId: number | null = null;
+    selectedConsultantId: number | null = null;
+    agencyVoucherRef = '';
+    clientCountry = '';
+    bookingNotes = '';
+    transactionReference = '';
+    proofOfPaymentUrl = '';
+    bookingPaymentStatus = 'NotPaid';
+    bookingStatusFilter = '';
+    lineAdultPax: number | null = null;
+    lineChildPax: number | null = null;
+    lineCompPax: number | null = null;
+    lineRooms: number | null = null;
+    lineNights: number | null = null;
+    linePickup = '';
+    lineDropoff = '';
+    lineActivityDate = '';
+    lineDiscountPercent: number | null = null;
+    lineSupplierId: number | null = null;
+    detailSelectedType: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour' = 'Product';
+    detailSelectedService: ServiceOption | null = null;
+    detailSelectedQty = 1;
+    detailDiscountPct: number | null = null;
+    detailSupplierId: number | null = null;
     paymentMethod = 'Manual';
     currency = 'USD';
     resultVisible = false;
@@ -919,11 +1082,12 @@ export class BookingWizardPage {
     isTripAccountsPage = false;
     selectedBooking: Record<string, unknown> | null = null;
     readonly selectedVoucher = signal<Record<string, unknown> | null>(null);
-    bookingDetailTab: 'booking' | 'products' | 'payment' = 'booking';
+    bookingDetailTab: 'booking' | 'products' | 'payment' | 'history' = 'booking';
     bookingForm: BookingForm = this.emptyBookingForm();
     invoiceForm: InvoiceForm = this.emptyInvoiceForm();
     readonly bookingStatusOptions = [
-        { label: 'Pending', value: 'Pending' },
+        { label: 'Enquiry', value: 'Enquiry' },
+        { label: 'Provisional', value: 'Provisional' },
         { label: 'Confirmed', value: 'Confirmed' },
         { label: 'Closed', value: 'Closed' },
         { label: 'Cancelled', value: 'Cancelled' }
@@ -949,7 +1113,8 @@ export class BookingWizardPage {
 
     loadBookings(page = 1): void {
         this.bookingLoading.set(true);
-        this.api.listPage('/api/reservations', page, this.pageSize, this.bookingSearch).subscribe({
+        const search = [this.bookingSearch, this.bookingStatusFilter ? `status=${this.bookingStatusFilter}` : ''].filter(Boolean).join('&');
+        this.api.listPage('/api/reservations', page, this.pageSize, search).subscribe({
             next: (result) => {
                 this.bookings.set(result.items ?? []);
                 this.bookingTotalRecords.set(result.totalCount ?? result.items?.length ?? 0);
@@ -1011,35 +1176,24 @@ export class BookingWizardPage {
     }
 
     cancelBooking(booking: Record<string, unknown>): void {
-        const form = this.toBookingForm(booking);
-        if (!form.reservationId) return;
-        if (!confirm('Cancel this booking?')) return;
-
-        this.api.put<any>(`/api/reservations/${form.reservationId}`, {
-            reservationId: form.reservationId,
-            reference: form.reference,
-            voucherCode: form.voucherCode,
-            customerId: this.optionalNumber(form.customerId),
-            accountId: this.optionalNumber(form.accountId),
-            agencyId: this.optionalNumber(Number(booking['agencyId'] ?? null)),
-            currency: form.currency,
-            totalAmount: Number(form.totalAmount),
-            status: 'Cancelled',
-            customerEmail: form.customerEmail || null
-        }).subscribe({
-            next: () => {
-                this.messages.add({ severity: 'success', summary: 'Booking cancelled', detail: 'The booking status was changed to Cancelled.' });
-                this.loadBookings(this.currentBookingPage());
-            },
-            error: (err) => this.messages.add({ severity: 'error', summary: 'Cancel failed', detail: this.describeError(err) })
-        });
+        this.cancelBookingFromTable(booking);
     }
 
     checkStatus(booking: Record<string, unknown>): void {
         const id = Number(booking['reservationId'] ?? booking['id']);
-        const ref = booking['reference'] ?? booking['voucherCode'] ?? id;
-        const status = booking['status'] ?? 'Unknown';
-        this.messages.add({ severity: 'info', summary: `Booking ${ref}`, detail: `Current status: ${status}`, life: 4000 });
+        if (!id) {
+            this.messages.add({ severity: 'warn', summary: 'No ID', detail: 'Cannot check status — reservation ID missing.' });
+            return;
+        }
+        this.api.get(`/api/reservations/${id}`).subscribe({
+            next: (res: any) => {
+                const data = res?.data ?? res;
+                const ref = data?.reference ?? data?.voucherCode ?? id;
+                const live = data?.status ?? 'Unknown';
+                this.messages.add({ severity: 'info', summary: `Booking ${ref}`, detail: `Live status: ${live}`, life: 5000 });
+            },
+            error: () => this.messages.add({ severity: 'error', summary: 'Check failed', detail: 'Could not retrieve live booking status.' })
+        });
     }
 
     refreshBooking(): void {
@@ -1124,7 +1278,16 @@ export class BookingWizardPage {
     }
 
     prepareNewInvoice(): void {
-        this.invoiceForm = this.emptyInvoiceForm();
+        const reservationId = this.reservationIdFromSelectedBooking();
+        const total = Number(this.selectedBooking?.['totalAmount'] ?? 0);
+        const currency = String(this.selectedBooking?.['currency'] ?? this.selectedBooking?.['currencyCode'] ?? 'USD');
+        this.invoiceForm = {
+            id: null,
+            reservationId,
+            totalAmount: total > 0 ? total : 0,
+            currency,
+            status: 'Pending'
+        };
         this.invoiceStatus.set('');
     }
 
@@ -1197,27 +1360,126 @@ export class BookingWizardPage {
         this.messages.add({ severity: 'success', summary: 'Client Selected', detail: `${customer.firstName ?? 'Client'} ${customer.surname ?? ''}`.trim() });
     }
 
+    onServiceTypeChange(): void {
+        // Reset the service picker when the category changes so it lists the new type.
+        this.selectedServices = [];
+        this.status.set('');
+    }
+
+    selectGroupedService(service: ServiceOption): void {
+        this.selectedType = service.serviceType;
+        this.selectedServices = [service];
+        this.status.set('');
+    }
+
     addService(): void {
-        if (!this.selectedService || this.selectedQuantity < 1) {
-            this.status.set('Select a service and quantity.');
+        if (!this.selectedServices.length || this.selectedQuantity < 1) {
+            this.status.set('Select at least one service and a quantity.');
+            return;
+        }
+
+        const unpriced = this.selectedServices.filter((s) => !s.hasSelectedCurrencyPrice);
+        if (unpriced.length) {
+            this.status.set(`No active ${this.currency.toUpperCase()} price is configured for: ${unpriced.map((s) => s.serviceName).join(', ')}.`);
             return;
         }
 
         const quantity = Number(this.selectedQuantity);
-        const item: BookingServiceItem = {
-            serviceType: this.selectedService.serviceType,
-            serviceId: this.selectedService.serviceId,
-            serviceName: this.selectedService.serviceName,
-            quantity,
-            unitPrice: Number(this.selectedService.unitPrice),
-            totalPrice: quantity * Number(this.selectedService.unitPrice),
-            currency: this.selectedService.currency
-        };
-        this.currency = item.currency;
-        this.serviceItems.update((rows) => [...rows, item]);
-        this.selectedService = null;
+        const disc = Number(this.lineDiscountPercent ?? 0);
+
+        // Bulk-add every selected service. The shared line settings (qty, pax, dates,
+        // discount, supplier) apply to each added row.
+        for (const service of this.selectedServices) {
+            const unitPrice = Number(service.unitPrice);
+            const grossTotal = quantity * unitPrice;
+            const discountAmount = grossTotal * disc / 100;
+            const item: BookingServiceItem = {
+                serviceType: service.serviceType,
+                serviceId: service.serviceId,
+                serviceName: service.serviceName,
+                quantity,
+                unitPrice,
+                totalPrice: grossTotal - discountAmount,
+                currency: service.currency,
+                supplierId: this.lineSupplierId,
+                adultPax: this.lineAdultPax,
+                childPax: this.lineChildPax,
+                compPax: this.lineCompPax,
+                rooms: this.lineRooms,
+                nights: this.lineNights,
+                pickupLocation: this.linePickup || null,
+                dropoffLocation: this.lineDropoff || null,
+                activityDate: this.lineActivityDate || null,
+                discountPercent: disc > 0 ? disc : null
+            };
+            this.currency = item.currency;
+            this.serviceItems.update((rows) => this.upsertServiceItem(rows, item));
+        }
+
+        this.selectedServices = [];
         this.selectedQuantity = 1;
+        this.lineAdultPax = null;
+        this.lineChildPax = null;
+        this.lineCompPax = null;
+        this.lineRooms = null;
+        this.lineNights = null;
+        this.linePickup = '';
+        this.lineDropoff = '';
+        this.lineActivityDate = '';
+        this.lineDiscountPercent = null;
+        this.lineSupplierId = null;
         this.status.set('');
+    }
+
+    private upsertServiceItem(rows: BookingServiceItem[], item: BookingServiceItem): BookingServiceItem[] {
+        const index = rows.findIndex((row) =>
+            row.serviceType === item.serviceType
+            && row.serviceId === item.serviceId
+            && row.currency === item.currency
+            && Number(row.supplierId ?? 0) === Number(item.supplierId ?? 0)
+            && Number(row.discountPercent ?? 0) === Number(item.discountPercent ?? 0)
+        );
+        if (index < 0) return [...rows, item];
+
+        return rows.map((row, rowIndex) => {
+            if (rowIndex !== index) return row;
+            const quantity = Number(row.quantity) + Number(item.quantity);
+            const gross = quantity * Number(row.unitPrice);
+            const discount = Number(row.discountPercent ?? 0);
+            return {
+                ...row,
+                quantity,
+                adultPax: this.sumNullable(row.adultPax, item.adultPax),
+                childPax: this.sumNullable(row.childPax, item.childPax),
+                compPax: this.sumNullable(row.compPax, item.compPax),
+                rooms: this.sumNullable(row.rooms, item.rooms),
+                nights: row.nights ?? item.nights,
+                totalPrice: gross - (gross * discount / 100)
+            };
+        });
+    }
+
+    private sumNullable(a?: number | null, b?: number | null): number | null {
+        const left = Number(a ?? 0);
+        const right = Number(b ?? 0);
+        const sum = left + right;
+        return sum > 0 ? sum : null;
+    }
+
+    onCurrencyChange(value: string): void {
+        this.currency = (value || 'USD').toUpperCase();
+        this.services.update((rows) => rows.map((item) => this.withSelectedCurrencyPrice(item)));
+        this.serviceItems.update((rows) => rows.map((item) => {
+            const service = this.services().find((option) => option.serviceType === item.serviceType && option.serviceId === item.serviceId);
+            if (!service?.hasSelectedCurrencyPrice) return item;
+            return {
+                ...item,
+                unitPrice: service.unitPrice,
+                currency: service.currency,
+                totalPrice: Number(item.quantity) * service.unitPrice
+            };
+        }));
+        this.selectedServices = this.selectedServices.map((s) => this.withSelectedCurrencyPrice(s));
     }
 
     removeService(index: number): void {
@@ -1234,30 +1496,39 @@ export class BookingWizardPage {
     }
 
     submit(): void {
+        this.submitWithStatus('Confirmed');
+    }
+
+    submitWithStatus(status: string): void {
         if (!this.validateStep(0) || !this.validateStep(1) || !this.validateStep(2)) return;
         const accountId = this.auth.user()?.id;
-        const total = this.total();
+        const netTotal = this.netTotal();
         const request: BookingCheckoutRequest = {
             customerId: this.selectedCustomer?.id ?? null,
             tripAccountId: this.selectedTripAccountId,
             customer: this.selectedCustomer?.id ? null : { ...this.client, agentCompanyId: this.selectedTripAccountId },
             reservation: {
+                reference: this.agencyVoucherRef,
                 accountId,
                 agencyId: this.selectedTripAccountId,
+                agencyConsultantId: this.selectedConsultantId,
+                agencyVoucherReference: this.agencyVoucherRef || null,
                 customerId: this.selectedCustomer?.id ?? null,
                 currency: this.currency,
-                totalAmount: total,
-                status: 'Pending',
-                customerEmail: this.client.email ?? null
+                totalAmount: netTotal,
+                status,
+                customerEmail: this.client.email ?? null,
+                country: this.clientCountry || null,
+                notes: this.bookingNotes || null
             },
             invoice: {
-                totalAmount: total,
+                totalAmount: netTotal,
                 currency: this.currency,
                 status: 'Pending'
             },
             payment: {
                 method: this.paymentMethod,
-                amount: total,
+                amount: netTotal,
                 currencyCode: this.currency,
                 idempotencyKey: `booking-${Date.now()}-${Math.random().toString(16).slice(2)}`
             },
@@ -1272,13 +1543,178 @@ export class BookingWizardPage {
                 this.resultVisible = true;
                 this.bookingModalVisible = false;
                 this.loadBookings(1);
-                this.messages.add({ severity: 'success', summary: 'Booking Created', detail: 'Reservation, invoice, payment, and voucher were captured.' });
+                this.messages.add({ severity: 'success', summary: `Booking Saved (${status})`, detail: 'Reservation, invoice, and voucher captured.' });
             },
             error: (err) => {
                 this.submitting.set(false);
                 this.status.set(this.describeError(err));
             }
         });
+    }
+
+    closeBookingFromTable(booking: Record<string, unknown>): void {
+        const id = Number(booking['reservationId'] ?? booking['id']);
+        if (!id || !confirm('Close this booking?')) return;
+        this.api.post(`/api/reservations/${id}/close`, {}).subscribe({
+            next: () => {
+                this.messages.add({ severity: 'success', summary: 'Closed', detail: `Booking #${id} closed.` });
+                this.loadBookings(this.currentBookingPage());
+            },
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Failed', detail: this.describeError(err) })
+        });
+    }
+
+    cancelBookingFromTable(booking: Record<string, unknown>): void {
+        const id = Number(booking['reservationId'] ?? booking['id']);
+        if (!id || !confirm('Cancel this booking?')) return;
+        this.api.post(`/api/reservations/${id}/cancel`, {}).subscribe({
+            next: () => {
+                this.messages.add({ severity: 'success', summary: 'Cancelled', detail: `Booking #${id} cancelled.` });
+                this.loadBookings(this.currentBookingPage());
+            },
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Failed', detail: this.describeError(err) })
+        });
+    }
+
+    openBookingFromTable(booking: Record<string, unknown>): void {
+        const id = Number(booking['reservationId'] ?? booking['id']);
+        if (!id) return;
+        this.api.post(`/api/reservations/${id}/open`, {}).subscribe({
+            next: () => {
+                this.messages.add({ severity: 'success', summary: 'Re-opened', detail: `Booking #${id} is now Confirmed.` });
+                this.loadBookings(this.currentBookingPage());
+            },
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Failed', detail: this.describeError(err) })
+        });
+    }
+
+    cloneBookingFromTable(booking: Record<string, unknown>): void {
+        const id = Number(booking['reservationId'] ?? booking['id']);
+        if (!id) return;
+        this.api.post(`/api/reservations/${id}/clone`, {}).subscribe({
+            next: (clone: any) => {
+                this.messages.add({ severity: 'success', summary: 'Cloned', detail: `New booking #${clone?.reservationId ?? ''} created as Enquiry.` });
+                this.loadBookings(1);
+            },
+            error: (err) => this.messages.add({ severity: 'error', summary: 'Failed', detail: this.describeError(err) })
+        });
+    }
+
+    loadSnapshots(): void {
+        const id = this.reservationIdFromSelectedBooking();
+        if (!id) return;
+        this.bookingHistoryLoading.set(true);
+        this.snapshots.set([]);
+        this.api.get<any[]>(`/api/reservations/${id}/snapshots`).subscribe({
+            next: (rows) => { this.snapshots.set(rows ?? []); this.bookingHistoryLoading.set(false); },
+            error: () => this.bookingHistoryLoading.set(false)
+        });
+    }
+
+    addServiceToExistingBooking(): void {
+        const reservationId = this.reservationIdFromSelectedBooking();
+        if (!reservationId) {
+            this.productStatus.set('No reservation ID available for this booking.');
+            return;
+        }
+        if (!this.detailSelectedService || this.detailSelectedQty < 1) {
+            this.productStatus.set('Select a service and quantity.');
+            return;
+        }
+        if (!this.detailSelectedService.hasSelectedCurrencyPrice) {
+            this.productStatus.set(`No active price is configured for ${this.detailSelectedService.serviceName}.`);
+            return;
+        }
+
+        const quantity = Number(this.detailSelectedQty);
+        const unitPrice = Number(this.detailSelectedService.unitPrice);
+        const disc = Number(this.detailDiscountPct ?? 0);
+        const gross = quantity * unitPrice;
+        const duplicate = this.selectedBookingServices().some((item) =>
+            item.serviceType === this.detailSelectedService?.serviceType
+            && Number(item.serviceId) === Number(this.detailSelectedService?.serviceId)
+            && Number(item.supplierId ?? 0) === Number(this.detailSupplierId ?? 0)
+        );
+        if (duplicate) {
+            this.productStatus.set('This service is already on the booking. Remove or edit the existing row instead of adding a duplicate.');
+            return;
+        }
+        const payload = {
+            serviceType: this.detailSelectedService.serviceType,
+            serviceId: this.detailSelectedService.serviceId,
+            serviceName: this.detailSelectedService.serviceName,
+            quantity,
+            unitPrice,
+            totalPrice: gross - (gross * disc / 100),
+            currency: this.detailSelectedService.currency,
+            supplierId: this.detailSupplierId,
+            discountPercent: disc > 0 ? disc : null
+        };
+
+        this.productSaving.set(true);
+        this.productStatus.set('');
+        this.api.post(`/api/reservations/${reservationId}/service-items`, payload).subscribe({
+            next: () => {
+                this.productSaving.set(false);
+                this.detailSelectedService = null;
+                this.detailSelectedQty = 1;
+                this.detailDiscountPct = null;
+                this.detailSupplierId = null;
+                this.loadBookingDetails();
+                this.loadBookings(this.currentBookingPage());
+                this.messages.add({ severity: 'success', summary: 'Service added', detail: 'Service line added to the booking.' });
+            },
+            error: (err) => {
+                this.productSaving.set(false);
+                this.productStatus.set(this.describeError(err));
+            }
+        });
+    }
+
+    removeServiceFromExistingBooking(item: any): void {
+        const reservationId = this.reservationIdFromSelectedBooking();
+        const itemId = Number(item?.id);
+        if (!reservationId || !itemId) {
+            this.productStatus.set('Cannot remove this service line.');
+            return;
+        }
+        if (!confirm('Remove this service line from the booking?')) return;
+
+        this.productSaving.set(true);
+        this.productStatus.set('');
+        this.api.delete(`/api/reservations/${reservationId}/service-items/${itemId}`).subscribe({
+            next: () => {
+                this.productSaving.set(false);
+                this.loadBookingDetails();
+                this.loadBookings(this.currentBookingPage());
+                this.messages.add({ severity: 'success', summary: 'Service removed', detail: 'Service line removed from the booking.' });
+            },
+            error: (err) => {
+                this.productSaving.set(false);
+                this.productStatus.set(this.describeError(err));
+            }
+        });
+    }
+
+    effectiveTotal(item: BookingServiceItem): number {
+        const gross = Number(item.unitPrice) * Number(item.quantity);
+        const disc = Number(item.discountPercent ?? 0);
+        return gross - (gross * disc / 100);
+    }
+
+    paymentStatusSeverity(status: unknown): 'success' | 'info' | 'warn' | 'danger' | 'contrast' {
+        const s = String(status ?? '').toLowerCase();
+        if (s.includes('fullypaid') || s === 'paid') return 'success';
+        if (s.includes('deposited')) return 'info';
+        if (s.includes('shortfall')) return 'danger';
+        return 'warn';
+    }
+
+    travelStatusSeverity(status: unknown): 'success' | 'info' | 'warn' | 'contrast' {
+        const s = String(status ?? '').toLowerCase();
+        if (s.includes('travelled')) return 'success';
+        if (s.includes('inprogress') || s.includes('in progress')) return 'info';
+        return 'warn';
     }
 
     goDashboard(): void {
@@ -1312,6 +1748,17 @@ export class BookingWizardPage {
         return `${prefix}${this.money(due, String(booking['currency'] ?? 'USD'))}`;
     }
 
+    supplierName(supplierId: unknown): string {
+        const id = Number(supplierId);
+        if (!Number.isFinite(id) || id <= 0) return '-';
+        return this.suppliers().find((supplier) => supplier.supplierId === id)?.name ?? `Supplier #${id}`;
+    }
+
+    serviceTypeLabel(value: unknown): string {
+        const raw = String(value ?? '');
+        return this.serviceTypeOptions().find((t) => t.value === raw)?.label ?? raw;
+    }
+
     statusSeverity(value: unknown): 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast' {
         const status = String(value ?? '').toLowerCase();
         if (status === 'paid' || status === 'completed' || status === 'captured') return 'success';
@@ -1330,6 +1777,7 @@ export class BookingWizardPage {
     }
 
     label(value: string): string {
+        if (['serviceType', 'category', 'productType'].includes(value)) return 'Service Type / Category';
         return value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (char) => char.toUpperCase());
     }
 
@@ -1343,9 +1791,18 @@ export class BookingWizardPage {
         this.selectedCustomer = null;
         this.client = { durationOfStayDays: 0 };
         this.selectedType = this.serviceTypeOptions()[0]?.value ?? 'Product';
-        this.selectedService = null;
+        this.selectedServices = [];
         this.selectedQuantity = 1;
         this.selectedTripAccountId = null;
+        this.selectedConsultantId = null;
+        this.agencyVoucherRef = '';
+        this.clientCountry = '';
+        this.bookingNotes = '';
+        this.transactionReference = '';
+        this.proofOfPaymentUrl = '';
+        this.bookingPaymentStatus = 'NotPaid';
+        this.lineSupplierId = null;
+        this.detailSupplierId = null;
         this.paymentMethod = this.paymentMethods()[0]?.value ?? '';
         this.currency = 'USD';
     }
@@ -1374,16 +1831,12 @@ export class BookingWizardPage {
 
     private emptyBookingForm(): BookingForm {
         return {
-            reservationId: null,
-            reference: '',
-            voucherCode: '',
-            customerId: null,
-            accountId: null,
-            customerEmail: '',
-            currency: 'USD',
-            totalAmount: 0,
-            status: 'Pending',
-            closingByUserName: ''
+            reservationId: null, reference: '', voucherCode: '',
+            customerId: null, accountId: null, customerEmail: '',
+            currency: 'USD', totalAmount: 0, status: 'Enquiry',
+            closingByUserName: '', agencyConsultantId: null,
+            agencyVoucherReference: '', country: '',
+            paymentStatus: 'NotPaid', travelStatus: 'NotCheckedIn', notes: ''
         };
     }
 
@@ -1397,8 +1850,14 @@ export class BookingWizardPage {
             customerEmail: String(booking?.['customerEmail'] ?? ''),
             currency: String(booking?.['currency'] ?? 'USD'),
             totalAmount: Number(booking?.['totalAmount'] ?? 0),
-            status: String(booking?.['status'] ?? 'Pending'),
-            closingByUserName: String(booking?.['closingByUserName'] ?? '')
+            status: String(booking?.['status'] ?? 'Enquiry'),
+            closingByUserName: String(booking?.['closingByUserName'] ?? ''),
+            agencyConsultantId: this.toNullableNumber(booking?.['agencyConsultantId']),
+            agencyVoucherReference: String(booking?.['agencyVoucherReference'] ?? ''),
+            country: String(booking?.['country'] ?? ''),
+            paymentStatus: String(booking?.['paymentStatus'] ?? 'NotPaid'),
+            travelStatus: String(booking?.['travelStatus'] ?? 'NotCheckedIn'),
+            notes: String(booking?.['notes'] ?? '')
         };
     }
 
@@ -1506,20 +1965,34 @@ export class BookingWizardPage {
             serviceTypes: this.api.list<ServiceTypeOption>('/api/frontend/service-types'),
             paymentMethods: this.api.list<PaymentMethodOption>('/api/frontend/payment-methods'),
             tripAccounts: this.api.list<TripAccountOption>('/api/trip-accounts'),
+            consultants: this.api.list<any>('/api/consultants'),
+            suppliers: this.api.list<SupplierOption>('/api/suppliers'),
+            currencies: this.api.list<any>('/api/currencies'),
             products: this.api.list<any>('/api/products'),
             accommodations: this.api.list<any>('/api/accommodations'),
-            activities: this.api.list<any>('/api/activities')
+            activities: this.api.list<any>('/api/activities'),
+            transfers: this.api.list<any>('/api/transfers'),
+            tours: this.api.list<any>('/api/tours')
         }).subscribe({
             next: (rows) => {
                 this.serviceTypeOptions.set(rows.serviceTypes);
                 this.paymentMethods.set(rows.paymentMethods);
                 this.tripAccounts.set(rows.tripAccounts);
+                this.consultants.set(rows.consultants.map((c: any) => ({ ...c, fullName: `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || c.email || `Consultant #${c.id}` })));
+                this.suppliers.set((rows.suppliers ?? []).map((s: any) => ({ ...s, supplierId: Number(s.supplierId ?? s.id), name: s.name ?? `Supplier #${s.supplierId ?? s.id}` })));
+                if (Array.isArray(rows.currencies) && rows.currencies.length) {
+                    this.currencyOptions.set(rows.currencies
+                        .filter((c: any) => c.isActive !== false && c.code)
+                        .map((c: any) => ({ code: c.code, name: c.name ?? c.code })));
+                }
                 this.selectedType = rows.serviceTypes[0]?.value ?? 'Product';
                 this.paymentMethod = rows.paymentMethods[0]?.value ?? '';
                 this.services.set([
                     ...rows.products.map((item) => this.toServiceOption('Product', item)),
                     ...rows.accommodations.map((item) => this.toServiceOption('Accommodation', item)),
-                    ...rows.activities.map((item) => this.toServiceOption('Activity', item))
+                    ...rows.activities.map((item) => this.toServiceOption('Activity', item)),
+                    ...rows.transfers.map((item) => this.toServiceOption('Transfer', item)),
+                    ...rows.tours.map((item) => this.toServiceOption('Tour', item))
                 ]);
             },
             error: (err) => {
@@ -1527,20 +2000,48 @@ export class BookingWizardPage {
                 this.serviceTypeOptions.set([]);
                 this.paymentMethods.set([]);
                 this.tripAccounts.set([]);
+                this.suppliers.set([]);
                 this.status.set(this.describeError(err));
             }
         });
     }
 
-    private toServiceOption(serviceType: 'Product' | 'Accommodation' | 'Activity', item: any): ServiceOption {
-        return {
+    private toServiceOption(serviceType: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour', item: any): ServiceOption {
+        const option = {
             serviceType,
             serviceId: Number(item.productId ?? item.id),
             serviceName: item.name ?? item.type ?? item.productName ?? serviceType,
             description: item.description ?? item.category ?? '',
             unitPrice: Number(item.basePriceUsd ?? item.price ?? 0),
-            currency: 'USD'
+            currency: 'USD',
+            serviceLabel: '',
+            hasSelectedCurrencyPrice: false,
+            prices: Array.isArray(item.prices) ? item.prices : []
         };
+        return this.withSelectedCurrencyPrice(option);
+    }
+
+    private withSelectedCurrencyPrice(item: ServiceOption): ServiceOption {
+        const currency = (this.currency || 'USD').toUpperCase();
+        const price = item.prices.find((p) => String(p.currencyCode).toUpperCase() === currency && p.isActive !== false);
+        const unitPrice = price ? Number(price.unitPrice) : currency === 'USD' && item.unitPrice > 0 ? Number(item.unitPrice) : 0;
+        const hasSelectedCurrencyPrice = !!price || (currency === 'USD' && item.unitPrice > 0);
+        return {
+            ...item,
+            unitPrice,
+            currency,
+            hasSelectedCurrencyPrice,
+            serviceLabel: hasSelectedCurrencyPrice ? `${item.serviceName} - ${this.money(unitPrice, currency)}` : `${item.serviceName} - missing ${currency} price`
+        };
+    }
+
+    previewVoucherNumber(): string {
+        const max = this.bookings()
+            .map((booking) => String(booking.voucherCode ?? '').replace(/\D/g, ''))
+            .map((value) => Number(value))
+            .filter((value) => Number.isFinite(value))
+            .reduce((highest, value) => Math.max(highest, value), 0);
+        return String(max + 1).padStart(5, '0');
     }
 
     private validateStep(step: number): boolean {
@@ -1548,6 +2049,10 @@ export class BookingWizardPage {
         if (step === 0) {
             const hasName = !!(this.client.firstName || this.client.surname);
             const hasContact = !!(this.client.email || this.client.phoneNumber);
+            if (!this.agencyVoucherRef.trim()) {
+                this.status.set('Agency voucher reference is required.');
+                return false;
+            }
             if (!hasName || !hasContact) {
                 this.status.set('Client name and either email or phone are required.');
                 return false;

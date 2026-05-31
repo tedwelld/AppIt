@@ -11,14 +11,21 @@ export const APPIT_ENTITIES: EntityConfig[] = [
     { key: 'companies', title: 'Companies', endpoint: '/api/companies', icon: 'pi pi-building-columns', group: 'Setup', idFields: ['companyId', 'id'] },
     { key: 'suppliers', title: 'Suppliers', endpoint: '/api/suppliers', icon: 'pi pi-truck', group: 'Setup', idFields: ['supplierId', 'id'] },
     { key: 'products', title: 'Products', endpoint: '/api/products', icon: 'pi pi-box', group: 'Catalog', idFields: ['productId', 'id'] },
-    { key: 'accommodations', title: 'Accommodations', endpoint: '/api/accommodations', icon: 'pi pi-building', group: 'Catalog', idFields: ['accommodationId', 'id'] },
     { key: 'currencies', title: 'Currencies', endpoint: '/api/currencies', icon: 'pi pi-money-bill', group: 'Setup', idFields: ['id'] },
-    { key: 'activities', title: 'Activities', endpoint: '/api/activities', icon: 'pi pi-compass', group: 'Catalog', idFields: ['activityId', 'id'] },
+    { key: 'service-prices', title: 'Service Prices', endpoint: '/api/service-prices', icon: 'pi pi-dollar', group: 'Catalog', idFields: ['id'] },
     { key: 'reservations', title: 'Reservations', endpoint: '/api/reservations', icon: 'pi pi-calendar', group: 'Bookings', idFields: ['id', 'reservationId'] },
     { key: 'invoices', title: 'Invoices', endpoint: '/api/invoices', icon: 'pi pi-receipt', group: 'Finance', idFields: ['id', 'invoiceId'] },
     { key: 'payments', title: 'Payments', endpoint: '/api/payments', icon: 'pi pi-credit-card', group: 'Finance', idFields: ['id', 'paymentId'] },
     { key: 'vouchers', title: 'Vouchers', endpoint: '/api/vouchers', icon: 'pi pi-ticket', group: 'Finance', idFields: ['id', 'voucherId'] },
-    { key: 'support-messages', title: 'Support Messages', endpoint: '/api/support/messages', icon: 'pi pi-comments', group: 'Service', idFields: ['id', 'messageId'] }
+    { key: 'support-messages', title: 'Support Messages', endpoint: '/api/support/messages', icon: 'pi pi-comments', group: 'Service', idFields: ['id', 'messageId'] },
+    { key: 'credit-notes', title: 'Credit Notes', endpoint: '/api/credit-notes', icon: 'pi pi-undo', group: 'Finance', idFields: ['id'] },
+    { key: 'refunds', title: 'Refunds', endpoint: '/api/refunds', icon: 'pi pi-refresh', group: 'Finance', idFields: ['id'] },
+    { key: 'proof-of-payments', title: 'Proof Of Payments', endpoint: '/api/proof-of-payments', icon: 'pi pi-credit-card', group: 'Finance', idFields: ['id'] },
+    { key: 'commissions', title: 'Commissions', endpoint: '/api/commissions', icon: 'pi pi-percentage', group: 'Finance', idFields: ['id'] },
+    { key: 'consultants', title: 'Consultants', endpoint: '/api/consultants', icon: 'pi pi-user-plus', group: 'Setup', idFields: ['id'] },
+    { key: 'product-categories', title: 'Product Categories', endpoint: '/api/product-categories', icon: 'pi pi-tag', group: 'Catalog', idFields: ['id'] },
+    { key: 'product-sub-categories', title: 'Product Sub-Categories', endpoint: '/api/product-sub-categories', icon: 'pi pi-tags', group: 'Catalog', idFields: ['id'] },
+    { key: 'special-product-prices', title: 'Special Prices', endpoint: '/api/special-product-prices', icon: 'pi pi-star', group: 'Catalog', idFields: ['id'] }
 ];
 
 export interface WorkspaceMenuModel {
@@ -31,27 +38,61 @@ interface WorkspaceMenuItem extends MenuItem {
     permissions?: string[];
 }
 
+const ALL_FEATURES = '*';
+
+/**
+ * Feature areas each named role may access. Keys are lowercased backend role names.
+ * '*' grants every feature. Roles not listed fall back to the admin-tier default
+ * (everything except the super-only 'System' area).
+ */
+export const ROLE_FEATURES: Record<string, string[] | typeof ALL_FEATURES> = {
+    'super': ALL_FEATURES,
+    'admin': ALL_FEATURES,
+    'general manager': ALL_FEATURES,
+    'finance director': ['Accounts', 'Cashier', 'Statistics', 'Reservations', 'System'],
+    'accountant': ['Accounts', 'Cashier', 'Statistics', 'System'],
+    'accounts clerk': ['Accounts', 'System'],
+    'cashier': ['Cashier', 'Accounts', 'System'],
+    'operations manager': ['Operations', 'Reservations', 'Statistics', 'System'],
+    'reservation manager/supervisor': ['Reservations', 'Operations', 'Statistics', 'System'],
+    'coordinator': ['Reservations', 'Operations', 'System'],
+    'driver guide': ['Operations', 'System'],
+    'consultant/trainee': ['Reservations', 'System'],
+    'marketing director': ['Statistics', 'Reservations', 'System'],
+    'it devs': ['Setup', 'Administration', 'System'],
+    'it engineer/manager': ['Setup', 'Administration', 'System']
+};
+
+function allowedFeaturesFor(role: AppItRole | null, roleName?: string | null): string[] | typeof ALL_FEATURES {
+    const key = (roleName ?? '').trim().toLowerCase();
+    if (key && ROLE_FEATURES[key]) return ROLE_FEATURES[key];
+    if (role === 'super') return ALL_FEATURES;
+    // Admin-tier default: everything except the super-only System area.
+    return ['Reservations', 'Cashier', 'Accounts', 'Statistics', 'Operations', 'Setup', 'Administration'];
+}
+
 function action(label: string, icon: string, routerLink: unknown[], feature: string, permissions: string[] = []): WorkspaceMenuItem {
     return { label, icon, routerLink, feature, permissions };
 }
 
-function canShow(item: WorkspaceMenuItem, role: AppItRole | null): boolean {
-    if (role === 'super') return true;
-    if (role === 'admin') return item.feature !== 'System';
-    return !item.feature || item.feature === 'User';
+function canShow(item: WorkspaceMenuItem, allowed: string[] | typeof ALL_FEATURES): boolean {
+    if (!item.feature || item.feature === 'User') return true;
+    if (allowed === ALL_FEATURES) return true;
+    return allowed.includes(item.feature);
 }
 
-function filterMenu(items: WorkspaceMenuItem[], role: AppItRole | null): WorkspaceMenuItem[] {
+function filterMenu(items: WorkspaceMenuItem[], allowed: string[] | typeof ALL_FEATURES): WorkspaceMenuItem[] {
     return items
         .map((item) => ({
             ...item,
-            items: item.items ? filterMenu(item.items as WorkspaceMenuItem[], role) : undefined
+            items: item.items ? filterMenu(item.items as WorkspaceMenuItem[], allowed) : undefined
         }))
-        .filter((item) => canShow(item, role) && (!item.items || item.items.length > 0));
+        .filter((item) => canShow(item, allowed) && (!item.items || item.items.length > 0));
 }
 
-export function buildWorkspaceMenu(role: AppItRole | null): WorkspaceMenuModel {
+export function buildWorkspaceMenu(role: AppItRole | null, roleName?: string | null): WorkspaceMenuModel {
     if (role === 'admin' || role === 'super') {
+        const allowed = allowedFeaturesFor(role, roleName);
         const groups: WorkspaceMenuItem[] = [
             {
                 label: 'Reservations',
@@ -83,6 +124,8 @@ export function buildWorkspaceMenu(role: AppItRole | null): WorkspaceMenuModel {
                 items: [
                     action('Invoicing', 'pi pi-fw pi-receipt', ['/admin/accounts/invoicing'], 'Accounts', ['Search for Invoice (USD)', 'Create Statement']),
                     action('Credit Notes', 'pi pi-fw pi-undo', ['/admin/accounts/credit-notes'], 'Accounts', ['Create Credit Notes and Refund']),
+                    action('Refunds', 'pi pi-fw pi-refresh', ['/admin/accounts/refunds'], 'Accounts', ['Process Refund']),
+                    action('Commissions', 'pi pi-fw pi-percentage', ['/admin/accounts/commissions'], 'Accounts', ['View Commissions']),
                     action('Deposit Reports', 'pi pi-fw pi-file-check', ['/admin/accounts/deposit-reports'], 'Accounts', ['Deposit Reports']),
                     action('Proof Of Payment', 'pi pi-fw pi-credit-card', ['/admin/accounts/proof-of-payments'], 'Accounts', ['Proof Of Payment'])
                 ]
@@ -102,6 +145,7 @@ export function buildWorkspaceMenu(role: AppItRole | null): WorkspaceMenuModel {
                 feature: 'Operations',
                 items: [
                     action('Check In', 'pi pi-fw pi-check-circle', ['/admin/operations/check-in'], 'Operations', ['Print or View Travelled PAX']),
+                    action('Day-End Audit', 'pi pi-fw pi-sun', ['/admin/operations/day-end'], 'Operations', ['Open Day', 'Close Day']),
                     action('Opera Management', 'pi pi-fw pi-sync', ['/admin/operations/opera-management'], 'Operations', ['Print or View Product Capacity'])
                 ]
             },
@@ -112,11 +156,14 @@ export function buildWorkspaceMenu(role: AppItRole | null): WorkspaceMenuModel {
                 items: [
                     action('Manage Companies', 'pi pi-fw pi-building', ['/admin/setup/manage-companies'], 'Setup', ['Add Company', 'Edit Company']),
                     action('Manage Products', 'pi pi-fw pi-shopping-cart', ['/admin/setup/manage-products'], 'Setup', ['Add Product', 'Edit Product']),
-                    action('Manage Accommodations', 'pi pi-fw pi-building', ['/admin/setup/manage-accommodations'], 'Setup', ['Add Product', 'Edit Product']),
-                    action('Manage Activities', 'pi pi-fw pi-compass', ['/admin/setup/manage-activities'], 'Setup', ['Add Product', 'Edit Product']),
+                    action('Service Prices', 'pi pi-fw pi-dollar', ['/admin/setup/manage-service-prices'], 'Setup', ['Add Product', 'Edit Product']),
                     action('Manage Departments', 'pi pi-fw pi-briefcase', ['/admin/setup/manage-departments'], 'Setup', ['Edit Departments']),
                     action('Manage Currencies', 'pi pi-fw pi-money-bill', ['/admin/setup/manage-currencies'], 'Setup', ['Add Currency', 'Edit Currency']),
                     action('Manage Suppliers', 'pi pi-fw pi-truck', ['/admin/setup/manage-suppliers'], 'Setup', ['Add Supplier', 'Edit Supplier']),
+                    action('Manage Consultants', 'pi pi-fw pi-user-plus', ['/admin/setup/manage-consultants'], 'Setup', ['Add Consultant', 'Edit Consultant']),
+                    action('Product Categories', 'pi pi-fw pi-tag', ['/admin/setup/manage-product-categories'], 'Setup', ['Add Category', 'Edit Category']),
+                    action('Product Sub-Categories', 'pi pi-fw pi-tags', ['/admin/setup/manage-product-sub-categories'], 'Setup', ['Add Sub-Category', 'Edit Sub-Category']),
+                    action('Special Prices', 'pi pi-fw pi-star', ['/admin/setup/manage-special-prices'], 'Setup', ['Add Special Price', 'Edit Special Price']),
                     action('Manage Features', 'pi pi-fw pi-sitemap', ['/admin/setup/manage-features'], 'Setup', ['Edit Features']),
                     action('Manage Permissions', 'pi pi-fw pi-key', ['/admin/setup/manage-permissions'], 'Setup', ['Edit Permissions'])
                 ]
@@ -144,7 +191,7 @@ export function buildWorkspaceMenu(role: AppItRole | null): WorkspaceMenuModel {
 
         return {
             home: { label: 'Dashboard', icon: 'pi pi-fw pi-chart-line', routerLink: ['/admin/dashboard'] },
-            groups: filterMenu(groups, role)
+            groups: filterMenu(groups, allowed)
         };
     }
 

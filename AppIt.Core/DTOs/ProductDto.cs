@@ -1,5 +1,6 @@
 ﻿using AppIt.Data.EntityModels;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace AppIt.Core.DTOs
@@ -9,10 +10,11 @@ namespace AppIt.Core.DTOs
         public int ProductId { get; set; }
         public string Name { get; set; } = null!;
         public string? Description { get; set; }
-        public string Category { get; set; } = "Adventure";
+        public string Category { get; set; } = "Product";
         public decimal BasePriceUsd { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedDate { get; set; }
+        public List<ServicePriceReadDto> Prices { get; set; } = new();
     }
 
     public class CreateProductDto
@@ -22,7 +24,7 @@ namespace AppIt.Core.DTOs
         public string Name { get; set; } = null!;
 
         [MaxLength(120)]
-        public string Category { get; set; } = "Adventure";
+        public string Category { get; set; } = "Product";
 
         [MaxLength(500)]
         public string? Description { get; set; }
@@ -44,7 +46,7 @@ namespace AppIt.Core.DTOs
         public string Name { get; set; } = null!;
 
         [MaxLength(120)]
-        public string Category { get; set; } = "Adventure";
+        public string Category { get; set; } = "Product";
 
         [MaxLength(500)]
         public string? Description { get; set; }

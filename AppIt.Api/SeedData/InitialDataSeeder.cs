@@ -9,6 +9,20 @@ namespace AppIt.Api.SeedData
     {
         public static async Task SeedAsync(AppItDbContext dbContext, ILogger? logger = null)
         {
+            // When APPIT_RESET_DATABASE=true the entire database is dropped and rebuilt so it
+            // ends up empty apart from the seeded roles (super = RoleId 1) and the default
+            // administrator account. All identity counters (vouchers, etc.) restart at 1.
+            var resetRequested = string.Equals(
+                Environment.GetEnvironmentVariable("APPIT_RESET_DATABASE"),
+                "true",
+                StringComparison.OrdinalIgnoreCase);
+
+            if (resetRequested)
+            {
+                logger?.LogWarning("APPIT_RESET_DATABASE=true — dropping and rebuilding the database. All data except the seeded admin and roles will be removed.");
+                await dbContext.Database.EnsureDeletedAsync();
+            }
+
             if (dbContext.Database.IsRelational())
             {
                 await ApplyPendingMigrationsAsync(dbContext, logger);
@@ -152,17 +166,19 @@ namespace AppIt.Api.SeedData
 
         private static async Task SeedRolesAsync(AppItDbContext dbContext)
         {
-            var roleNames = new[] { "super" };
+            var roleNames = AppIt.Core.Authorization.RoleCatalog.AllSeededRoles.ToArray();
             var existing = await dbContext.Roles.Select(r => r.Name.ToLower()).ToListAsync();
-            var missing = roleNames.Where(name => !existing.Contains(name)).Select(name => new Role { Name = name }).ToList();
-
-            if (missing.Count == 0)
+            foreach (var roleName in roleNames)
             {
-                return;
-            }
+                if (existing.Contains(roleName.ToLowerInvariant()))
+                {
+                    continue;
+                }
 
-            dbContext.Roles.AddRange(missing);
-            await dbContext.SaveChangesAsync();
+                dbContext.Roles.Add(new Role { Name = roleName });
+                await dbContext.SaveChangesAsync();
+                existing.Add(roleName.ToLowerInvariant());
+            }
         }
 
         private static async Task SeedAdminAccountAsync(AppItDbContext dbContext)

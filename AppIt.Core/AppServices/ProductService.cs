@@ -20,7 +20,7 @@ namespace AppIt.Core.Services
             var product = new Product
             {
                 Name = dto.Name,
-                Category = dto.Category,
+                Category = NormalizeCategory(dto.Category),
                 Description = dto.Description,
                 BasePriceUsd = dto.BasePriceUsd,
                 IsActive = dto.IsActive,
@@ -30,16 +30,8 @@ namespace AppIt.Core.Services
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
 
-            return new ProductReadDto
-            {
-                ProductId = product.ProductId,
-                Name = product.Name,
-                Category = product.Category,
-                Description = product.Description,
-                BasePriceUsd = product.BasePriceUsd,
-                IsActive = product.IsActive,
-                CreatedDate = product.CreatedDate
-            };
+            await EnsureUsdPriceAsync(product.ProductId, product.BasePriceUsd);
+            return await ToReadDtoAsync(product);
         }
 
         public async Task<ProductReadDto?> UpdateAsync(UpdateProductDto dto)
@@ -48,7 +40,7 @@ namespace AppIt.Core.Services
             if (product == null) return null;
 
             product.Name = dto.Name;
-            product.Category = dto.Category;
+            product.Category = NormalizeCategory(dto.Category);
             product.Description = dto.Description;
             product.BasePriceUsd = dto.BasePriceUsd;
             product.IsActive = dto.IsActive;
@@ -56,16 +48,8 @@ namespace AppIt.Core.Services
 
             await _context.SaveChangesAsync();
 
-            return new ProductReadDto
-            {
-                ProductId = product.ProductId,
-                Name = product.Name,
-                Category = product.Category,
-                Description = product.Description,
-                BasePriceUsd = product.BasePriceUsd,
-                IsActive = product.IsActive,
-                CreatedDate = product.CreatedDate
-            };
+            await EnsureUsdPriceAsync(product.ProductId, product.BasePriceUsd);
+            return await ToReadDtoAsync(product);
         }
 
         public async Task<bool> DeleteAsync(int productId)
@@ -83,31 +67,82 @@ namespace AppIt.Core.Services
             var product = await _context.Products.FindAsync(productId);
             if (product == null) return null;
 
-            return new ProductReadDto
-            {
-                ProductId = product.ProductId,
-                Name = product.Name,
-                Category = product.Category,
-                Description = product.Description,
-                BasePriceUsd = product.BasePriceUsd,
-                IsActive = product.IsActive,
-                CreatedDate = product.CreatedDate
-            };
+            return await ToReadDtoAsync(product);
         }
 
         public async Task<IEnumerable<ProductReadDto>> GetAllAsync()
         {
-            var products = await _context.Products.ToListAsync();
-            return products.Select(p => new ProductReadDto
+            var products = await _context.Products.AsNoTracking().ToListAsync();
+            var prices = await PricesForAsync(products.Select(p => p.ProductId));
+            return products.Select(p => ToReadDto(p, prices));
+        }
+
+        private async Task EnsureUsdPriceAsync(int productId, decimal basePriceUsd)
+        {
+            var price = await _context.ServicePrices
+                .FirstOrDefaultAsync(p => p.ServiceType == "Product" && p.ServiceId == productId && p.CurrencyCode == "USD" && p.IsActive);
+            if (price == null)
             {
-                ProductId = p.ProductId,
-                Name = p.Name,
-                Category = p.Category,
-                Description = p.Description,
-                BasePriceUsd = p.BasePriceUsd,
-                IsActive = p.IsActive,
-                CreatedDate = p.CreatedDate
-            });
+                _context.ServicePrices.Add(new ServicePrice
+                {
+                    ServiceType = "Product",
+                    ServiceId = productId,
+                    CurrencyCode = "USD",
+                    UnitPrice = basePriceUsd,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                price.UnitPrice = basePriceUsd;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        private async Task<ProductReadDto> ToReadDtoAsync(Product product)
+        {
+            var prices = await PricesForAsync(new[] { product.ProductId });
+            return ToReadDto(product, prices);
+        }
+
+        private static ProductReadDto ToReadDto(Product product, ILookup<int, ServicePriceReadDto> prices) => new()
+        {
+            ProductId = product.ProductId,
+            Name = product.Name,
+            Category = NormalizeCategory(product.Category),
+            Description = product.Description,
+            BasePriceUsd = product.BasePriceUsd,
+            IsActive = product.IsActive,
+            CreatedDate = product.CreatedDate,
+            Prices = prices[product.ProductId].ToList()
+        };
+
+        private async Task<ILookup<int, ServicePriceReadDto>> PricesForAsync(IEnumerable<int> productIds)
+        {
+            var ids = productIds.ToList();
+            var prices = await _context.ServicePrices
+                .AsNoTracking()
+                .Where(p => p.ServiceType == "Product" && ids.Contains(p.ServiceId) && p.IsActive)
+                .OrderBy(p => p.CurrencyCode)
+                .Select(p => new ServicePriceReadDto
+                {
+                    Id = p.Id,
+                    ServiceType = p.ServiceType,
+                    ServiceId = p.ServiceId,
+                    CurrencyCode = p.CurrencyCode,
+                    UnitPrice = p.UnitPrice,
+                    IsActive = p.IsActive,
+                    CreatedAt = p.CreatedAt
+                })
+                .ToListAsync();
+            return prices.ToLookup(p => p.ServiceId);
+        }
+
+        private static string NormalizeCategory(string? category)
+        {
+            return string.IsNullOrWhiteSpace(category) ? "Product" : "Product";
         }
     }
 }

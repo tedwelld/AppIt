@@ -23,7 +23,13 @@ namespace AppIt.Data.EntityModels
         public decimal TotalAmount { get; set; }
 
         [MaxLength(30)]
-        public string Status { get; set; } = "Pending";
+        public string Status { get; set; } = "Enquiry";
+
+        [MaxLength(30)]
+        public string PaymentStatus { get; set; } = "NotPaid";
+
+        [MaxLength(30)]
+        public string TravelStatus { get; set; } = "NotCheckedIn";
 
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 

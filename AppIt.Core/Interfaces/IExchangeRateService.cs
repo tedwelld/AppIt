@@ -11,6 +11,8 @@ namespace AppIt.Core.Interfaces
         Task<ExchangeRateDto?> GetExchangeRateByIdAsync(int id);
         Task<IEnumerable<ExchangeRateDto>> GetAllExchangeRatesAsync();
         Task<IEnumerable<ExchangeRateDto>> GetExchangeRatesByDateAsync(DateTime date);
+        Task<IEnumerable<ExchangeRateDto>> GetEffectiveRatesAsync(DateTime date);
+        Task<ExchangeRateDto?> GetEffectiveRateAsync(string currencyCode, DateTime date);
         Task<ExchangeRateDto?> UpdateExchangeRateAsync(int id, UpdateExchangeRateDto dto);
         Task<bool> DeleteExchangeRateAsync(int id);
     }

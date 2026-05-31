@@ -41,9 +41,11 @@ namespace AppIt.Api.Controllers
         {
             return Ok(new[]
             {
-                new { label = "Products", value = "Product", endpoint = "/api/products" },
+                new { label = "Lodging", value = "Product", endpoint = "/api/products" },
                 new { label = "Accommodations", value = "Accommodation", endpoint = "/api/accommodations" },
-                new { label = "Activities", value = "Activity", endpoint = "/api/activities" }
+                new { label = "Activities", value = "Activity", endpoint = "/api/activities" },
+                new { label = "Transfers", value = "Transfer", endpoint = "/api/transfers" },
+                new { label = "Tours", value = "Tour", endpoint = "/api/tours" }
             });
         }
 

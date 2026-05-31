@@ -21,7 +21,7 @@ namespace AppIt.Data.EntityModels
         public string? Description { get; set; }
 
         [MaxLength(120)]
-        public string Category { get; set; } = "Adventure";
+        public string Category { get; set; } = "Product";
 
         public decimal BasePriceUsd { get; set; }
 

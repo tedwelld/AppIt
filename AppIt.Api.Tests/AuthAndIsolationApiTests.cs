@@ -166,6 +166,7 @@ public class AuthAndIsolationApiTests : IClassFixture<TestApiFactory>
         var client = CreateHttpsClient();
         var auth = await RegisterAndLoginAsync(client, $"booking.customer.{Guid.NewGuid():N}@test.local");
         SetBearer(client, auth.Token);
+        var catalog = await SeedCheckoutCatalogAsync();
 
         var response = await client.PostAsJsonAsync("/api/bookings/checkout", new
         {
@@ -187,8 +188,8 @@ public class AuthAndIsolationApiTests : IClassFixture<TestApiFactory>
             payment = new { method = "Manual", currencyCode = "USD" },
             serviceItems = new[]
             {
-                new { serviceType = "Product", serviceId = 1, serviceName = "Guided Tour", quantity = 2, unitPrice = 30m, currency = "USD" },
-                new { serviceType = "Activity", serviceId = 2, serviceName = "Sunset Cruise", quantity = 1, unitPrice = 40m, currency = "USD" }
+                new { serviceType = "Product", serviceId = catalog.ProductId, serviceName = "Guided Tour", quantity = 2, unitPrice = 30m, currency = "USD" },
+                new { serviceType = "Activity", serviceId = catalog.ActivityId, serviceName = "Sunset Cruise", quantity = 1, unitPrice = 40m, currency = "USD" }
             }
         });
 
@@ -213,6 +214,7 @@ public class AuthAndIsolationApiTests : IClassFixture<TestApiFactory>
         var client = CreateHttpsClient();
         var auth = await RegisterAndLoginAsync(client, $"booking.existing.{Guid.NewGuid():N}@test.local");
         SetBearer(client, auth.Token);
+        var catalog = await SeedCheckoutCatalogAsync();
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppItDbContext>();
@@ -241,7 +243,7 @@ public class AuthAndIsolationApiTests : IClassFixture<TestApiFactory>
             payment = new { method = "Manual", currencyCode = "USD" },
             serviceItems = new[]
             {
-                new { serviceType = "Accommodation", serviceId = 3, serviceName = "Standard Room", quantity = 1, unitPrice = 80m, currency = "USD" }
+                new { serviceType = "Accommodation", serviceId = catalog.AccommodationId, serviceName = "Standard Room", quantity = 1, unitPrice = 80m, currency = "USD" }
             }
         });
 
@@ -460,6 +462,44 @@ public class AuthAndIsolationApiTests : IClassFixture<TestApiFactory>
         db.Invoices.Add(invoice);
         await db.SaveChangesAsync();
         return invoice;
+    }
+
+    private async Task<(int ProductId, int ActivityId, int AccommodationId)> SeedCheckoutCatalogAsync()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppItDbContext>();
+
+        var product = new Product
+        {
+            Name = "Guided Tour",
+            Category = "Tour",
+            BasePriceUsd = 30m,
+            IsActive = true,
+            CreatedDate = DateTime.UtcNow
+        };
+        var activity = new Activity
+        {
+            Name = "Sunset Cruise",
+            BasePriceUsd = 40m,
+            IsActive = true,
+            CreatedDate = DateTime.UtcNow
+        };
+        var accommodation = new Accommodation
+        {
+            Type = "Standard Room",
+            Capacity = 12,
+            GuestCapacity = 2,
+            BasePriceUsd = 80m,
+            IsActive = true,
+            CreatedDate = DateTime.UtcNow
+        };
+
+        db.Products.Add(product);
+        db.Activities.Add(activity);
+        db.Accommodations.Add(accommodation);
+        await db.SaveChangesAsync();
+
+        return (product.ProductId, activity.Id, accommodation.Id);
     }
 
     private static async Task<AdminStatsDto> GetAdminStatsAsync(AppItDbContext db, string range)

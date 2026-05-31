@@ -28,6 +28,6 @@ export class AppMenu {
     model: WorkspaceMenuModel = { home: null, groups: [] };
 
     ngOnInit() {
-        this.model = buildWorkspaceMenu(this.auth.role());
+        this.model = buildWorkspaceMenu(this.auth.role(), this.auth.roleName());
     }
 }

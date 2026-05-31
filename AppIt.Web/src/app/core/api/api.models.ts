@@ -92,13 +92,26 @@ export interface Customer {
 
 export interface BookingServiceItem {
     id?: number;
-    serviceType: 'Product' | 'Accommodation' | 'Activity';
+    serviceType: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour';
     serviceId: number;
     serviceName: string;
     quantity: number;
     unitPrice: number;
     totalPrice?: number;
     currency: string;
+    supplierId?: number | null;
+    adultPax?: number | null;
+    childPax?: number | null;
+    compPax?: number | null;
+    rooms?: number | null;
+    nights?: number | null;
+    pickupLocation?: string | null;
+    dropoffLocation?: string | null;
+    activityDate?: string | null;
+    discountPercent?: number | null;
+    vatPercent?: number | null;
+    costOfSale?: number | null;
+    notes?: string | null;
 }
 
 export interface BookingCheckoutRequest {
@@ -106,13 +119,19 @@ export interface BookingCheckoutRequest {
     tripAccountId?: number | null;
     customer?: Customer | null;
     reservation: {
+        reference?: string | null;
+        voucherCode?: string | null;
         accountId?: number | string | null;
         customerId?: number | null;
         agencyId?: number | null;
+        agencyConsultantId?: number | null;
+        agencyVoucherReference?: string | null;
         currency: string;
         totalAmount: number;
         status: string;
         customerEmail?: string | null;
+        country?: string | null;
+        notes?: string | null;
     };
     invoice: {
         totalAmount: number;

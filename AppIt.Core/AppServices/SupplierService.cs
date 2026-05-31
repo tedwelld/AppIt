@@ -21,11 +21,12 @@ namespace AppIt.Core.AppServices
         // Create a new supplier
         public async Task<SupplierDto> CreateSupplierAsync(CreateSupplierDto dto)
         {
+            await EnsureUniqueSupplierAsync(dto.Name, dto.ContactEmail, null);
             var supplier = new Supplier
             {
-                Name = dto.Name,
+                Name = dto.Name.Trim(),
                 Description = dto.Description,
-                ContactEmail = dto.ContactEmail,
+                ContactEmail = NormalizeOptional(dto.ContactEmail),
                 ContactPhone = dto.ContactPhone
             };
 
@@ -91,9 +92,10 @@ namespace AppIt.Core.AppServices
             var supplier = await _db.Suppliers.FindAsync(id);
             if (supplier == null) return null;
 
-            supplier.Name = dto.Name;
+            await EnsureUniqueSupplierAsync(dto.Name, dto.ContactEmail, id);
+            supplier.Name = dto.Name.Trim();
             supplier.Description = dto.Description;
-            supplier.ContactEmail = dto.ContactEmail;
+            supplier.ContactEmail = NormalizeOptional(dto.ContactEmail);
             supplier.ContactPhone = dto.ContactPhone;
 
             await _db.SaveChangesAsync();
@@ -106,6 +108,33 @@ namespace AppIt.Core.AppServices
                 ContactEmail = supplier.ContactEmail,
                 ContactPhone = supplier.ContactPhone
             };
+        }
+
+        private async Task EnsureUniqueSupplierAsync(string name, string? email, int? currentId)
+        {
+            var normalizedName = (name ?? string.Empty).Trim().ToLower();
+            var normalizedEmail = NormalizeOptional(email)?.ToLower();
+            if (string.IsNullOrWhiteSpace(normalizedName))
+            {
+                throw new InvalidOperationException("Supplier name is required.");
+            }
+
+            var exists = await _db.Suppliers.AnyAsync(s =>
+                s.SupplierId != currentId
+                && (
+                    s.Name.ToLower() == normalizedName
+                    || (normalizedEmail != null && s.ContactEmail != null && s.ContactEmail.ToLower() == normalizedEmail)
+                ));
+            if (exists)
+            {
+                throw new InvalidOperationException("This supplier already exists.");
+            }
+        }
+
+        private static string? NormalizeOptional(string? value)
+        {
+            var normalized = value?.Trim();
+            return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
         }
     }
 }

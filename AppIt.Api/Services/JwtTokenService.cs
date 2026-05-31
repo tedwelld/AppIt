@@ -26,7 +26,9 @@ namespace AppIt.Api.Services
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-            var claims = new[]
+            var roleName = string.IsNullOrWhiteSpace(user.Role) ? "regular" : user.Role;
+
+            var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
@@ -34,9 +36,18 @@ namespace AppIt.Api.Services
                 new Claim(ClaimTypes.Name, BuildDisplayName(user)),
                 new Claim(ClaimTypes.GivenName, user.FirstName ?? string.Empty),
                 new Claim(ClaimTypes.Surname, user.LastName ?? string.Empty),
-                new Claim(ClaimTypes.Role, user.Role ?? "regular"),
+                // Specific role name drives client-side menu/feature visibility.
+                new Claim(ClaimTypes.Role, roleName),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
+
+            // Back-office staff roles also receive the "admin" tier claim so existing
+            // role-gated endpoints (Roles = "super,admin") keep authorizing them.
+            if (AppIt.Core.Authorization.RoleCatalog.IsBackOffice(roleName)
+                && !roleName.Equals(AppIt.Core.Authorization.RoleCatalog.AdminRole, StringComparison.OrdinalIgnoreCase))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, AppIt.Core.Authorization.RoleCatalog.AdminRole));
+            }
 
             var token = new JwtSecurityToken(
                 issuer: issuer,

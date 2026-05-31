@@ -37,6 +37,19 @@ public class AppItDbContext : DbContext
     public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; }
     public DbSet<Currency> Currencies { get; set; }
     public DbSet<ExchangeRate> ExchangeRates { get; set; }
+    public DbSet<CreditNote> CreditNotes { get; set; }
+    public DbSet<Refund> Refunds { get; set; }
+    public DbSet<ProofOfPayment> ProofOfPayments { get; set; }
+    public DbSet<Commission> Commissions { get; set; }
+    public DbSet<DayEnd> DayEnds { get; set; }
+    public DbSet<Consultant> Consultants { get; set; }
+    public DbSet<ProductCategory> ProductCategories { get; set; }
+    public DbSet<ProductSubCategory> ProductSubCategories { get; set; }
+    public DbSet<SpecialProductPrice> SpecialProductPrices { get; set; }
+    public DbSet<ServicePrice> ServicePrices { get; set; }
+    public DbSet<Transfer> Transfers { get; set; }
+    public DbSet<Tour> Tours { get; set; }
+    public DbSet<ReservationSnapshot> ReservationSnapshots { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -183,6 +196,9 @@ public class AppItDbContext : DbContext
             b.HasKey(e => e.Id);
             b.Property(e => e.UnitPrice).HasPrecision(18, 2);
             b.Property(e => e.TotalPrice).HasPrecision(18, 2);
+            b.Property(e => e.DiscountPercent).HasPrecision(18, 4);
+            b.Property(e => e.VatPercent).HasPrecision(18, 4);
+            b.Property(e => e.CostOfSale).HasPrecision(18, 2);
             b.HasIndex(e => e.ReservationId);
 
             b.HasOne(e => e.Reservation)
@@ -288,11 +304,108 @@ public class AppItDbContext : DbContext
         modelBuilder.Entity<Accommodation>(b =>
         {
             b.Property(e => e.BasePriceUsd).HasPrecision(18, 2);
+            b.Property(e => e.GuestCapacity).HasDefaultValue(1);
         });
 
         modelBuilder.Entity<Activity>(b =>
         {
             b.Property(e => e.BasePriceUsd).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<ServicePrice>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.UnitPrice).HasPrecision(18, 2);
+            b.HasIndex(e => new { e.ServiceType, e.ServiceId, e.CurrencyCode })
+                .IsUnique()
+                .HasFilter("[IsActive] = 1");
+        });
+
+        modelBuilder.Entity<Transfer>(b =>
+        {
+            b.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<Tour>(b =>
+        {
+            b.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<CreditNote>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Amount).HasPrecision(18, 2);
+            b.HasOne(e => e.Invoice).WithMany().HasForeignKey(e => e.InvoiceId).OnDelete(DeleteBehavior.NoAction);
+            b.HasOne(e => e.Reservation).WithMany().HasForeignKey(e => e.ReservationId).OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<Refund>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Amount).HasPrecision(18, 2);
+            b.HasOne(e => e.Payment).WithMany().HasForeignKey(e => e.PaymentId).OnDelete(DeleteBehavior.NoAction);
+            b.HasOne(e => e.Invoice).WithMany().HasForeignKey(e => e.InvoiceId).OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<ProofOfPayment>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasOne(e => e.Payment).WithMany().HasForeignKey(e => e.PaymentId).OnDelete(DeleteBehavior.NoAction);
+            b.HasOne(e => e.Invoice).WithMany().HasForeignKey(e => e.InvoiceId).OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<Consultant>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.CommissionRate).HasPrecision(18, 4);
+            b.HasOne(e => e.Company).WithMany().HasForeignKey(e => e.CompanyId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Commission>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Amount).HasPrecision(18, 2);
+            b.Property(e => e.Percentage).HasPrecision(18, 4);
+            b.HasOne(e => e.Reservation).WithMany().HasForeignKey(e => e.ReservationId).OnDelete(DeleteBehavior.SetNull);
+            b.HasOne(e => e.Consultant).WithMany(c => c.Commissions).HasForeignKey(e => e.ConsultantId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<DayEnd>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.TotalRevenue).HasPrecision(18, 2);
+            b.HasIndex(e => e.AuditDate).IsUnique();
+        });
+
+        modelBuilder.Entity<ProductCategory>(b =>
+        {
+            b.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<ProductSubCategory>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasOne(e => e.Category)
+                .WithMany(c => c.SubCategories)
+                .HasForeignKey(e => e.CategoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SpecialProductPrice>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.SpecialPrice).HasPrecision(18, 2);
+            b.HasOne(e => e.Product).WithMany().HasForeignKey(e => e.ProductId).OnDelete(DeleteBehavior.SetNull);
+            b.HasOne(e => e.Consultant).WithMany().HasForeignKey(e => e.ConsultantId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<ReservationSnapshot>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasOne(e => e.Reservation)
+                .WithMany()
+                .HasForeignKey(e => e.ReservationId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -22,6 +22,8 @@ namespace AppIt.Core.DTOs
     {
         public string Type { get; set; } = string.Empty;
         public int TotalCapacity { get; set; }
+        public int MinGuestCapacity { get; set; }
+        public int MaxGuestCapacity { get; set; }
         public int Booked { get; set; }
         public int Available { get; set; }
     }

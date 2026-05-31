@@ -17,7 +17,9 @@ import { AdminStats } from '../../core/api/api.models';
                 <p class="text-muted-color m-0">Live operational summary from the AppIt backend.</p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div *ngIf="loading()" class="flex justify-center py-8"><i class="pi pi-spin pi-spinner text-4xl text-primary"></i></div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4" *ngIf="!loading()">
                 <article class="workspace-card" *ngFor="let card of cards()">
                     <div class="flex items-center justify-between">
                         <div>
@@ -59,6 +61,7 @@ import { AdminStats } from '../../core/api/api.models';
 export class AdminDashboardPage {
     private readonly api = inject(ApiService);
     readonly status = signal('');
+    readonly loading = signal(false);
     readonly stats = signal<AdminStats>({});
     readonly health = signal<Array<{ label: string; count: number }>>([]);
     readonly cards = signal<Array<{ label: string; value: string; icon: string }>>([]);
@@ -81,6 +84,7 @@ export class AdminDashboardPage {
     }
 
     private load(): void {
+        this.loading.set(true);
         this.api.get<AdminStats>('/api/admin/stats').subscribe({
             next: (stats) => {
                 this.stats.set(stats ?? {});
@@ -100,7 +104,7 @@ export class AdminDashboardPage {
                     ['#2563eb', '#14b8a6', '#f59e0b', '#22c55e']
                 ));
             },
-            error: (err) => this.status.set(this.describeError(err))
+            error: (err) => { this.status.set(this.describeError(err)); this.loading.set(false); }
         });
 
         forkJoin({
@@ -128,8 +132,9 @@ export class AdminDashboardPage {
                     health.map((item) => item.count),
                     ['#64748b', '#2563eb', '#14b8a6', '#f59e0b', '#22c55e', '#8b5cf6', '#ef4444']
                 ));
+                this.loading.set(false);
             },
-            error: (err) => this.status.set(this.describeError(err))
+            error: (err) => { this.status.set(this.describeError(err)); this.loading.set(false); }
         });
     }
 

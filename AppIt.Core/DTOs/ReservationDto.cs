@@ -34,6 +34,7 @@ namespace AppIt.Core.DTOs
 
         public string? PaymentStatus { get; set; }
         public decimal? PaymentAmount { get; set; }
+        public string? TravelStatus { get; set; }
     }
 
     public class CreateReservationDto
@@ -43,10 +44,14 @@ namespace AppIt.Core.DTOs
         public int? CustomerId { get; set; }
         public int? AccountId { get; set; }
         public int? AgencyId { get; set; }
+        public int? AgencyConsultantId { get; set; }
+        public string? AgencyVoucherReference { get; set; }
         public string Currency { get; set; } = "USD";
         public decimal TotalAmount { get; set; }
         public string Status { get; set; } = "Pending";
         public string? CustomerEmail { get; set; }
+        public string? Country { get; set; }
+        public string? Notes { get; set; }
     }
 
     public class UpdateReservationDto : CreateReservationDto

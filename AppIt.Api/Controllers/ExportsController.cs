@@ -91,30 +91,39 @@ namespace AppIt.Api.Controllers
 
     internal static class SimplePdfWriter
     {
+        private const string BrandName = "AppIt";
+        private const string BrandTagline = "Adventure and Hospitality Management Suite";
+        private const string BrandEmail = "admin@appit.com";
+        private const string BrandPhone = "+263 77 000 0000";
+        private const string BrandAddress = "Harare, Zimbabwe";
+        private const string BrandPoweredBy = "Powered By Tedwell (YourItGuy - 2026)";
+
         public static byte[] WriteDetails(string title, IReadOnlyList<(string Label, string Value)> rows)
         {
-            var content = BuildContent(title, rows);
-            return WritePdf(content);
+            var layout = PdfLayout.Portrait();
+            var content = BuildContent(title, rows, layout);
+            return WritePdf(content, layout);
         }
 
         public static byte[] WriteTable(string title, IReadOnlyList<string> columns, IReadOnlyList<Dictionary<string, JsonElement>> rows)
         {
+            var layout = columns.Count > 5 ? PdfLayout.Landscape() : PdfLayout.Portrait();
             var labels = columns.Select(ToLabel).ToList();
             var values = rows.Take(10)
                 .Select(row => columns.Select(column => row.TryGetValue(column, out var value) ? Display(value) : "-").ToList())
                 .ToList();
 
-            var content = BuildTableContent(title, labels, values);
-            return WritePdf(content);
+            var content = BuildTableContent(title, labels, values, layout);
+            return WritePdf(content, layout);
         }
 
-        private static byte[] WritePdf(string content)
+        private static byte[] WritePdf(string content, PdfLayout layout)
         {
             var objects = new List<string>
             {
                 "<< /Type /Catalog /Pages 2 0 R >>",
                 "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>",
+                $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {layout.Width:0} {layout.Height:0}] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>",
                 "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
                 "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
                 $"<< /Length {Encoding.ASCII.GetByteCount(content)} >>\nstream\n{content}\nendstream"
@@ -146,30 +155,35 @@ namespace AppIt.Api.Controllers
             return stream.ToArray();
         }
 
-        private static string BuildTableContent(string title, IReadOnlyList<string> columns, IReadOnlyList<IReadOnlyList<string>> rows)
+        private static string BuildTableContent(string title, IReadOnlyList<string> columns, IReadOnlyList<IReadOnlyList<string>> rows, PdfLayout layout)
         {
-            var builder = BuildHeader(title);
-            var columnWidth = Math.Max(70, 540 / Math.Max(1, columns.Count));
-            var x = 36;
-            var y = 700;
+            var builder = BuildHeader(title, layout);
+            var usableWidth = layout.Width - (layout.Margin * 2);
+            var columnWidth = Math.Max(38, usableWidth / Math.Max(1, columns.Count));
+            var fontSize = columns.Count > 9 ? 5 : columns.Count > 7 ? 6 : 7;
+            var headerFontSize = Math.Min(8, fontSize + 1);
+            var maxHeaderChars = Math.Max(6, (int)(columnWidth / Math.Max(3, headerFontSize * 0.48)));
+            var maxValueChars = Math.Max(8, (int)(columnWidth / Math.Max(3, fontSize * 0.48)));
+            var x = layout.Margin;
+            var y = layout.ContentStartY;
 
             builder.AppendLine("0.98 0.72 0.18 rg");
-            builder.AppendLine($"36 {y - 8} 540 22 re f");
+            builder.AppendLine($"{layout.Margin:0.##} {y - 8:0.##} {usableWidth:0.##} 22 re f");
             builder.AppendLine("0.07 0.09 0.15 rg");
             for (var i = 0; i < columns.Count; i++)
             {
-                builder.AppendLine($"BT /F2 8 Tf {x + (i * columnWidth)} {y} Td ({Escape(Truncate(columns[i], 14))}) Tj ET");
+                builder.AppendLine($"BT /F2 {headerFontSize:0.##} Tf {x + (i * columnWidth):0.##} {y:0.##} Td ({Escape(Truncate(columns[i], maxHeaderChars))}) Tj ET");
             }
 
             y -= 28;
             foreach (var row in rows)
             {
                 builder.AppendLine("0.96 0.96 0.95 rg");
-                builder.AppendLine($"36 {y - 8} 540 22 re f");
+                builder.AppendLine($"{layout.Margin:0.##} {y - 8:0.##} {usableWidth:0.##} 22 re f");
                 builder.AppendLine("0.22 0.25 0.31 rg");
                 for (var i = 0; i < row.Count; i++)
                 {
-                    builder.AppendLine($"BT /F1 7 Tf {x + (i * columnWidth)} {y} Td ({Escape(Truncate(row[i], 16))}) Tj ET");
+                    builder.AppendLine($"BT /F1 {fontSize:0.##} Tf {x + (i * columnWidth):0.##} {y:0.##} Td ({Escape(Truncate(row[i], maxValueChars))}) Tj ET");
                 }
 
                 y -= 26;
@@ -213,36 +227,61 @@ namespace AppIt.Api.Controllers
             return builder.ToString();
         }
 
-        private static string BuildContent(string title, IReadOnlyList<(string Label, string Value)> rows)
+        private static string BuildContent(string title, IReadOnlyList<(string Label, string Value)> rows, PdfLayout layout)
         {
-            var builder = BuildHeader(title);
-            var y = 698;
+            var builder = BuildHeader(title, layout);
+            var y = layout.ContentStartY - 2;
             foreach (var (label, value) in rows.Take(18))
             {
                 builder.AppendLine("0.95 0.95 0.94 rg");
-                builder.AppendLine($"36 {y - 8} 540 24 re f");
+                builder.AppendLine($"{layout.Margin:0.##} {y - 8:0.##} {layout.Width - (layout.Margin * 2):0.##} 24 re f");
                 builder.AppendLine("0.07 0.09 0.15 rg");
-                builder.AppendLine($"BT /F2 10 Tf 48 {y} Td ({Escape(label)}) Tj ET");
+                builder.AppendLine($"BT /F2 10 Tf {layout.Margin + 12:0.##} {y:0.##} Td ({Escape(label)}) Tj ET");
                 builder.AppendLine("0.22 0.25 0.31 rg");
-                builder.AppendLine($"BT /F1 10 Tf 220 {y} Td ({Escape(Truncate(value, 72))}) Tj ET");
+                builder.AppendLine($"BT /F1 10 Tf {layout.Margin + 184:0.##} {y:0.##} Td ({Escape(Truncate(value, layout.IsLandscape ? 104 : 72))}) Tj ET");
                 y -= 30;
             }
 
             return builder.ToString();
         }
 
-        private static StringBuilder BuildHeader(string title)
+        private static StringBuilder BuildHeader(string title, PdfLayout layout)
         {
             var builder = new StringBuilder();
+            var headerY = layout.Height - 50;
+            var titleY = layout.Height - 72;
+            var metaY = layout.Height - 86;
+            var contactX = layout.Width - 282;
             builder.AppendLine("0.98 0.72 0.18 rg");
-            builder.AppendLine("0 742 612 50 re f");
+            builder.AppendLine($"0 {headerY:0.##} {layout.Width:0.##} 50 re f");
             builder.AppendLine("0.07 0.09 0.15 rg");
-            builder.AppendLine("BT /F2 18 Tf 36 762 Td");
+            builder.AppendLine($"{layout.Margin:0.##} {headerY + 13:0.##} 28 24 re f");
+            builder.AppendLine("0.98 0.72 0.18 rg");
+            builder.AppendLine($"BT /F2 16 Tf {layout.Margin + 9:0.##} {headerY + 20:0.##} Td");
+            builder.AppendLine("(A) Tj ET");
+            builder.AppendLine("0.07 0.09 0.15 rg");
+            builder.AppendLine($"BT /F2 18 Tf {layout.Margin + 38:0.##} {headerY + 22:0.##} Td ({Escape(BrandName)}) Tj ET");
+            builder.AppendLine("0.22 0.25 0.31 rg");
+            builder.AppendLine($"BT /F1 8 Tf {layout.Margin + 38:0.##} {headerY + 10:0.##} Td ({Escape(BrandTagline)}) Tj ET");
+            builder.AppendLine("0.07 0.09 0.15 rg");
+            builder.AppendLine($"BT /F2 14 Tf {layout.Margin:0.##} {titleY:0.##} Td");
             builder.AppendLine($"({Escape(title)}) Tj ET");
             builder.AppendLine("0.22 0.25 0.31 rg");
-            builder.AppendLine("BT /F1 9 Tf 36 728 Td");
+            builder.AppendLine($"BT /F1 8 Tf {layout.Margin:0.##} {metaY:0.##} Td");
             builder.AppendLine($"(Generated {Escape(DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture))}) Tj ET");
+            builder.AppendLine($"BT /F1 8 Tf {contactX:0.##} {titleY:0.##} Td");
+            builder.AppendLine($"({Escape($"{BrandEmail} | {BrandPhone}")}) Tj ET");
+            builder.AppendLine($"BT /F1 8 Tf {contactX:0.##} {titleY - 12:0.##} Td");
+            builder.AppendLine($"({Escape(BrandAddress)}) Tj ET");
+            builder.AppendLine($"BT /F1 8 Tf {contactX:0.##} {titleY - 24:0.##} Td");
+            builder.AppendLine($"({Escape(BrandPoweredBy)}) Tj ET");
             return builder;
+        }
+
+        private readonly record struct PdfLayout(double Width, double Height, double Margin, double ContentStartY, bool IsLandscape)
+        {
+            public static PdfLayout Portrait() => new(612, 792, 30, 670, false);
+            public static PdfLayout Landscape() => new(792, 612, 30, 490, true);
         }
 
         private static string Escape(string value)

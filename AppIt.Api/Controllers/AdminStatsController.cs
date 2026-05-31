@@ -46,15 +46,30 @@ namespace AppIt.Api.Controllers
             var totalEarnings = await invoicesQuery.SumAsync(i => (decimal?)i.TotalAmount) ?? 0m;
             var totalCustomers = await customersQuery.CountAsync();
 
+            var totalAccounts = await _context.Accounts.AsNoTracking().CountAsync();
+            var totalReservations = await _context.Reservations.AsNoTracking().CountAsync();
+            var totalInvoices = await _context.Invoices.AsNoTracking().CountAsync();
+            var totalPayments = await _context.Payments.AsNoTracking().CountAsync();
+            var totalRevenue = await _context.Payments.AsNoTracking().SumAsync(p => (decimal?)p.Amount) ?? 0m;
+            var pendingPayments = await _context.Payments.AsNoTracking().CountAsync(p => p.Status != null && p.Status.ToLower() == "pending");
+            var activeVouchers = await _context.Vouchers.AsNoTracking().CountAsync();
+
             var trend = await BuildTrendAsync(start, buckets);
 
             var dto = new AdminStatsDto
             {
                 Range = normalized,
+                TotalAccounts = totalAccounts,
+                TotalReservations = totalReservations,
+                TotalInvoices = totalInvoices,
+                TotalPayments = totalPayments,
+                TotalRevenue = totalRevenue,
                 TotalSales = totalSales,
                 TotalBookings = totalBookings,
                 TotalEarnings = totalEarnings,
                 TotalCustomers = totalCustomers,
+                PendingPayments = pendingPayments,
+                ActiveVouchers = activeVouchers,
                 Trend = trend
             };
 

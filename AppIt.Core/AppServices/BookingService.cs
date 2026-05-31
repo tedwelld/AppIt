@@ -42,6 +42,12 @@ namespace AppIt.Core.Services
                 request.Reservation.AgencyId = request.TripAccountId ?? customer.AgentCompanyId;
 
                 var serviceItems = NormalizeServiceItems(request.ServiceItems);
+                foreach (var item in serviceItems)
+                {
+                    item.UnitPrice = await ResolveCatalogUnitPriceAsync(item.ServiceType, item.ServiceId, item.Currency);
+                    item.TotalPrice = CalculateLineTotal(item.Quantity, item.UnitPrice, item.DiscountPercent);
+                }
+
                 var totalAmount = serviceItems.Sum(item => item.TotalPrice);
                 if (totalAmount <= 0)
                 {
@@ -60,7 +66,20 @@ namespace AppIt.Core.Services
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice,
                     TotalPrice = item.TotalPrice,
-                    Currency = item.Currency
+                    Currency = item.Currency,
+                    SupplierId = item.SupplierId,
+                    AdultPax = item.AdultPax,
+                    ChildPax = item.ChildPax,
+                    CompPax = item.CompPax,
+                    Rooms = item.Rooms,
+                    Nights = item.Nights,
+                    PickupLocation = item.PickupLocation,
+                    DropoffLocation = item.DropoffLocation,
+                    ActivityDate = item.ActivityDate,
+                    DiscountPercent = item.DiscountPercent,
+                    VatPercent = item.VatPercent,
+                    CostOfSale = item.CostOfSale,
+                    Notes = item.Notes
                 }).ToList();
                 _context.ReservationServiceItems.AddRange(savedItems);
                 await _context.SaveChangesAsync();
@@ -198,7 +217,7 @@ namespace AppIt.Core.Services
                 {
                     var quantity = item.Quantity < 1 ? 1 : item.Quantity;
                     var unitPrice = item.UnitPrice;
-                    var totalPrice = quantity * unitPrice;
+                    var totalPrice = CalculateLineTotal(quantity, unitPrice, item.DiscountPercent);
                     return new BookingServiceItemDto
                     {
                         ServiceType = NormalizeServiceType(item.ServiceType),
@@ -207,7 +226,20 @@ namespace AppIt.Core.Services
                         Quantity = quantity,
                         UnitPrice = unitPrice,
                         TotalPrice = totalPrice,
-                        Currency = string.IsNullOrWhiteSpace(item.Currency) ? "USD" : item.Currency.Trim().ToUpperInvariant()
+                        Currency = string.IsNullOrWhiteSpace(item.Currency) ? "USD" : item.Currency.Trim().ToUpperInvariant(),
+                        SupplierId = item.SupplierId,
+                        AdultPax = item.AdultPax,
+                        ChildPax = item.ChildPax,
+                        CompPax = item.CompPax,
+                        Rooms = item.Rooms,
+                        Nights = item.Nights,
+                        PickupLocation = item.PickupLocation,
+                        DropoffLocation = item.DropoffLocation,
+                        ActivityDate = item.ActivityDate,
+                        DiscountPercent = item.DiscountPercent,
+                        VatPercent = item.VatPercent,
+                        CostOfSale = item.CostOfSale,
+                        Notes = item.Notes
                     };
                 })
                 .ToList();
@@ -217,9 +249,9 @@ namespace AppIt.Core.Services
                 throw new InvalidOperationException("At least one service item is required.");
             }
 
-            if (normalized.Any(item => item.ServiceId <= 0 || item.UnitPrice <= 0 || item.TotalPrice <= 0))
+            if (normalized.Any(item => item.ServiceId <= 0))
             {
-                throw new InvalidOperationException("Each service item must have a service, quantity, and price.");
+                throw new InvalidOperationException("Each service item must have a service and quantity.");
             }
 
             if (normalized.Select(item => item.Currency).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
@@ -232,12 +264,69 @@ namespace AppIt.Core.Services
 
         private static string NormalizeServiceType(string? serviceType)
         {
-            var value = (serviceType ?? string.Empty).Trim();
-            return value.Equals("Accommodation", StringComparison.OrdinalIgnoreCase)
-                ? "Accommodation"
-                : value.Equals("Activity", StringComparison.OrdinalIgnoreCase)
-                    ? "Activity"
-                    : "Product";
+            return ServicePriceService.NormalizeServiceType(serviceType);
+        }
+
+        private static decimal CalculateLineTotal(int quantity, decimal unitPrice, decimal? discountPercent)
+        {
+            var gross = quantity * unitPrice;
+            var discount = Math.Clamp(discountPercent ?? 0m, 0m, 100m);
+            return gross - (gross * discount / 100m);
+        }
+
+        private async Task<decimal> ResolveCatalogUnitPriceAsync(string serviceType, int serviceId, string currency)
+        {
+            var normalizedType = ServicePriceService.NormalizeServiceType(serviceType);
+            var normalizedCurrency = ServicePriceService.NormalizeCurrency(currency);
+
+            var price = await _context.ServicePrices
+                .AsNoTracking()
+                .Where(p => p.IsActive
+                    && p.ServiceType == normalizedType
+                    && p.ServiceId == serviceId
+                    && p.CurrencyCode == normalizedCurrency)
+                .Select(p => (decimal?)p.UnitPrice)
+                .FirstOrDefaultAsync();
+
+            if (price.HasValue)
+            {
+                return price.Value;
+            }
+
+            if (normalizedCurrency == "USD")
+            {
+                var fallback = normalizedType switch
+                {
+                    "Product" => await _context.Products
+                        .Where(p => p.ProductId == serviceId && p.IsActive)
+                        .Select(p => (decimal?)p.BasePriceUsd)
+                        .FirstOrDefaultAsync(),
+                    "Accommodation" => await _context.Accommodations
+                        .Where(a => a.Id == serviceId && a.IsActive)
+                        .Select(a => (decimal?)a.BasePriceUsd)
+                        .FirstOrDefaultAsync(),
+                    "Activity" => await _context.Activities
+                        .Where(a => a.Id == serviceId && a.IsActive)
+                        .Select(a => (decimal?)a.BasePriceUsd)
+                        .FirstOrDefaultAsync(),
+                    "Transfer" => await _context.Transfers
+                        .Where(t => t.Id == serviceId && t.IsActive)
+                        .Select(t => (decimal?)null)
+                        .FirstOrDefaultAsync(),
+                    "Tour" => await _context.Tours
+                        .Where(t => t.Id == serviceId && t.IsActive)
+                        .Select(t => (decimal?)null)
+                        .FirstOrDefaultAsync(),
+                    _ => null
+                };
+
+                if (fallback.HasValue && fallback.Value > 0)
+                {
+                    return fallback.Value;
+                }
+            }
+
+            throw new InvalidOperationException($"No active {normalizedCurrency} price is configured for this {normalizedType} service.");
         }
 
         private static BookingServiceItemDto ToServiceItemDto(ReservationServiceItem item)
@@ -251,7 +340,20 @@ namespace AppIt.Core.Services
                 Quantity = item.Quantity,
                 UnitPrice = item.UnitPrice,
                 TotalPrice = item.TotalPrice,
-                Currency = item.Currency
+                Currency = item.Currency,
+                SupplierId = item.SupplierId,
+                AdultPax = item.AdultPax,
+                ChildPax = item.ChildPax,
+                CompPax = item.CompPax,
+                Rooms = item.Rooms,
+                Nights = item.Nights,
+                PickupLocation = item.PickupLocation,
+                DropoffLocation = item.DropoffLocation,
+                ActivityDate = item.ActivityDate,
+                DiscountPercent = item.DiscountPercent,
+                VatPercent = item.VatPercent,
+                CostOfSale = item.CostOfSale,
+                Notes = item.Notes
             };
         }
 

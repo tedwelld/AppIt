@@ -46,9 +46,9 @@ export class UserDashboardPage {
     constructor() {
         const accountId = this.auth.user()?.id;
         forkJoin({
-            reservations: this.api.list(`/api/reservations/mine?accountId=${accountId}`),
-            invoices: this.api.list(`/api/invoices/mine?accountId=${accountId}`),
-            vouchers: this.api.list(`/api/vouchers/mine?accountId=${accountId}`),
+            reservations: this.api.list('/api/reservations/mine'),
+            invoices: this.api.list('/api/invoices/mine'),
+            vouchers: this.api.list('/api/vouchers/mine'),
             products: this.api.list('/api/products'),
             accommodations: this.api.list('/api/accommodations'),
             activities: this.api.list('/api/activities')
