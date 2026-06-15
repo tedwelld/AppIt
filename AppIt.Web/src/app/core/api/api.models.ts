@@ -74,6 +74,7 @@ export interface AdminStats {
     totalCustomers?: number;
     pendingPayments?: number;
     activeVouchers?: number;
+    trend?: Array<{ label?: string; value?: number }>;
     [key: string]: unknown;
 }
 
@@ -143,7 +144,9 @@ export interface BookingCheckoutRequest {
         amount: number;
         currencyCode: string;
         idempotencyKey?: string;
+        transactionReference?: string;
     };
+    proofOfPaymentUrl?: string;
     serviceItems: BookingServiceItem[];
 }
 

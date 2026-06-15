@@ -9,9 +9,11 @@ namespace AppIt.Core.DTOs
         public string Code { get; set; } = string.Empty;
         public string Reference { get; set; } = string.Empty;
         public string Type { get; set; } = "Reservation";
+        public string Status { get; set; } = "Active";
         public string? ComboReference { get; set; }
         public int? ReservationId { get; set; }
         public DateTime CreatedAt { get; set; }
+        public DateTime? RedeemedDate { get; set; }
     }
 
     public class CreateVoucherDto
@@ -21,6 +23,7 @@ namespace AppIt.Core.DTOs
         [Required]
         public string Reference { get; set; } = string.Empty;
         public string Type { get; set; } = "Reservation";
+        public string Status { get; set; } = "Active";
         public string? ComboReference { get; set; }
         public int? ReservationId { get; set; }
     }

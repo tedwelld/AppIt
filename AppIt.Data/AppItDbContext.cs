@@ -324,11 +324,13 @@ public class AppItDbContext : DbContext
         modelBuilder.Entity<Transfer>(b =>
         {
             b.HasKey(e => e.Id);
+            b.Property(e => e.BasePriceUsd).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<Tour>(b =>
         {
             b.HasKey(e => e.Id);
+            b.Property(e => e.BasePriceUsd).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<CreditNote>(b =>

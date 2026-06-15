@@ -85,46 +85,43 @@ export class AdminDashboardPage {
 
     private load(): void {
         this.loading.set(true);
-        this.api.get<AdminStats>('/api/admin/stats').subscribe({
-            next: (stats) => {
+        this.status.set('');
+        forkJoin({
+            stats: this.api.get<AdminStats>('/api/admin/stats'),
+            accounts: this.api.count('/api/accounts'),
+            products: this.api.count('/api/products'),
+            reservations: this.api.count('/api/reservations'),
+            invoices: this.api.count('/api/invoices'),
+            payments: this.api.count('/api/payments'),
+            vouchers: this.api.count('/api/vouchers'),
+            support: this.api.count('/api/support/messages')
+        }).subscribe({
+            next: ({ stats, ...rows }) => {
                 this.stats.set(stats ?? {});
-                const sales = Number(stats?.totalSales ?? stats?.totalPayments ?? 0);
+                const revenue = Number(stats?.totalEarnings ?? stats?.totalRevenue ?? 0);
                 const bookings = Number(stats?.totalBookings ?? stats?.totalReservations ?? 0);
                 const customers = Number(stats?.totalCustomers ?? stats?.totalAccounts ?? 0);
-                const earnings = Number(stats?.totalEarnings ?? stats?.totalRevenue ?? 0);
+                const invoiceCount = Number(stats?.totalSales ?? rows.invoices ?? 0);
                 this.cards.set([
-                    { label: 'Sales', value: String(sales), icon: 'pi pi-shopping-cart' },
+                    { label: 'Revenue', value: this.money(revenue), icon: 'pi pi-wallet' },
                     { label: 'Bookings', value: String(bookings), icon: 'pi pi-calendar' },
                     { label: 'Customers', value: String(customers), icon: 'pi pi-users' },
-                    { label: 'Earnings', value: this.money(earnings), icon: 'pi pi-wallet' }
+                    { label: 'Invoices', value: String(invoiceCount), icon: 'pi pi-shopping-cart' }
                 ]);
                 this.operationalChart.set(this.barChart(
-                    ['Sales', 'Bookings', 'Customers', 'Earnings'],
-                    [sales, bookings, customers, earnings],
-                    ['#2563eb', '#14b8a6', '#f59e0b', '#22c55e']
+                    ['Revenue', 'Bookings', 'Customers', 'Invoices'],
+                    [revenue, bookings, customers, invoiceCount],
+                    ['#22c55e', '#14b8a6', '#f59e0b', '#2563eb']
                 ));
-            },
-            error: (err) => { this.status.set(this.describeError(err)); this.loading.set(false); }
-        });
 
-        forkJoin({
-            accounts: this.api.list('/api/accounts'),
-            products: this.api.list('/api/products'),
-            reservations: this.api.list('/api/reservations'),
-            invoices: this.api.list('/api/invoices'),
-            payments: this.api.list('/api/payments'),
-            vouchers: this.api.list('/api/vouchers'),
-            support: this.api.list('/api/support/messages')
-        }).subscribe({
-            next: (rows) => {
                 const health = [
-                    { label: 'Accounts', count: rows.accounts.length },
-                    { label: 'Products', count: rows.products.length },
-                    { label: 'Reservations', count: rows.reservations.length },
-                    { label: 'Invoices', count: rows.invoices.length },
-                    { label: 'Payments', count: rows.payments.length },
-                    { label: 'Vouchers', count: rows.vouchers.length },
-                    { label: 'Support Messages', count: rows.support.length }
+                    { label: 'Accounts', count: rows.accounts },
+                    { label: 'Products', count: rows.products },
+                    { label: 'Reservations', count: rows.reservations },
+                    { label: 'Invoices', count: rows.invoices },
+                    { label: 'Payments', count: rows.payments },
+                    { label: 'Vouchers', count: rows.vouchers },
+                    { label: 'Support Messages', count: rows.support }
                 ];
                 this.health.set(health);
                 this.healthChart.set(this.barChart(
@@ -134,7 +131,10 @@ export class AdminDashboardPage {
                 ));
                 this.loading.set(false);
             },
-            error: (err) => { this.status.set(this.describeError(err)); this.loading.set(false); }
+            error: (err) => {
+                this.status.set(this.describeError(err));
+                this.loading.set(false);
+            }
         });
     }
 

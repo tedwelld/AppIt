@@ -172,16 +172,6 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
         icon: 'pi pi-check-circle',
         columns: ['reference', 'voucherCode', 'customerEmail', 'status', 'totalAmount']
     },
-    'opera-management': {
-        key: 'opera-management',
-        group: 'Operations',
-        title: 'Opera Management',
-        subtitle: 'Operations integration shell backed by AppIt vouchers.',
-        endpoint: '/api/vouchers',
-        icon: 'pi pi-sync',
-        columns: ['code', 'reference', 'type', 'reservationId'],
-        unsupportedActions: ['Sync Opera', 'Sync HConnect']
-    },
     'user-activity': {
         key: 'user-activity',
         group: 'Administration',
@@ -643,6 +633,7 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
                             <th>Voucher</th>
                             <th>Customer Email</th>
                             <th>Status</th>
+                            <th>Travel</th>
                             <th class="text-right">Total</th>
                             <th class="text-right w-44">Actions</th>
                         </tr>
@@ -653,17 +644,18 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
                             <td>{{ display(row.voucherCode) }}</td>
                             <td>{{ display(row.customerEmail) }}</td>
                             <td><p-tag [value]="display(row.status)" [severity]="statusSeverity(row.status)"></p-tag></td>
+                            <td><p-tag [value]="row.travelStatus ?? 'NotCheckedIn'" [severity]="travelSeverity(row.travelStatus)"></p-tag></td>
                             <td class="text-right">{{ display(row.totalAmount) }}</td>
                             <td class="text-right">
                                 <div class="flex justify-end gap-1">
                                     <button pButton type="button" icon="pi pi-eye" rounded text class="app-row-action" pTooltip="View" (click)="view(row)"></button>
-                                    <button pButton type="button" icon="pi pi-check" rounded text class="app-row-action" severity="success" pTooltip="Confirm Check In" (click)="confirmCheckIn(row)" [disabled]="row.status === 'CheckedIn'"></button>
+                                    <button pButton type="button" icon="pi pi-check" rounded text class="app-row-action" severity="success" pTooltip="Confirm Check In" (click)="confirmCheckIn(row)" [disabled]="isCheckedIn(row)"></button>
                                 </div>
                             </td>
                         </tr>
                     </ng-template>
                     <ng-template pTemplate="emptymessage">
-                        <tr><td colspan="6" class="text-center text-muted-color py-6">No reservations in check-in queue.</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted-color py-6">No reservations in check-in queue.</td></tr>
                     </ng-template>
                 </p-table>
             </article>
@@ -1438,12 +1430,12 @@ export class OperationalFlowPage {
 
     private loadFlowChartMeta(): void {
         const today = this.toInputDate(new Date());
-        this.api.list('/api/product-categories').subscribe({
+        this.api.listAll('/api/product-categories').subscribe({
             next: (rows) => this.categories.set(rows ?? []),
             error: () => this.categories.set([])
         });
         forkJoin({
-            currencies: this.api.list('/api/currencies'),
+            currencies: this.api.listAll('/api/currencies'),
             rates: this.api.get(`/api/exchange-rates/effective?date=${today}`)
         }).subscribe({
             next: (result: any) => {
@@ -1512,7 +1504,7 @@ export class OperationalFlowPage {
             error: (err) => this.status.set(this.describeError(err))
         });
 
-        this.api.list('/api/activities').subscribe({
+        this.api.listAll('/api/activities').subscribe({
             next: (rows) => this.activities.set(rows),
             error: () => this.activities.set([])
         });
@@ -1609,7 +1601,7 @@ export class OperationalFlowPage {
         if (!date) return;
 
         forkJoin({
-            currencies: this.api.list('/api/currencies'),
+            currencies: this.api.listAll('/api/currencies'),
             rates: this.api.get(`/api/exchange-rates/effective?date=${date}`)
         }).subscribe({
             next: (result) => {
@@ -1843,6 +1835,18 @@ export class OperationalFlowPage {
         if (status.includes('partial') || status.includes('pending')) return 'warn';
         if (status.includes('fail') || status.includes('cancel') || status.includes('unpaid')) return 'danger';
         return 'info';
+    }
+
+    travelSeverity(value: unknown): 'success' | 'info' | 'warn' {
+        const status = String(value ?? '').toLowerCase();
+        if (status.includes('travelled')) return 'success';
+        if (status.includes('checkedin') || status.includes('checked in')) return 'info';
+        return 'warn';
+    }
+
+    isCheckedIn(row: any): boolean {
+        const status = String(row?.travelStatus ?? '').toLowerCase();
+        return status.includes('checkedin') || status.includes('checked in') || status.includes('travelled');
     }
 
     generateInvoiceStatement(row: any): void {

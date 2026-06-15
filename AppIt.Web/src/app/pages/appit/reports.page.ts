@@ -190,7 +190,7 @@ export class ReportsPage {
 
         this.loading.set(true);
         this.status.set('');
-        this.api.list(report.path).subscribe({
+        this.api.listAll(report.path).subscribe({
             next: (rows) => {
                 this.sourceRows.set(this.normalizeRows(rows));
                 this.applyFilters();
@@ -353,7 +353,7 @@ export class ReportsPage {
     }
 
     private loadActivities(): void {
-        this.api.list('/api/activities').subscribe({
+        this.api.listAll('/api/activities').subscribe({
             next: (rows) => this.activities.set(rows),
             error: () => this.activities.set([])
         });

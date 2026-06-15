@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
+using AppIt.Core.Interfaces;
 using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,10 +15,12 @@ namespace AppIt.Api.Controllers
     public class SupportMessagesController : ControllerBase
     {
         private readonly ISupportMessageService _service;
+        private readonly ICurrentUserService _currentUser;
 
-        public SupportMessagesController(ISupportMessageService service)
+        public SupportMessagesController(ISupportMessageService service, ICurrentUserService currentUser)
         {
             _service = service;
+            _currentUser = currentUser;
         }
 
         [HttpGet]
@@ -57,6 +60,17 @@ namespace AppIt.Api.Controllers
             if (message == null)
             {
                 return NotFound();
+            }
+
+            if (!_currentUser.IsStaff)
+            {
+                var email = (_currentUser.Email ?? string.Empty).Trim().ToLowerInvariant();
+                var from = (message.FromEmail ?? string.Empty).Trim().ToLowerInvariant();
+                var to = (message.ToEmail ?? string.Empty).Trim().ToLowerInvariant();
+                if (string.IsNullOrEmpty(email) || (email != from && email != to))
+                {
+                    return Forbid();
+                }
             }
 
             return Ok(message);

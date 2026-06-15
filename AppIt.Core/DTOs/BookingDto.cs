@@ -19,6 +19,7 @@ namespace AppIt.Core.DTOs
 
         public CreateVoucherDto? Voucher { get; set; }
         public List<BookingServiceItemDto> ServiceItems { get; set; } = new();
+        public string? ProofOfPaymentUrl { get; set; }
     }
 
     public class BookingCheckoutResultDto

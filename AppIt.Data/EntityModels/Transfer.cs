@@ -14,6 +14,8 @@ namespace AppIt.Data.EntityModels
         [MaxLength(500)]
         public string? Description { get; set; }
 
+        public decimal BasePriceUsd { get; set; }
+
         public bool IsActive { get; set; } = true;
 
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;

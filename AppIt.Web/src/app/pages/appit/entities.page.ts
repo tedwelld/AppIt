@@ -41,7 +41,7 @@ import { APPIT_ENTITIES } from '../../core/navigation/workspace-navigation';
                     [first]="first()"
                     [loading]="loading()"
                     [rowsPerPageOptions]="[10]"
-                    dataKey="id"
+                    [dataKey]="tableDataKey()"
                     responsiveLayout="scroll"
                     (onLazyLoad)="onLazyLoad($event)"
                     styleClass="p-datatable-sm"
@@ -128,6 +128,7 @@ export class EntitiesPage {
     draft: Record<string, any> = {};
 
     readonly config = computed(() => APPIT_ENTITIES.find((item) => item.key === this.resource()));
+    readonly tableDataKey = computed(() => this.config()?.idFields?.[0] ?? 'id');
     readonly columns = computed(() => {
         if (this.resource() === 'products') {
             return ['serviceTypeCategory', 'name', 'description', 'capacity', 'guestCapacity', 'basePriceUsd', 'isActive'];
@@ -163,7 +164,7 @@ export class EntitiesPage {
     }
 
     private loadRoleNames(): void {
-        this.api.list<any>('/api/roles').subscribe({
+        this.api.listAll<any>('/api/roles').subscribe({
             next: (roles) => this.roleNames.set(
                 (roles ?? [])
                     .map((r: any) => String(r.name ?? r.roleName ?? '').trim())
@@ -363,7 +364,7 @@ export class EntitiesPage {
             case 'reservations': return ['Pending', 'Confirmed', 'Open', 'Completed', 'Closed', 'Cancelled', 'CheckedIn', 'CheckedOut', 'Refunded'];
             case 'invoices': return ['Pending', 'Paid', 'Cancelled', 'Void'];
             case 'payments': return ['Pending', 'Paid', 'Failed', 'Cancelled', 'Refunded'];
-            case 'vouchers': return ['Active', 'Used', 'Expired', 'Cancelled'];
+            case 'vouchers': return ['Active', 'Redeemed', 'Expired', 'Cancelled'];
             case 'support-messages': return ['Open', 'In Progress', 'Resolved', 'Closed'];
             case 'commissions': return ['Pending', 'Approved', 'Paid', 'Cancelled'];
             case 'credit-notes': return ['Pending', 'Approved', 'Refunded', 'Cancelled'];
@@ -470,11 +471,11 @@ export class EntitiesPage {
     private loadUnifiedProducts(page = 1): void {
         this.loading.set(true);
         forkJoin({
-            products: this.api.list<any>('/api/products'),
-            accommodations: this.api.list<any>('/api/accommodations'),
-            activities: this.api.list<any>('/api/activities'),
-            transfers: this.api.list<any>('/api/transfers'),
-            tours: this.api.list<any>('/api/tours')
+            products: this.api.listAll<any>('/api/products'),
+            accommodations: this.api.listAll<any>('/api/accommodations'),
+            activities: this.api.listAll<any>('/api/activities'),
+            transfers: this.api.listAll<any>('/api/transfers'),
+            tours: this.api.listAll<any>('/api/tours')
         }).subscribe({
             next: (rows) => {
                 const all = [

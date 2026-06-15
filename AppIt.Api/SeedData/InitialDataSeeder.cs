@@ -7,7 +7,7 @@ namespace AppIt.Api.SeedData
 {
     public static class InitialDataSeeder
     {
-        public static async Task SeedAsync(AppItDbContext dbContext, ILogger? logger = null)
+        public static async Task SeedAsync(AppItDbContext dbContext, IConfiguration? configuration = null, ILogger? logger = null)
         {
             // When APPIT_RESET_DATABASE=true the entire database is dropped and rebuilt so it
             // ends up empty apart from the seeded roles (super = RoleId 1) and the default
@@ -33,7 +33,9 @@ namespace AppIt.Api.SeedData
             }
 
             await SeedRolesAsync(dbContext);
-            await SeedAdminAccountAsync(dbContext);
+            await SeedAdminAccountAsync(dbContext, configuration);
+            await SeedDemoDataAsync(dbContext, configuration, logger);
+            await BackfillCatalogPricingAsync(dbContext, logger);
         }
 
         private static async Task ApplyPendingMigrationsAsync(AppItDbContext dbContext, ILogger? logger)
@@ -181,7 +183,7 @@ namespace AppIt.Api.SeedData
             }
         }
 
-        private static async Task SeedAdminAccountAsync(AppItDbContext dbContext)
+        private static async Task SeedAdminAccountAsync(AppItDbContext dbContext, IConfiguration? configuration)
         {
             var superRole = await dbContext.Roles.FirstOrDefaultAsync(r => r.Name.ToLower() == "super");
             if (superRole == null)
@@ -189,7 +191,9 @@ namespace AppIt.Api.SeedData
                 return;
             }
 
-            var adminPassword = Environment.GetEnvironmentVariable("APPIT_ADMIN_PASSWORD") ?? "Admin@2026";
+            var adminPassword = Environment.GetEnvironmentVariable("APPIT_ADMIN_PASSWORD")
+                ?? configuration?["Auth:SeedAdminPassword"]
+                ?? "Admin@2026";
             var existing = await dbContext.Accounts.FirstOrDefaultAsync(a => a.Email.ToLower() == "admin@appit.com");
             if (existing != null)
             {
@@ -220,6 +224,63 @@ namespace AppIt.Api.SeedData
             });
 
             await dbContext.SaveChangesAsync();
+        }
+
+        private static async Task SeedDemoDataAsync(AppItDbContext dbContext, IConfiguration? configuration, ILogger? logger)
+        {
+            var enabled = string.Equals(
+                Environment.GetEnvironmentVariable("APPIT_SEED_DEMO_DATA")
+                    ?? configuration?["Seed:DemoData"],
+                "true",
+                StringComparison.OrdinalIgnoreCase);
+            if (!enabled)
+            {
+                return;
+            }
+
+            if (!await dbContext.Currencies.AnyAsync(c => c.Code == "USD"))
+            {
+                dbContext.Currencies.Add(new Currency { Code = "USD", Name = "US Dollar", IsActive = true });
+            }
+
+            if (!await dbContext.Products.AnyAsync())
+            {
+                dbContext.Products.Add(new Product
+                {
+                    Name = "Victoria Falls Tour",
+                    Description = "Guided falls experience",
+                    IsActive = true,
+                    BasePriceUsd = 120m
+                });
+            }
+
+            if (!await dbContext.ExchangeRates.AnyAsync())
+            {
+                dbContext.ExchangeRates.Add(new ExchangeRate
+                {
+                    CurrencyCode = "ZAR",
+                    Rate = 18.5m,
+                    EffectiveDate = DateTime.UtcNow.Date
+                });
+            }
+
+            await dbContext.SaveChangesAsync();
+            logger?.LogInformation("Demo seed data applied (APPIT_SEED_DEMO_DATA=true).");
+        }
+
+        private static async Task BackfillCatalogPricingAsync(AppItDbContext dbContext, ILogger? logger)
+        {
+            var toursUpdated = await dbContext.Tours
+                .Where(t => t.BasePriceUsd <= 0)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.BasePriceUsd, 100m));
+            var transfersUpdated = await dbContext.Transfers
+                .Where(t => t.BasePriceUsd <= 0)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.BasePriceUsd, 50m));
+
+            if (toursUpdated + transfersUpdated > 0)
+            {
+                logger?.LogInformation("Backfilled BasePriceUsd for {TourCount} tours and {TransferCount} transfers.", toursUpdated, transfersUpdated);
+            }
         }
     }
 }

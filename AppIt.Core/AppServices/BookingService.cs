@@ -14,19 +14,22 @@ namespace AppIt.Core.Services
         private readonly IInvoiceService _invoiceService;
         private readonly IPaymentService _paymentService;
         private readonly IVoucherService _voucherService;
+        private readonly IPricingService _pricingService;
 
         public BookingService(
             AppItDbContext context,
             IReservationService reservationService,
             IInvoiceService invoiceService,
             IPaymentService paymentService,
-            IVoucherService voucherService)
+            IVoucherService voucherService,
+            IPricingService pricingService)
         {
             _context = context;
             _reservationService = reservationService;
             _invoiceService = invoiceService;
             _paymentService = paymentService;
             _voucherService = voucherService;
+            _pricingService = pricingService;
         }
 
         public async Task<BookingCheckoutResultDto> CheckoutAsync(BookingCheckoutRequestDto request, int accountId)
@@ -44,18 +47,24 @@ namespace AppIt.Core.Services
                 var serviceItems = NormalizeServiceItems(request.ServiceItems);
                 foreach (var item in serviceItems)
                 {
-                    item.UnitPrice = await ResolveCatalogUnitPriceAsync(item.ServiceType, item.ServiceId, item.Currency);
+                    item.UnitPrice = await _pricingService.ResolveUnitPriceAsync(
+                        item.ServiceType, item.ServiceId, item.Currency, item.ActivityDate, request.Reservation.AgencyConsultantId);
                     item.TotalPrice = CalculateLineTotal(item.Quantity, item.UnitPrice, item.DiscountPercent);
                 }
 
-                var totalAmount = serviceItems.Sum(item => item.TotalPrice);
+                var netTotal = serviceItems.Sum(item => item.TotalPrice);
+                var vatTotal = serviceItems.Sum(item => CalculateLineVat(item.TotalPrice, item.VatPercent));
+                var totalAmount = netTotal + vatTotal;
                 if (totalAmount <= 0)
                 {
                     throw new InvalidOperationException("At least one service item with a valid total is required.");
                 }
 
+                var reservationCurrency = serviceItems.First().Currency;
                 request.Reservation.TotalAmount = totalAmount;
-                request.Reservation.Currency = serviceItems.First().Currency;
+                request.Reservation.Currency = reservationCurrency;
+                request.Reservation.Vat = vatTotal > 0 ? vatTotal : null;
+                request.Reservation.CurrencyExchangeRate = await _pricingService.GetEffectiveRateAsync(reservationCurrency, DateTime.UtcNow);
                 var reservation = await _reservationService.CreateAsync(request.Reservation);
                 var savedItems = serviceItems.Select(item => new ReservationServiceItem
                 {
@@ -102,13 +111,27 @@ namespace AppIt.Core.Services
                     CurrencyCode = string.IsNullOrWhiteSpace(request.Payment.CurrencyCode) ? invoice.Currency : request.Payment.CurrencyCode,
                     ReturnUrl = request.Payment.ReturnUrl,
                     CancelUrl = request.Payment.CancelUrl,
-                    IdempotencyKey = request.Payment.IdempotencyKey
+                    IdempotencyKey = request.Payment.IdempotencyKey,
+                    TransactionReference = request.Payment.TransactionReference
                 };
 
                 var payment = await _paymentService.ProcessAsync(paymentRequest);
                 if (!payment.Success)
                 {
                     throw new InvalidOperationException(payment.Message);
+                }
+
+                if (!string.IsNullOrWhiteSpace(request.ProofOfPaymentUrl) && payment.PaymentId.HasValue)
+                {
+                    _context.ProofOfPayments.Add(new ProofOfPayment
+                    {
+                        PaymentId = payment.PaymentId.Value,
+                        InvoiceId = invoice.Id,
+                        DocumentUrl = request.ProofOfPaymentUrl.Trim(),
+                        Status = "Pending",
+                        UploadedAt = DateTime.UtcNow
+                    });
+                    await _context.SaveChangesAsync();
                 }
 
                 VoucherReadDto? voucher = null;
@@ -274,59 +297,10 @@ namespace AppIt.Core.Services
             return gross - (gross * discount / 100m);
         }
 
-        private async Task<decimal> ResolveCatalogUnitPriceAsync(string serviceType, int serviceId, string currency)
+        private static decimal CalculateLineVat(decimal netLineTotal, decimal? vatPercent)
         {
-            var normalizedType = ServicePriceService.NormalizeServiceType(serviceType);
-            var normalizedCurrency = ServicePriceService.NormalizeCurrency(currency);
-
-            var price = await _context.ServicePrices
-                .AsNoTracking()
-                .Where(p => p.IsActive
-                    && p.ServiceType == normalizedType
-                    && p.ServiceId == serviceId
-                    && p.CurrencyCode == normalizedCurrency)
-                .Select(p => (decimal?)p.UnitPrice)
-                .FirstOrDefaultAsync();
-
-            if (price.HasValue)
-            {
-                return price.Value;
-            }
-
-            if (normalizedCurrency == "USD")
-            {
-                var fallback = normalizedType switch
-                {
-                    "Product" => await _context.Products
-                        .Where(p => p.ProductId == serviceId && p.IsActive)
-                        .Select(p => (decimal?)p.BasePriceUsd)
-                        .FirstOrDefaultAsync(),
-                    "Accommodation" => await _context.Accommodations
-                        .Where(a => a.Id == serviceId && a.IsActive)
-                        .Select(a => (decimal?)a.BasePriceUsd)
-                        .FirstOrDefaultAsync(),
-                    "Activity" => await _context.Activities
-                        .Where(a => a.Id == serviceId && a.IsActive)
-                        .Select(a => (decimal?)a.BasePriceUsd)
-                        .FirstOrDefaultAsync(),
-                    "Transfer" => await _context.Transfers
-                        .Where(t => t.Id == serviceId && t.IsActive)
-                        .Select(t => (decimal?)null)
-                        .FirstOrDefaultAsync(),
-                    "Tour" => await _context.Tours
-                        .Where(t => t.Id == serviceId && t.IsActive)
-                        .Select(t => (decimal?)null)
-                        .FirstOrDefaultAsync(),
-                    _ => null
-                };
-
-                if (fallback.HasValue && fallback.Value > 0)
-                {
-                    return fallback.Value;
-                }
-            }
-
-            throw new InvalidOperationException($"No active {normalizedCurrency} price is configured for this {normalizedType} service.");
+            var vat = Math.Clamp(vatPercent ?? 0m, 0m, 100m);
+            return decimal.Round(netLineTotal * vat / 100m, 2, MidpointRounding.AwayFromZero);
         }
 
         private static BookingServiceItemDto ToServiceItemDto(ReservationServiceItem item)

@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { map, Observable } from 'rxjs';
+import { EMPTY, expand, map, Observable, reduce } from 'rxjs';
 import { API_BASE_URL } from './api.constants';
 import {
     ApiEnvelope,
@@ -43,9 +43,36 @@ export class ApiService {
         return this.http.get<unknown>(this.url(path)).pipe(map((res) => this.toArray<T>(this.unwrap<unknown>(res))));
     }
 
+    /**
+     * Loads every record for a reference list by paging through the API, so dropdowns
+     * are never silently truncated to the default page size. Use for small/medium
+     * lookups (currencies, suppliers, consultants, trip accounts).
+     */
+    listAll<T = any>(path: string, pageSize = 200): Observable<T[]> {
+        return this.listPage<T>(path, 1, pageSize).pipe(
+            expand((res) => {
+                const page = res.page ?? 1;
+                const total = res.totalCount ?? (res.items?.length ?? 0);
+                return page * pageSize < total ? this.listPage<T>(path, page + 1, pageSize) : EMPTY;
+            }),
+            reduce((acc: T[], res) => acc.concat(res.items ?? []), [] as T[])
+        );
+    }
+
+    /** Returns the true total record count for a resource (not capped by page size). */
+    count(path: string): Observable<number> {
+        return this.listPage(path, 1, 1).pipe(map((page) => page.totalCount ?? (page.items?.length ?? 0)));
+    }
+
     listPage<T = any>(path: string, page = 1, pageSize = SYSTEM_PAGE_SIZE, search = ''): Observable<ListResponse<T>> {
         const separator = path.includes('?') ? '&' : '?';
         const query = `page=${page}&pageSize=${pageSize}${search.trim() ? `&search=${encodeURIComponent(search.trim())}` : ''}`;
+        return this.http.get<unknown>(this.url(`${path}${separator}${query}`)).pipe(map((res) => this.toPage<T>(this.unwrap<unknown>(res))));
+    }
+
+    listMinePage<T = any>(path: string, accountId: number | string, page = 1, pageSize = SYSTEM_PAGE_SIZE, search = ''): Observable<ListResponse<T>> {
+        const separator = path.includes('?') ? '&' : '?';
+        const query = `accountId=${encodeURIComponent(String(accountId))}&page=${page}&pageSize=${pageSize}${search.trim() ? `&search=${encodeURIComponent(search.trim())}` : ''}`;
         return this.http.get<unknown>(this.url(`${path}${separator}${query}`)).pipe(map((res) => this.toPage<T>(this.unwrap<unknown>(res))));
     }
 
@@ -69,12 +96,28 @@ export class ApiService {
         return this.http.delete<unknown>(this.url(path)).pipe(map((res) => this.unwrap<T>(res)));
     }
 
-    getAccounts(): Observable<AppItUser[]> {
-        return this.list<AppItUser>(`/api/accounts?page=1&pageSize=${SYSTEM_PAGE_SIZE}`);
-    }
-
     searchCustomers(search = ''): Observable<Customer[]> {
         return this.listPage<Customer>('/api/customers', 1, SYSTEM_PAGE_SIZE, search).pipe(map((page) => page.items ?? []));
+    }
+
+    getPricingQuote(serviceType: string, serviceId: number, currency: string, consultantId?: number | null): Observable<{ unitPrice: number; exchangeRate: number }> {
+        const params = new URLSearchParams({
+            serviceType,
+            serviceId: String(serviceId),
+            currency
+        });
+        if (consultantId) {
+            params.set('consultantId', String(consultantId));
+        }
+        return this.get(`/api/pricing/quote?${params.toString()}`);
+    }
+
+    listNotifications(): Observable<any[]> {
+        return this.list('/api/notifications');
+    }
+
+    markNotificationRead(id: number): Observable<unknown> {
+        return this.put(`/api/notifications/${id}/read`, {});
     }
 
     checkoutBooking(request: BookingCheckoutRequest): Observable<BookingCheckoutResult> {

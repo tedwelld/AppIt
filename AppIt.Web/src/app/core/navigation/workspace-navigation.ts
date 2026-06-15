@@ -75,22 +75,33 @@ function action(label: string, icon: string, routerLink: unknown[], feature: str
     return { label, icon, routerLink, feature, permissions };
 }
 
-function canShow(item: WorkspaceMenuItem, allowed: string[] | typeof ALL_FEATURES): boolean {
-    if (!item.feature || item.feature === 'User') return true;
-    if (allowed === ALL_FEATURES) return true;
-    return allowed.includes(item.feature);
+function canShow(item: WorkspaceMenuItem, allowed: string[] | typeof ALL_FEATURES, activePermissions: string[] | null): boolean {
+    if (!item.feature || item.feature === 'User') {
+        return matchesPermissions(item, activePermissions);
+    }
+    if (allowed !== ALL_FEATURES && !allowed.includes(item.feature)) {
+        return false;
+    }
+    return matchesPermissions(item, activePermissions);
 }
 
-function filterMenu(items: WorkspaceMenuItem[], allowed: string[] | typeof ALL_FEATURES): WorkspaceMenuItem[] {
+function matchesPermissions(item: WorkspaceMenuItem, activePermissions: string[] | null): boolean {
+    if (!item.permissions?.length || activePermissions === null) {
+        return true;
+    }
+    return item.permissions.some((permission) => activePermissions.includes(permission));
+}
+
+function filterMenu(items: WorkspaceMenuItem[], allowed: string[] | typeof ALL_FEATURES, activePermissions: string[] | null): WorkspaceMenuItem[] {
     return items
         .map((item) => ({
             ...item,
-            items: item.items ? filterMenu(item.items as WorkspaceMenuItem[], allowed) : undefined
+            items: item.items ? filterMenu(item.items as WorkspaceMenuItem[], allowed, activePermissions) : undefined
         }))
-        .filter((item) => canShow(item, allowed) && (!item.items || item.items.length > 0));
+        .filter((item) => canShow(item, allowed, activePermissions) && (!item.items || item.items.length > 0));
 }
 
-export function buildWorkspaceMenu(role: AppItRole | null, roleName?: string | null): WorkspaceMenuModel {
+export function buildWorkspaceMenu(role: AppItRole | null, roleName?: string | null, activePermissions: string[] | null = null): WorkspaceMenuModel {
     if (role === 'admin' || role === 'super') {
         const allowed = allowedFeaturesFor(role, roleName);
         const groups: WorkspaceMenuItem[] = [
@@ -145,8 +156,7 @@ export function buildWorkspaceMenu(role: AppItRole | null, roleName?: string | n
                 feature: 'Operations',
                 items: [
                     action('Check In', 'pi pi-fw pi-check-circle', ['/admin/operations/check-in'], 'Operations', ['Print or View Travelled PAX']),
-                    action('Day-End Audit', 'pi pi-fw pi-sun', ['/admin/operations/day-end'], 'Operations', ['Open Day', 'Close Day']),
-                    action('Opera Management', 'pi pi-fw pi-sync', ['/admin/operations/opera-management'], 'Operations', ['Print or View Product Capacity'])
+                    action('Day-End Audit', 'pi pi-fw pi-sun', ['/admin/operations/day-end'], 'Operations', ['Open Day', 'Close Day'])
                 ]
             },
             {
@@ -191,7 +201,7 @@ export function buildWorkspaceMenu(role: AppItRole | null, roleName?: string | n
 
         return {
             home: { label: 'Dashboard', icon: 'pi pi-fw pi-chart-line', routerLink: ['/admin/dashboard'] },
-            groups: filterMenu(groups, allowed)
+            groups: filterMenu(groups, allowed, activePermissions)
         };
     }
 

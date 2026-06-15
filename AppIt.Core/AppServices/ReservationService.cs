@@ -33,6 +33,8 @@ namespace AppIt.Core.Services
                 VoucherCode = voucher,
                 CurrencyCode = string.IsNullOrWhiteSpace(dto.Currency) ? "USD" : dto.Currency,
                 TotalAmount = dto.TotalAmount,
+                Vat = dto.Vat,
+                CurrencyExchangeRate = dto.CurrencyExchangeRate is > 0 ? dto.CurrencyExchangeRate.Value : 1m,
                 Status = string.IsNullOrWhiteSpace(dto.Status) ? "Pending" : dto.Status,
                 CreatedDate = DateTime.UtcNow,
                 AccountId = dto.AccountId,
@@ -66,6 +68,10 @@ namespace AppIt.Core.Services
             reservation.AgencyId = dto.AgencyId;
             reservation.CustomerId = dto.CustomerId;
             reservation.CustomerEmail = dto.CustomerEmail;
+            if (dto.AgencyConsultantId.HasValue) reservation.AgencyConsultantId = dto.AgencyConsultantId;
+            if (!string.IsNullOrWhiteSpace(dto.AgencyVoucherReference)) reservation.AgencyVoucherReference = dto.AgencyVoucherReference;
+            if (!string.IsNullOrWhiteSpace(dto.Country)) reservation.Country = dto.Country;
+            if (!string.IsNullOrWhiteSpace(dto.Notes)) reservation.Notes = dto.Notes;
 
             if (reservation.Status.Equals("Closed", StringComparison.OrdinalIgnoreCase))
             {
@@ -176,13 +182,12 @@ namespace AppIt.Core.Services
                 .OrderByDescending(p => p.ProcessedAt ?? DateTime.MinValue)
                 .ThenByDescending(p => p.Id)
                 .ToList();
-            var payment = paymentRows.FirstOrDefault();
             var paidAmount = paymentRows
                 .Where(p => p.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase)
                     || p.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
                     || p.Status.Equals("Captured", StringComparison.OrdinalIgnoreCase))
                 .Sum(p => (decimal?)p.Amount) ?? 0;
-            var paymentStatus = ResolvePaymentStatus(invoice, payment);
+            var paymentStatus = ResolvePaymentStatus(invoice, paidAmount);
 
             return new ReservationReadDto
             {
@@ -243,17 +248,12 @@ namespace AppIt.Core.Services
             };
         }
 
-        private static string ResolvePaymentStatus(Invoice? invoice, Payment? latestPayment)
+        private static string ResolvePaymentStatus(Invoice? invoice, decimal paidAmount)
         {
-            if (invoice == null) return "NotPaid";
-            if (latestPayment == null) return "NotPaid";
+            if (invoice == null || paidAmount <= 0) return "NotPaid";
 
-            var paid = latestPayment.Amount;
-            var total = invoice.TotalAmount;
-
-            if (paid <= 0) return "NotPaid";
-            if (paid >= total) return paid > total ? "Shortfall" : "FullyPaid";
-            return "Deposited";
+            // FullyPaid once the summed captured payments cover the invoice; otherwise a deposit.
+            return paidAmount >= invoice.TotalAmount ? "FullyPaid" : "Deposited";
         }
 
         private async Task<string> BuildUniqueReferenceAsync(string prefix)
@@ -272,10 +272,16 @@ namespace AppIt.Core.Services
 
         private async Task<string> BuildUniqueVoucherAsync()
         {
-            var existing = await Reservations
+            var reservationCodes = await Reservations
                 .Where(r => r.VoucherCode != null)
                 .Select(r => r.VoucherCode!)
                 .ToListAsync();
+            var voucherCodes = await _context.Vouchers
+                .Where(v => v.Code != null)
+                .Select(v => v.Code)
+                .ToListAsync();
+
+            var existing = reservationCodes.Concat(voucherCodes).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
             var maxSeq = 0;
             foreach (var code in existing)
@@ -285,8 +291,16 @@ namespace AppIt.Core.Services
                     maxSeq = n;
             }
 
-            var next = maxSeq + 1;
-            return $"{next:D5}";
+            for (var attempt = 0; attempt < 10; attempt++)
+            {
+                var candidate = $"{maxSeq + 1 + attempt:D5}";
+                if (!existing.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+                {
+                    return candidate;
+                }
+            }
+
+            throw new InvalidOperationException("Could not generate a unique voucher code.");
         }
 
         private static string BuildReference(string prefix)
@@ -322,6 +336,7 @@ namespace AppIt.Core.Services
                 });
             }
 
+            await UpdateVoucherStatusAsync(id, "Redeemed");
             await _context.SaveChangesAsync();
             await WriteSnapshotAsync(id, "Closed", closedBy);
             return await GetByIdAsync(id);
@@ -329,14 +344,35 @@ namespace AppIt.Core.Services
 
         public async Task<ReservationReadDto?> CancelBookingAsync(int id, string? reason = null)
         {
-            var reservation = await Reservations.FindAsync(id);
+            var reservation = await Reservations
+                .Include(r => r.Invoices)
+                    .ThenInclude(i => i.Payments)
+                .FirstOrDefaultAsync(r => r.ReservationId == id);
             if (reservation == null) return null;
 
-            var alreadyPaid = reservation.PaymentStatus == "FullyPaid";
+            var invoice = reservation.Invoices?
+                .OrderByDescending(i => i.IssuedDate)
+                .ThenByDescending(i => i.Id)
+                .FirstOrDefault();
+            var paidAmount = (invoice?.Payments ?? Enumerable.Empty<Payment>())
+                .Where(p => p.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase)
+                    || p.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+                    || p.Status.Equals("Captured", StringComparison.OrdinalIgnoreCase))
+                .Sum(p => (decimal?)p.Amount) ?? 0;
+            var computedStatus = ResolvePaymentStatus(invoice, paidAmount);
+            reservation.PaymentStatus = computedStatus;
+
+            var alreadyPaid = computedStatus == "FullyPaid";
             reservation.Status = "Cancelled";
             if (!alreadyPaid) reservation.PaymentStatus = "NotPaid";
-            if (!string.IsNullOrWhiteSpace(reason)) reservation.Notes = reason;
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                reservation.Notes = string.IsNullOrWhiteSpace(reservation.Notes)
+                    ? reason.Trim()
+                    : $"{reservation.Notes.Trim()}\nCancelled: {reason.Trim()}";
+            }
 
+            await UpdateVoucherStatusAsync(id, "Cancelled");
             await _context.SaveChangesAsync();
             await WriteSnapshotAsync(id, "Cancelled", reason);
             return await GetByIdAsync(id);
@@ -353,9 +389,40 @@ namespace AppIt.Core.Services
             reservation.ClosingDate = null;
             reservation.ClosingByUserName = null;
 
+            await UpdateVoucherStatusAsync(id, "Active");
             await _context.SaveChangesAsync();
             await WriteSnapshotAsync(id, "Opened", null);
             return await GetByIdAsync(id);
+        }
+
+        public async Task<ReservationReadDto?> CheckInBookingAsync(int id, string checkedInBy)
+        {
+            var reservation = await Reservations.FindAsync(id);
+            if (reservation == null) return null;
+
+            // Travel lifecycle: NotCheckedIn -> CheckedIn -> Travelled (Travelled is set on close).
+            reservation.TravelStatus = "CheckedIn";
+
+            await UpdateVoucherStatusAsync(id, "Redeemed");
+            await _context.SaveChangesAsync();
+            await WriteSnapshotAsync(id, "CheckedIn", checkedInBy);
+            return await GetByIdAsync(id);
+        }
+
+        private async Task UpdateVoucherStatusAsync(int reservationId, string status)
+        {
+            var voucher = await _context.Vouchers.FirstOrDefaultAsync(v => v.ReservationId == reservationId);
+            if (voucher == null) return;
+
+            voucher.Status = status;
+            if (status.Equals("Redeemed", StringComparison.OrdinalIgnoreCase))
+            {
+                voucher.RedeemedDate ??= DateTime.UtcNow;
+            }
+            else if (status.Equals("Active", StringComparison.OrdinalIgnoreCase))
+            {
+                voucher.RedeemedDate = null;
+            }
         }
 
         public async Task<ReservationReadDto?> CloneBookingAsync(int id, string clonedBy)

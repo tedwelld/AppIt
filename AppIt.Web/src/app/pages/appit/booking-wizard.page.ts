@@ -10,6 +10,7 @@ import { SelectModule } from 'primeng/select';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
+import { TooltipModule } from 'primeng/tooltip';
 import { forkJoin } from 'rxjs';
 import { ApiService, SYSTEM_PAGE_SIZE } from '../../core/api/api.service';
 import { BookingCheckoutRequest, BookingCheckoutResult, BookingServiceItem, Customer } from '../../core/api/api.models';
@@ -21,6 +22,8 @@ interface ServiceOption {
     serviceName: string;
     description: string;
     unitPrice: number;
+    // Stable USD base price; never mutated, so currency re-mapping never double-converts.
+    basePriceUsd: number;
     currency: string;
     serviceLabel: string;
     hasSelectedCurrencyPrice: boolean;
@@ -84,7 +87,7 @@ interface BookingForm {
 
 @Component({
     standalone: true,
-    imports: [CommonModule, FormsModule, ButtonModule, DialogModule, SelectModule, MultiSelectModule, InputTextModule, TableModule, TagModule],
+    imports: [CommonModule, FormsModule, ButtonModule, DialogModule, SelectModule, MultiSelectModule, InputTextModule, TableModule, TagModule, TooltipModule],
     template: `
         <section class="grid gap-5">
             <div class="workspace-card flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
@@ -353,7 +356,7 @@ interface BookingForm {
                             </ng-template>
                         </p-table>
                         <div class="flex justify-end gap-6 pt-2 text-sm font-semibold" *ngIf="serviceItems().length > 0">
-                            <span>Gross: {{ money(total(), currency) }}</span>
+                            <span>Gross: {{ money(grossTotal(), currency) }}</span>
                             <span *ngIf="totalDiscount() > 0" class="text-green-600">Discount: -{{ money(totalDiscount(), currency) }}</span>
                             <span>Net: {{ money(netTotal(), currency) }}</span>
                         </div>
@@ -392,7 +395,7 @@ interface BookingForm {
                             <aside class="rounded-xl border border-surface-200 dark:border-surface-700 p-4 grid gap-3">
                                 <div>
                                     <p class="text-muted-color text-sm m-0">Gross Total</p>
-                                    <p class="font-display text-3xl font-bold my-1">{{ money(total(), currency) }}</p>
+                                    <p class="font-display text-3xl font-bold my-1">{{ money(grossTotal(), currency) }}</p>
                                 </div>
                                 <div *ngIf="totalDiscount() > 0">
                                     <p class="text-muted-color text-sm m-0">Discount</p>
@@ -1011,7 +1014,18 @@ export class BookingWizardPage {
     readonly invoiceSaving = signal(false);
     readonly invoiceStatus = signal('');
     readonly bookingEditMode = signal(false);
-    readonly total = computed(() => this.serviceItems().reduce((sum, item) => sum + Number(item.totalPrice ?? 0), 0));
+    readonly grossTotal = computed(() =>
+        this.serviceItems().reduce((sum, item) => sum + Number(item.unitPrice) * Number(item.quantity), 0)
+    );
+    readonly totalDiscount = computed(() =>
+        this.serviceItems().reduce((sum, item) => {
+            const gross = Number(item.unitPrice) * Number(item.quantity);
+            const disc = Number(item.discountPercent ?? 0);
+            return sum + (gross * disc / 100);
+        }, 0)
+    );
+    readonly netTotal = computed(() => this.grossTotal() - this.totalDiscount());
+    readonly total = computed(() => this.netTotal());
     readonly filteredServices = computed(() => this.services().filter((item) => item.serviceType === this.selectedType));
     readonly groupedServiceOptions = computed(() => this.serviceTypeOptions().map((type) => ({
         label: type.label,
@@ -1019,7 +1033,6 @@ export class BookingWizardPage {
         items: this.services().filter((item) => item.serviceType === type.value)
     })));
     readonly pageSize = SYSTEM_PAGE_SIZE;
-
     readonly serviceTypeOptions = signal<ServiceTypeOption[]>([]);
     readonly paymentMethods = signal<PaymentMethodOption[]>([]);
     readonly tripAccounts = signal<TripAccountOption[]>([]);
@@ -1034,19 +1047,13 @@ export class BookingWizardPage {
     readonly productSaving = signal(false);
     readonly productStatus = signal('');
     readonly detailFilteredServices = computed(() => this.services().filter((item) => item.serviceType === this.detailSelectedType));
-    readonly totalDiscount = computed(() =>
-        this.serviceItems().reduce((sum, item) => {
-            const gross = Number(item.unitPrice) * Number(item.quantity);
-            const disc = Number(item.discountPercent ?? 0);
-            return sum + (gross * disc / 100);
-        }, 0)
-    );
-    readonly netTotal = computed(() => this.total() - this.totalDiscount());
 
     customerSearch = '';
     selectedCustomer: Customer | null = null;
     client: Customer = { durationOfStayDays: 0 };
     selectedType: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour' = 'Product';
+    // Effective FX rates (foreign units per 1 USD) used to preview converted prices in the wizard.
+    private ratesMap: Record<string, number> = { USD: 1 };
     selectedServices: ServiceOption[] = [];
     selectedQuantity = 1;
     selectedTripAccountId: number | null = null;
@@ -1096,7 +1103,7 @@ export class BookingWizardPage {
         { label: 'Pending', value: 'Pending' },
         { label: 'Paid', value: 'Paid' },
         { label: 'Cancelled', value: 'Cancelled' },
-        { label: 'Refunded', value: 'Refunded' }
+        { label: 'Void', value: 'Void' }
     ];
 
     constructor() {
@@ -1113,14 +1120,41 @@ export class BookingWizardPage {
 
     loadBookings(page = 1): void {
         this.bookingLoading.set(true);
-        const search = [this.bookingSearch, this.bookingStatusFilter ? `status=${this.bookingStatusFilter}` : ''].filter(Boolean).join('&');
-        this.api.listPage('/api/reservations', page, this.pageSize, search).subscribe({
-            next: (result) => {
-                this.bookings.set(result.items ?? []);
-                this.bookingTotalRecords.set(result.totalCount ?? result.items?.length ?? 0);
-                this.bookingFirst.set(((result.page ?? page) - 1) * this.pageSize);
-                this.bookingLoading.set(false);
-            },
+        const search = this.bookingSearch.trim();
+        const statusFilter = this.bookingStatusFilter;
+
+        const handleResult = (items: Record<string, unknown>[], totalCount: number, resultPage: number) => {
+            let rows = items ?? [];
+            if (statusFilter) {
+                rows = rows.filter((row) => String(row['status'] ?? '') === statusFilter);
+            }
+            this.bookings.set(rows);
+            this.bookingTotalRecords.set(statusFilter ? rows.length : (totalCount ?? rows.length));
+            this.bookingFirst.set(((resultPage ?? page) - 1) * this.pageSize);
+            this.bookingLoading.set(false);
+        };
+
+        if (this.auth.isAdmin()) {
+            this.api.listPage<Record<string, unknown>>('/api/reservations', page, this.pageSize, search).subscribe({
+                next: (result) => handleResult(result.items ?? [], result.totalCount ?? 0, result.page ?? page),
+                error: (err) => {
+                    this.bookingLoading.set(false);
+                    this.status.set(this.describeError(err));
+                }
+            });
+            return;
+        }
+
+        const accountId = this.auth.user()?.id;
+        if (!accountId) {
+            this.bookings.set([]);
+            this.bookingTotalRecords.set(0);
+            this.bookingLoading.set(false);
+            return;
+        }
+
+        this.api.listMinePage<Record<string, unknown>>('/api/reservations/mine', accountId, page, this.pageSize, search).subscribe({
+            next: (result) => handleResult(result.items ?? [], result.totalCount ?? 0, result.page ?? page),
             error: (err) => {
                 this.bookingLoading.set(false);
                 this.status.set(this.describeError(err));
@@ -1225,10 +1259,14 @@ export class BookingWizardPage {
             voucherCode: this.bookingForm.voucherCode,
             customerId: this.optionalNumber(this.bookingForm.customerId),
             accountId: this.optionalNumber(this.bookingForm.accountId),
+            agencyConsultantId: this.optionalNumber(this.bookingForm.agencyConsultantId),
+            agencyVoucherReference: this.bookingForm.agencyVoucherReference || null,
             currency: this.bookingForm.currency,
             totalAmount: Number(this.bookingForm.totalAmount),
             status: this.bookingForm.status,
             customerEmail: this.bookingForm.customerEmail || null,
+            country: this.bookingForm.country || null,
+            notes: this.bookingForm.notes || null,
             closingByUserName: this.bookingForm.closingByUserName || null
         }).subscribe({
             next: (booking) => {
@@ -1530,8 +1568,10 @@ export class BookingWizardPage {
                 method: this.paymentMethod,
                 amount: netTotal,
                 currencyCode: this.currency,
-                idempotencyKey: `booking-${Date.now()}-${Math.random().toString(16).slice(2)}`
+                idempotencyKey: `booking-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                transactionReference: this.transactionReference?.trim() || undefined
             },
+            proofOfPaymentUrl: this.proofOfPaymentUrl?.trim() || undefined,
             serviceItems: this.serviceItems()
         };
 
@@ -1740,12 +1780,13 @@ export class BookingWizardPage {
     }
 
     amountDue(booking: Record<string, unknown>): string {
-        const services: any[] = Array.isArray(booking['serviceItems']) ? booking['serviceItems'] : [];
-        const serviceTotal = services.reduce((sum, s) => sum + Number(s.totalPrice ?? 0), 0);
+        // The list payload doesn't include service items; the invoice/header total is the source of truth.
+        const total = Number(booking['invoiceTotalAmount'] ?? booking['totalAmount'] ?? 0);
         const paid = Number(booking['paymentAmount'] ?? 0);
-        const due = serviceTotal - paid;
+        const due = total - paid;
         const prefix = due > 0 ? '+' : '';
-        return `${prefix}${this.money(due, String(booking['currency'] ?? 'USD'))}`;
+        const currency = String(booking['invoiceCurrency'] ?? booking['currency'] ?? 'USD');
+        return `${prefix}${this.money(due, currency)}`;
     }
 
     supplierName(supplierId: unknown): string {
@@ -1762,8 +1803,9 @@ export class BookingWizardPage {
     statusSeverity(value: unknown): 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast' {
         const status = String(value ?? '').toLowerCase();
         if (status === 'paid' || status === 'completed' || status === 'captured') return 'success';
-        if (status === 'confirmed') return 'success';
-        if (status === 'pending') return 'warn';
+        if (status === 'confirmed' || status === 'travelled' || status === 'checkedin') return 'success';
+        if (status === 'pending' || status === 'provisional') return 'warn';
+        if (status === 'enquiry') return 'info';
         if (status === 'closed') return 'info';
         if (status === 'cancelled') return 'danger';
         return 'secondary';
@@ -1961,18 +2003,21 @@ export class BookingWizardPage {
     }
 
     private loadCatalog(): void {
+        this.loadExchangeRatesMap();
         forkJoin({
+            // Fixed metadata arrays are not paginated; reference lists and catalogues are loaded in
+            // full via listAll so dropdown search is never capped at the default page size.
             serviceTypes: this.api.list<ServiceTypeOption>('/api/frontend/service-types'),
             paymentMethods: this.api.list<PaymentMethodOption>('/api/frontend/payment-methods'),
-            tripAccounts: this.api.list<TripAccountOption>('/api/trip-accounts'),
-            consultants: this.api.list<any>('/api/consultants'),
-            suppliers: this.api.list<SupplierOption>('/api/suppliers'),
-            currencies: this.api.list<any>('/api/currencies'),
-            products: this.api.list<any>('/api/products'),
-            accommodations: this.api.list<any>('/api/accommodations'),
-            activities: this.api.list<any>('/api/activities'),
-            transfers: this.api.list<any>('/api/transfers'),
-            tours: this.api.list<any>('/api/tours')
+            tripAccounts: this.api.listAll<TripAccountOption>('/api/trip-accounts'),
+            consultants: this.api.listAll<any>('/api/consultants'),
+            suppliers: this.api.listAll<SupplierOption>('/api/suppliers'),
+            currencies: this.api.listAll<any>('/api/currencies'),
+            products: this.api.listAll<any>('/api/products'),
+            accommodations: this.api.listAll<any>('/api/accommodations'),
+            activities: this.api.listAll<any>('/api/activities'),
+            transfers: this.api.listAll<any>('/api/transfers'),
+            tours: this.api.listAll<any>('/api/tours')
         }).subscribe({
             next: (rows) => {
                 this.serviceTypeOptions.set(rows.serviceTypes);
@@ -2007,12 +2052,14 @@ export class BookingWizardPage {
     }
 
     private toServiceOption(serviceType: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour', item: any): ServiceOption {
-        const option = {
+        const basePriceUsd = Number(item.basePriceUsd ?? item.price ?? 0);
+        const option: ServiceOption = {
             serviceType,
             serviceId: Number(item.productId ?? item.id),
             serviceName: item.name ?? item.type ?? item.productName ?? serviceType,
             description: item.description ?? item.category ?? '',
-            unitPrice: Number(item.basePriceUsd ?? item.price ?? 0),
+            unitPrice: basePriceUsd,
+            basePriceUsd,
             currency: 'USD',
             serviceLabel: '',
             hasSelectedCurrencyPrice: false,
@@ -2021,18 +2068,56 @@ export class BookingWizardPage {
         return this.withSelectedCurrencyPrice(option);
     }
 
+    // Mirrors the backend PricingService chain for the preview shown in the wizard:
+    // explicit per-currency ServicePrice -> USD price/base converted via the effective FX rate.
+    // The backend re-resolves authoritatively at checkout (incl. special prices).
     private withSelectedCurrencyPrice(item: ServiceOption): ServiceOption {
         const currency = (this.currency || 'USD').toUpperCase();
-        const price = item.prices.find((p) => String(p.currencyCode).toUpperCase() === currency && p.isActive !== false);
-        const unitPrice = price ? Number(price.unitPrice) : currency === 'USD' && item.unitPrice > 0 ? Number(item.unitPrice) : 0;
-        const hasSelectedCurrencyPrice = !!price || (currency === 'USD' && item.unitPrice > 0);
-        return {
-            ...item,
-            unitPrice,
-            currency,
-            hasSelectedCurrencyPrice,
-            serviceLabel: hasSelectedCurrencyPrice ? `${item.serviceName} - ${this.money(unitPrice, currency)}` : `${item.serviceName} - missing ${currency} price`
-        };
+        const explicit = item.prices.find((p) => String(p.currencyCode).toUpperCase() === currency && p.isActive !== false);
+        const usdExplicit = item.prices.find((p) => String(p.currencyCode).toUpperCase() === 'USD' && p.isActive !== false);
+        const usdBase = usdExplicit ? Number(usdExplicit.unitPrice) : Number(item.basePriceUsd);
+
+        let unitPrice = 0;
+        let hasSelectedCurrencyPrice = false;
+        let converted = false;
+
+        if (explicit) {
+            unitPrice = Number(explicit.unitPrice);
+            hasSelectedCurrencyPrice = true;
+        } else if (currency === 'USD' && usdBase > 0) {
+            unitPrice = usdBase;
+            hasSelectedCurrencyPrice = true;
+        } else if (usdBase > 0) {
+            const rate = this.ratesMap[currency];
+            if (rate && rate > 0) {
+                unitPrice = Math.round(usdBase * rate * 100) / 100;
+                hasSelectedCurrencyPrice = true;
+                converted = true;
+            }
+        }
+
+        const serviceLabel = hasSelectedCurrencyPrice
+            ? `${item.serviceName} - ${this.money(unitPrice, currency)}${converted ? ' (converted)' : ''}`
+            : `${item.serviceName} - missing ${currency} price`;
+
+        return { ...item, unitPrice, currency, hasSelectedCurrencyPrice, serviceLabel };
+    }
+
+    private loadExchangeRatesMap(): void {
+        const today = new Date();
+        const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        this.api.get<any>(`/api/exchange-rates/effective?date=${date}`).subscribe({
+            next: (rates) => {
+                const map: Record<string, number> = { USD: 1 };
+                (Array.isArray(rates) ? rates : []).forEach((r: any) => {
+                    if (r.currencyCode && Number(r.rate) > 0) map[String(r.currencyCode).toUpperCase()] = Number(r.rate);
+                });
+                this.ratesMap = map;
+                // Re-price any already-loaded services now that rates are available.
+                this.services.update((rows) => rows.map((item) => this.withSelectedCurrencyPrice(item)));
+            },
+            error: () => { this.ratesMap = { USD: 1 }; }
+        });
     }
 
     previewVoucherNumber(): string {

@@ -1,16 +1,29 @@
-import { HttpInterceptorFn } from '@angular/common/http';
-
-const AUTH_TOKEN_KEY = 'appit.auth.token';
+import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { catchError, throwError } from 'rxjs';
+import { AuthService } from './auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-    if (req.url.includes('/api/auth/')) {
-        return next(req);
-    }
+    const auth = inject(AuthService);
+    const router = inject(Router);
+    const token = auth.token();
 
-    const token = localStorage.getItem(AUTH_TOKEN_KEY);
-    if (!token) {
-        return next(req);
-    }
+    const isAuthEndpoint = req.url.includes('/api/auth/login')
+        || req.url.includes('/api/auth/register')
+        || req.url.includes('/api/auth/password-reset');
 
-    return next(req.clone({ headers: req.headers.set('Authorization', `Bearer ${token}`) }));
+    const authReq = token && !isAuthEndpoint
+        ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
+        : req;
+
+    return next(authReq).pipe(
+        catchError((error: HttpErrorResponse) => {
+            if (error.status === 401 && !isAuthEndpoint && token) {
+                auth.logout();
+                void router.navigateByUrl('/auth/login');
+            }
+            return throwError(() => error);
+        })
+    );
 };

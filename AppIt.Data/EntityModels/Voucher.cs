@@ -17,6 +17,9 @@ namespace AppIt.Data.EntityModels
         [MaxLength(20)]
         public string Type { get; set; } = "Reservation";
 
+        [MaxLength(20)]
+        public string Status { get; set; } = "Active";
+
         [MaxLength(50)]
         public string? ComboReference { get; set; }
 
@@ -24,5 +27,7 @@ namespace AppIt.Data.EntityModels
         public Reservation? Reservation { get; set; }
 
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+
+        public DateTime? RedeemedDate { get; set; }
     }
 }

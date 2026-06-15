@@ -22,6 +22,7 @@ namespace AppIt.Core.Services
                 Code = dto.Code,
                 Reference = dto.Reference,
                 Type = dto.Type,
+                Status = string.IsNullOrWhiteSpace(dto.Status) ? "Active" : dto.Status,
                 ComboReference = dto.ComboReference,
                 ReservationId = dto.ReservationId,
                 CreatedDate = DateTime.UtcNow
@@ -41,6 +42,7 @@ namespace AppIt.Core.Services
             voucher.Code = dto.Code;
             voucher.Reference = dto.Reference;
             voucher.Type = dto.Type;
+            if (!string.IsNullOrWhiteSpace(dto.Status)) voucher.Status = dto.Status;
             voucher.ComboReference = dto.ComboReference;
             voucher.ReservationId = dto.ReservationId;
 
@@ -73,9 +75,11 @@ namespace AppIt.Core.Services
                     Code = v.Code,
                     Reference = v.Reference,
                     Type = v.Type,
+                    Status = v.Status,
                     ComboReference = v.ComboReference,
                     ReservationId = v.ReservationId,
-                    CreatedAt = v.CreatedDate
+                    CreatedAt = v.CreatedDate,
+                    RedeemedDate = v.RedeemedDate
                 })
                 .ToListAsync();
         }
@@ -90,9 +94,11 @@ namespace AppIt.Core.Services
                     Code = v.Code,
                     Reference = v.Reference,
                     Type = v.Type,
+                    Status = v.Status,
                     ComboReference = v.ComboReference,
                     ReservationId = v.ReservationId,
-                    CreatedAt = v.CreatedDate
+                    CreatedAt = v.CreatedDate,
+                    RedeemedDate = v.RedeemedDate
                 })
                 .FirstOrDefaultAsync();
         }
@@ -108,9 +114,11 @@ namespace AppIt.Core.Services
                     Code = v.Code,
                     Reference = v.Reference,
                     Type = v.Type,
+                    Status = v.Status,
                     ComboReference = v.ComboReference,
                     ReservationId = v.ReservationId,
-                    CreatedAt = v.CreatedDate
+                    CreatedAt = v.CreatedDate,
+                    RedeemedDate = v.RedeemedDate
                 })
                 .ToListAsync();
         }
@@ -123,9 +131,11 @@ namespace AppIt.Core.Services
                 Code = voucher.Code,
                 Reference = voucher.Reference,
                 Type = voucher.Type,
+                Status = voucher.Status,
                 ComboReference = voucher.ComboReference,
                 ReservationId = voucher.ReservationId,
-                CreatedAt = voucher.CreatedDate
+                CreatedAt = voucher.CreatedDate,
+                RedeemedDate = voucher.RedeemedDate
             };
         }
     }

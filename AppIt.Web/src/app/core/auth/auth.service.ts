@@ -13,10 +13,11 @@ export class AuthService {
     private readonly api = inject(ApiService);
     private readonly router = inject(Router);
     private readonly userState = signal<AppItUser | null>(this.loadUser());
+    private readonly tokenState = signal<string | null>(localStorage.getItem(AUTH_TOKEN_KEY));
     private readonly loadingState = signal(false);
 
     readonly user = computed(() => this.userState());
-    readonly token = computed(() => localStorage.getItem(AUTH_TOKEN_KEY));
+    readonly token = computed(() => this.tokenState());
     readonly role = computed<AppItRole | null>(() => this.normalizeRole(this.userState()?.role));
     readonly roleName = computed<string>(() => String(this.userState()?.role ?? '').trim().toLowerCase());
     readonly displayName = computed(() => {
@@ -65,6 +66,7 @@ export class AuthService {
 
     logout(): void {
         this.userState.set(null);
+        this.tokenState.set(null);
         localStorage.removeItem(AUTH_STORAGE_KEY);
         localStorage.removeItem(AUTH_TOKEN_KEY);
         localStorage.removeItem(WELCOME_KEY);
@@ -108,6 +110,7 @@ export class AuthService {
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(normalizedUser));
         if (response.token) {
             localStorage.setItem(AUTH_TOKEN_KEY, response.token);
+            this.tokenState.set(response.token);
         }
         localStorage.setItem(WELCOME_KEY, `Welcome ${normalizedUser.firstName ?? normalizedUser.email}`.trim());
         void this.navigateAfterLogin();
@@ -124,6 +127,7 @@ export class AuthService {
         } catch {
             localStorage.removeItem(AUTH_STORAGE_KEY);
             localStorage.removeItem(AUTH_TOKEN_KEY);
+            this.tokenState.set(null);
             return null;
         }
     }

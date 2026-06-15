@@ -107,6 +107,7 @@ namespace AppIt.Api
                 builder.Services.AddScoped<ITransferService, TransferService>();
                 builder.Services.AddScoped<ITourService, TourService>();
                 builder.Services.AddScoped<IServicePriceService, ServicePriceService>();
+                builder.Services.AddScoped<IPricingService, PricingService>();
                 builder.Services.AddScoped<IRoleService, RoleService>();
                 builder.Services.AddScoped<IRoleFeatureService, RoleFeatureService>();
                 builder.Services.AddScoped<ICompanyService, CompanyService>();
@@ -150,6 +151,9 @@ namespace AppIt.Api
                 });
                 builder.Services.Configure<PaymentProviderOptions>(builder.Configuration.GetSection("Payments"));
                 builder.Services.AddScoped<JwtTokenService>();
+                builder.Services.AddHttpContextAccessor();
+                builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+                builder.Services.AddScoped<IResourceAuthorizationService, ResourceAuthorizationService>();
 
                 #endregion
 
@@ -157,6 +161,12 @@ namespace AppIt.Api
 
                 var jwtKey = builder.Configuration["Auth:JwtKey"]
                     ?? throw new InvalidOperationException("Auth:JwtKey is not configured.");
+                if (!builder.Environment.IsDevelopment()
+                    && (jwtKey.Contains("REPLACE_WITH", StringComparison.OrdinalIgnoreCase)
+                        || jwtKey.Length < 32))
+                {
+                    throw new InvalidOperationException("Auth:JwtKey must be set to a secure value (32+ chars) outside Development.");
+                }
                 var jwtIssuer = builder.Configuration["Auth:JwtIssuer"] ?? "AppIt";
                 var jwtAudience = builder.Configuration["Auth:JwtAudience"] ?? "AppItClient";
 
@@ -177,6 +187,9 @@ namespace AppIt.Api
                     });
 
                 builder.Services.AddAuthorization();
+
+                builder.Services.AddHealthChecks()
+                    .AddDbContextCheck<AppItDbContext>("database");
 
                 #endregion
 
@@ -235,7 +248,7 @@ namespace AppIt.Api
                 {
                     var dbContext = scope.ServiceProvider.GetRequiredService<AppItDbContext>();
                     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-                    InitialDataSeeder.SeedAsync(dbContext, logger).GetAwaiter().GetResult();
+                    InitialDataSeeder.SeedAsync(dbContext, builder.Configuration, logger).GetAwaiter().GetResult();
                 }
 
                 #region Global Exception Handling (HTTP Pipeline)
@@ -286,18 +299,27 @@ namespace AppIt.Api
                     name = "AppIt API",
                     status = "ok"
                 })).ExcludeFromDescription();
-                app.UseSwagger(options =>
+                app.MapHealthChecks("/health");
+                app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
                 {
-                    options.RouteTemplate = "swagger/{documentName}/swagger.json";
-                    options.OpenApiVersion = OpenApiSpecVersion.OpenApi2_0;
+                    Predicate = check => check.Tags.Contains("ready") || check.Name == "database"
                 });
-                app.UseSwaggerUI(options =>
+
+                if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("Swagger:Enabled"))
                 {
-                    options.SwaggerEndpoint("/swagger/v2/swagger.json", "AppIt API v2");
-                    options.RoutePrefix = "swagger";
-                    options.DocumentTitle = "AppIt API Swagger";
-                    options.DisplayRequestDuration();
-                });
+                    app.UseSwagger(options =>
+                    {
+                        options.RouteTemplate = "swagger/{documentName}/swagger.json";
+                        options.OpenApiVersion = OpenApiSpecVersion.OpenApi2_0;
+                    });
+                    app.UseSwaggerUI(options =>
+                    {
+                        options.SwaggerEndpoint("/swagger/v2/swagger.json", "AppIt API v2");
+                        options.RoutePrefix = "swagger";
+                        options.DocumentTitle = "AppIt API Swagger";
+                        options.DisplayRequestDuration();
+                    });
+                }
 
                 app.UseStatusCodePages(async statusContext =>
                 {

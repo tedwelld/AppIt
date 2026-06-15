@@ -12,5 +12,6 @@ namespace AppIt.Core.Interfaces.Services
         Task<IEnumerable<PaymentReadDto>> GetAllAsync();
         Task<IEnumerable<PaymentReadDto>> GetByAccountIdAsync(int accountId);
         Task<int> DeleteExpiredPendingPaymentsAsync(TimeSpan? maxAge = null);
+        Task<bool> CompletePendingPaymentByReferenceAsync(string transactionReference);
     }
 }

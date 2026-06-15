@@ -20,6 +20,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
         {
             var customers = await _service.GetAllAsync();
@@ -31,6 +32,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpGet("{id}")]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> GetById(int id)
         {
             var customer = await _service.GetByIdAsync(id);
@@ -39,6 +41,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> Create([FromBody] CreateCustomerDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -48,6 +51,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateCustomerDto dto)
         {
             if (id != dto.Id) return BadRequest("ID mismatch");
@@ -58,6 +62,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> Delete(int id)
         {
             var deleted = await _service.DeleteAsync(id);

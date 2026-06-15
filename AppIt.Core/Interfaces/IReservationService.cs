@@ -15,6 +15,7 @@ namespace AppIt.Core.Interfaces.Services
         Task<ReservationReadDto?> CloseBookingAsync(int id, string closedBy);
         Task<ReservationReadDto?> CancelBookingAsync(int id, string? reason = null);
         Task<ReservationReadDto?> OpenBookingAsync(int id);
+        Task<ReservationReadDto?> CheckInBookingAsync(int id, string checkedInBy);
         Task<ReservationReadDto?> CloneBookingAsync(int id, string clonedBy);
         Task<IEnumerable<ReservationSnapshotDto>> GetSnapshotsAsync(int id);
     }

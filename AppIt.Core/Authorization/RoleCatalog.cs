@@ -37,7 +37,7 @@ namespace AppIt.Core.Authorization
 
         /// <summary>All roles that should exist in the system (includes super).</summary>
         public static IEnumerable<string> AllSeededRoles =>
-            new[] { SuperRole }.Concat(BackOfficeRoles);
+            new[] { SuperRole, RegularRole }.Concat(BackOfficeRoles);
 
         private static readonly HashSet<string> BackOfficeSet =
             new(BackOfficeRoles.Select(r => r.ToLowerInvariant()), StringComparer.OrdinalIgnoreCase);

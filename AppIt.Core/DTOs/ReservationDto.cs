@@ -48,6 +48,8 @@ namespace AppIt.Core.DTOs
         public string? AgencyVoucherReference { get; set; }
         public string Currency { get; set; } = "USD";
         public decimal TotalAmount { get; set; }
+        public decimal? Vat { get; set; }
+        public decimal? CurrencyExchangeRate { get; set; }
         public string Status { get; set; } = "Pending";
         public string? CustomerEmail { get; set; }
         public string? Country { get; set; }

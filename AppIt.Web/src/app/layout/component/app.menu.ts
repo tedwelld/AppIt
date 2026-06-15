@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { AppMenuitem } from './app.menuitem';
+import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { buildWorkspaceMenu, WorkspaceMenuModel } from '../../core/navigation/workspace-navigation';
 
@@ -23,11 +24,24 @@ import { buildWorkspaceMenu, WorkspaceMenuModel } from '../../core/navigation/wo
         </nav>
     `
 })
-export class AppMenu {
+export class AppMenu implements OnInit {
     private readonly auth = inject(AuthService);
+    private readonly api = inject(ApiService);
     model: WorkspaceMenuModel = { home: null, groups: [] };
 
-    ngOnInit() {
-        this.model = buildWorkspaceMenu(this.auth.role(), this.auth.roleName());
+    ngOnInit(): void {
+        if (this.auth.role() === 'super') {
+            this.model = buildWorkspaceMenu(this.auth.role(), this.auth.roleName(), null);
+            return;
+        }
+
+        this.api.get<string[]>('/api/auth/permissions').subscribe({
+            next: (permissions) => {
+                this.model = buildWorkspaceMenu(this.auth.role(), this.auth.roleName(), permissions ?? []);
+            },
+            error: () => {
+                this.model = buildWorkspaceMenu(this.auth.role(), this.auth.roleName(), []);
+            }
+        });
     }
 }

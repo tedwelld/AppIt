@@ -24,7 +24,7 @@ import { AuthService } from '../../core/auth/auth.service';
                     <div *ngFor="let message of filteredMessages()" class="p-4 rounded-xl border border-surface-200 dark:border-surface-700" [class.ml-auto]="message.fromEmail === currentEmail()" [class.bg-primary-50]="message.fromEmail === currentEmail()">
                         <div class="flex items-center justify-between gap-4 text-xs text-muted-color">
                             <span>{{ message.fromEmail }}</span>
-                            <span>{{ message.sentAt || message.createdAt | date:'short' }}</span>
+                            <span>{{ message.createdAt || message.sentAt | date:'short' }}</span>
                         </div>
                         <p class="m-0 mt-2">{{ message.body || message.message }}</p>
                     </div>
@@ -69,12 +69,11 @@ export class SupportPage implements OnDestroy {
             this.schedule();
             return of([]);
         })).subscribe((rows) => {
-            if (this.failed) {
-                this.failed = false;
-                return;
-            }
             this.messages.set(rows);
-            this.pollDelayMs = 15000;
+            if (!this.failed) {
+                this.pollDelayMs = 15000;
+            }
+            this.failed = false;
             this.schedule();
         });
     }

@@ -115,9 +115,27 @@ public class AuthAndIsolationApiTests : IClassFixture<TestApiFactory>
         var client = CreateHttpsClient();
         var auth = await RegisterAndLoginAsync(client, $"contract.{Guid.NewGuid():N}@test.local");
         SetBearer(client, auth.Token);
-        await CreateReservationAsync(client, auth.UserId, "RES-CONTRACT");
+        var catalog = await SeedCheckoutCatalogAsync();
+        await client.PostAsJsonAsync("/api/bookings/checkout", new
+        {
+            reservation = new
+            {
+                reference = "RES-CONTRACT",
+                accountId = auth.UserId,
+                currency = "USD",
+                totalAmount = 120.50m,
+                status = "Confirmed",
+                customerEmail = "customer@test.local"
+            },
+            invoice = new { totalAmount = 120.50m, currency = "USD", status = "Pending" },
+            payment = new { method = "Manual", amount = 120.50m, currencyCode = "USD", idempotencyKey = Guid.NewGuid().ToString("N") },
+            serviceItems = new[]
+            {
+                new { serviceType = "Product", serviceId = catalog.ProductId, serviceName = "Contract Product", quantity = 1, unitPrice = 120.50m, totalPrice = 120.50m, currency = "USD" }
+            }
+        });
 
-        var response = await client.GetAsync($"/api/reservations/mine?accountId={auth.UserId}&page=1&pageSize=10&sortBy=reference&sortDirection=asc");
+        var response = await client.GetAsync("/api/reservations/mine?page=1&pageSize=10&sortBy=reference&sortDirection=asc");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -507,6 +525,31 @@ public class AuthAndIsolationApiTests : IClassFixture<TestApiFactory>
         var result = await new AdminStatsController(db).Get(range);
         var ok = Assert.IsType<OkObjectResult>(result);
         return Assert.IsType<AdminStatsDto>(ok.Value);
+    }
+
+    [Fact]
+    public async Task MineEndpoint_RejectsSpoofedAccountId_ForRegularUser()
+    {
+        var client = CreateHttpsClient();
+        var victim = await RegisterAndLoginAsync(client, $"victim.{Guid.NewGuid():N}@test.local");
+        var attacker = await RegisterAndLoginAsync(client, $"attacker.{Guid.NewGuid():N}@test.local");
+
+        SetBearer(client, attacker.Token);
+        var response = await client.GetAsync($"/api/reservations/mine?accountId={victim.UserId}");
+
+        await AssertStatusCodeAsync(response, HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task GetAllReservations_RejectsRegularUser()
+    {
+        var client = CreateHttpsClient();
+        var auth = await RegisterAndLoginAsync(client, $"regular.list.{Guid.NewGuid():N}@test.local");
+        SetBearer(client, auth.Token);
+
+        var response = await client.GetAsync("/api/reservations");
+
+        await AssertStatusCodeAsync(response, HttpStatusCode.Forbidden);
     }
 
     private readonly record struct AuthResult(int UserId, string Token);

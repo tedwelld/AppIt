@@ -19,6 +19,7 @@ export const appRoutes: Routes = [
             { path: 'dashboard', loadComponent: () => import('./app/pages/appit/user-dashboard.page').then((m) => m.UserDashboardPage) },
             { path: 'bookings/new', loadComponent: () => import('./app/pages/appit/booking-wizard.page').then((m) => m.BookingWizardPage) },
             { path: 'support', loadComponent: () => import('./app/pages/appit/support.page').then((m) => m.SupportPage) },
+            { path: 'notifications', loadComponent: () => import('./app/pages/appit/notifications.page').then((m) => m.NotificationsPage) },
             { path: 'settings', loadComponent: () => import('./app/pages/appit/settings.page').then((m) => m.SettingsPage) }
         ]
     },
@@ -29,7 +30,7 @@ export const appRoutes: Routes = [
         children: [
             { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
             { path: 'dashboard', loadComponent: () => import('./app/pages/appit/admin-dashboard.page').then((m) => m.AdminDashboardPage) },
-            { path: 'bookings/new', loadComponent: () => import('./app/pages/appit/booking-wizard.page').then((m) => m.BookingWizardPage) },
+            { path: 'bookings/new', redirectTo: 'reservations/booking', pathMatch: 'full' },
             { path: 'entities/:resource', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage) },
             { path: 'reports', loadComponent: () => import('./app/pages/appit/reports.page').then((m) => m.ReportsPage) },
             { path: 'reservations/booking', loadComponent: () => import('./app/pages/appit/booking-wizard.page').then((m) => m.BookingWizardPage) },
@@ -46,9 +47,8 @@ export const appRoutes: Routes = [
             { path: 'accounts/deposit-reports', loadComponent: () => import('./app/pages/appit/reports.page').then((m) => m.ReportsPage), data: { reportGroup: 'Accounts' } },
             { path: 'accounts/proof-of-payments', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'proof-of-payments' } },
             { path: 'statistics/all-reports', loadComponent: () => import('./app/pages/appit/reports.page').then((m) => m.ReportsPage) },
-            { path: 'statistics/executive-stats', loadComponent: () => import('./app/pages/appit/admin-dashboard.page').then((m) => m.AdminDashboardPage) },
+            { path: 'statistics/executive-stats', loadComponent: () => import('./app/pages/appit/executive-stats.page').then((m) => m.ExecutiveStatsPage) },
             { path: 'operations/check-in', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'check-in' } },
-            { path: 'operations/opera-management', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'opera-management' } },
             { path: 'setup/manage-companies', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'companies' } },
             { path: 'setup/manage-products', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'products' } },
             { path: 'setup/manage-service-prices', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'service-prices' } },
@@ -68,6 +68,7 @@ export const appRoutes: Routes = [
             { path: 'setup/manage-product-sub-categories', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'product-sub-categories' } },
             { path: 'setup/manage-special-prices', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'special-product-prices' } },
             { path: 'support', loadComponent: () => import('./app/pages/appit/support.page').then((m) => m.SupportPage) },
+            { path: 'notifications', loadComponent: () => import('./app/pages/appit/notifications.page').then((m) => m.NotificationsPage) },
             { path: 'settings', loadComponent: () => import('./app/pages/appit/settings.page').then((m) => m.SettingsPage) }
         ]
     },

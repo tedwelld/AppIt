@@ -15,6 +15,7 @@ namespace AppIt.Core.DTOs
         public string ReturnUrl { get; set; } = string.Empty;
         public string CancelUrl { get; set; } = string.Empty;
         public string? IdempotencyKey { get; set; }
+        public string? TransactionReference { get; set; }
     }
 
     public class ProcessPaymentResultDto

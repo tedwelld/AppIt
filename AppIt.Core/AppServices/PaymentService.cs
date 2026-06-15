@@ -40,6 +40,7 @@ namespace AppIt.Core.Services
             _context.Payments.Add(payment);
             await _context.SaveChangesAsync();
             await SyncInvoicePaymentStatusAsync(payment.InvoiceId);
+            await SyncReservationPaymentStatusForInvoiceAsync(payment.InvoiceId);
             await _context.SaveChangesAsync();
 
             return ToReadDto(payment);
@@ -123,7 +124,9 @@ namespace AppIt.Core.Services
                 InvoiceId = dto.InvoiceId,
                 Method = dto.Method,
                 Status = paymentStatus,
-                TransactionReference = providerResult.TransactionReference,
+                TransactionReference = !string.IsNullOrWhiteSpace(dto.TransactionReference)
+                    ? dto.TransactionReference.Trim()
+                    : providerResult.TransactionReference,
                 Amount = amount,
                 CurrencyCode = currencyCode.ToUpperInvariant(),
                 ProcessedAt = paymentStatus.Equals("Paid", StringComparison.OrdinalIgnoreCase) ? DateTime.UtcNow : null
@@ -142,6 +145,9 @@ namespace AppIt.Core.Services
                 invoice.IsPaid = false;
             }
 
+            await _context.SaveChangesAsync();
+
+            await SyncReservationPaymentStatusForInvoiceAsync(invoice.Id);
             await _context.SaveChangesAsync();
 
             await NotifyAdminsAsync(invoice.Id, amount, currencyCode, payment.Method, paymentStatus, payment.TransactionReference);
@@ -180,9 +186,11 @@ namespace AppIt.Core.Services
 
             await _context.SaveChangesAsync();
             await SyncInvoicePaymentStatusAsync(payment.InvoiceId);
+            await SyncReservationPaymentStatusForInvoiceAsync(payment.InvoiceId);
             if (previousInvoiceId != payment.InvoiceId)
             {
                 await SyncInvoicePaymentStatusAsync(previousInvoiceId);
+                await SyncReservationPaymentStatusForInvoiceAsync(previousInvoiceId);
             }
 
             await _context.SaveChangesAsync();
@@ -201,6 +209,7 @@ namespace AppIt.Core.Services
             _context.Payments.Remove(payment);
             await _context.SaveChangesAsync();
             await SyncInvoicePaymentStatusAsync(invoiceId);
+            await SyncReservationPaymentStatusForInvoiceAsync(invoiceId);
             await _context.SaveChangesAsync();
             return true;
         }
@@ -282,7 +291,50 @@ namespace AppIt.Core.Services
 
             _context.Payments.RemoveRange(stalePayments);
             await _context.SaveChangesAsync();
+
+            var invoiceIds = stalePayments.Select(p => p.InvoiceId).Distinct().ToList();
+            foreach (var invoiceId in invoiceIds)
+            {
+                await SyncInvoicePaymentStatusAsync(invoiceId);
+                await SyncReservationPaymentStatusForInvoiceAsync(invoiceId);
+            }
+
+            await _context.SaveChangesAsync();
             return stalePayments.Count;
+        }
+
+        public async Task<bool> CompletePendingPaymentByReferenceAsync(string transactionReference)
+        {
+            if (string.IsNullOrWhiteSpace(transactionReference))
+            {
+                return false;
+            }
+
+            var normalized = transactionReference.Trim();
+            var payment = await _context.Payments
+                .Include(p => p.Invoice)
+                .FirstOrDefaultAsync(p =>
+                    p.TransactionReference == normalized
+                    && p.Status.ToLower() == "pending");
+
+            if (payment == null)
+            {
+                return false;
+            }
+
+            payment.Status = "Paid";
+            payment.ProcessedAt = DateTime.UtcNow;
+            if (payment.Invoice != null)
+            {
+                payment.Invoice.Status = "Paid";
+                payment.Invoice.IsPaid = true;
+            }
+
+            await _context.SaveChangesAsync();
+            await SyncInvoicePaymentStatusAsync(payment.InvoiceId);
+            await SyncReservationPaymentStatusForInvoiceAsync(payment.InvoiceId);
+            await _context.SaveChangesAsync();
+            return true;
         }
 
         private static PaymentReadDto ToReadDto(Payment payment)
@@ -310,21 +362,61 @@ namespace AppIt.Core.Services
                 return;
             }
 
-            var hasPaidPayment = invoice.Payments.Any(IsPaidStatus);
+            var paidAmount = invoice.Payments
+                .Where(IsPaidStatus)
+                .Sum(p => (decimal?)p.Amount) ?? 0;
             var hasPayment = invoice.Payments.Any();
 
-            if (hasPaidPayment)
+            if (paidAmount > 0 && paidAmount >= invoice.TotalAmount)
             {
                 invoice.Status = "Paid";
                 invoice.IsPaid = true;
                 return;
             }
 
-            if (hasPayment)
+            if (paidAmount > 0 || hasPayment)
             {
                 invoice.Status = "Pending";
                 invoice.IsPaid = false;
             }
+        }
+
+        private async Task SyncReservationPaymentStatusForInvoiceAsync(int invoiceId)
+        {
+            var reservationId = await _context.Invoices
+                .AsNoTracking()
+                .Where(i => i.Id == invoiceId)
+                .Select(i => (int?)i.ReservationId)
+                .FirstOrDefaultAsync();
+            if (!reservationId.HasValue)
+            {
+                return;
+            }
+
+            var reservation = await _context.Reservations
+                .Include(r => r.Invoices)
+                    .ThenInclude(i => i.Payments)
+                .FirstOrDefaultAsync(r => r.ReservationId == reservationId.Value);
+            if (reservation == null)
+            {
+                return;
+            }
+
+            var invoice = reservation.Invoices?
+                .OrderByDescending(i => i.IssuedDate)
+                .ThenByDescending(i => i.Id)
+                .FirstOrDefault();
+            var paidAmount = (invoice?.Payments ?? Enumerable.Empty<Payment>())
+                .Where(IsPaidStatus)
+                .Sum(p => (decimal?)p.Amount) ?? 0;
+
+            reservation.PaymentStatus = ResolveReservationPaymentStatus(invoice, paidAmount);
+        }
+
+        private static string ResolveReservationPaymentStatus(Invoice? invoice, decimal paidAmount)
+        {
+            if (invoice == null || paidAmount <= 0) return "NotPaid";
+            return paidAmount >= invoice.TotalAmount ? "FullyPaid" : "Deposited";
         }
 
         private static bool IsPaidStatus(Payment payment)

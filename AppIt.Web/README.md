@@ -1,63 +1,34 @@
-# ZynkEdu Web
+# AppIt.Web
 
-This project is the Angular 20 frontend for ZynkEdu. It provides the shared shell and role-based workspaces for platform admins, school admins, accountants, teachers, and other staff users.
+Angular SPA for the AppIt adventure and hospitality management platform.
 
-The app includes:
-
-- Platform workspace navigation for cross-school administration
-- School admin workspace for operational tasks
-- Accountant workspace for dashboards, students, payments, invoices, and reports
-- Teacher workspace for classes, attendance, and results
-- Role-aware routing and guards that keep each user in the correct area
-
-## Development Server
-
-To start a local development server, run:
+## Development
 
 ```bash
+npm install
 npm start
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application reloads automatically when source files change.
+The dev server proxies API calls to `http://localhost:5175` via `proxy.conf.json`.
 
-## Building
-
-To build the project, run:
+## Build
 
 ```bash
 npm run build
 ```
 
-The production build output is written to `dist/sakai-ng/browser`, which is the folder Vercel should serve for this Angular 20 application.
+Output: `dist/AppIt.Web/browser`
 
-## Running Tests
-
-To run the Angular test suite, use:
+## E2E
 
 ```bash
-npm test
+npm run e2e
 ```
 
-## Frontend Routes
+Playwright starts the API and frontend automatically (see `playwright.config.ts`).
 
-The key workspace routes are:
+## Routes
 
-- `/platform/...` for platform administration
-- `/admin/...` for school administration
-- `/accountant/...` for accounting workspaces
-- `/teacher/...` for teacher workflows
-
-The accounting workspace currently includes:
-
-- `/accountant/dashboard`
-- `/accountant/students`
-- `/accountant/payments`
-- `/accountant/invoices`
-- `/accountant/reports`
-
-## Notes
-
-- The app uses the shared API service in `src/app/core/api`
-- Role redirects and guards live in `src/app/core/auth`
-- Workspace navigation lives in `src/app/core/navigation`
-- The shell and topbar/sidebar components adapt labels based on the active role
+- `/auth/login` — sign in and password reset
+- `/admin/*` — staff workspace
+- `/user/*` — guest portal

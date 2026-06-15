@@ -3,6 +3,7 @@ using System.Security.Claims;
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
 using AppIt.Core.DTOs.Notifications;
+using AppIt.Core.Interfaces;
 using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,22 +16,23 @@ namespace AppIt.Api.Controllers
     public class NotificationsController : ControllerBase
     {
         private readonly INotificationService _notificationService;
+        private readonly ICurrentUserService _currentUser;
 
-        public NotificationsController(INotificationService notificationService)
+        public NotificationsController(
+            INotificationService notificationService,
+            ICurrentUserService currentUser)
         {
             _notificationService = notificationService;
+            _currentUser = currentUser;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetMine([FromQuery] ListQueryOptions query)
         {
-            var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-
-            if (!int.TryParse(userIdValue, out var userId))
+            if (!_currentUser.UserId.HasValue)
                 return Unauthorized();
 
-            var notifications = await _notificationService.GetByUserAsync(userId);
+            var notifications = await _notificationService.GetByUserAsync(_currentUser.UserId.Value);
             return Ok(notifications.ApplyQuery(query,
                 nameof(NotificationDto.Title),
                 nameof(NotificationDto.Message)));
@@ -56,6 +58,11 @@ namespace AppIt.Api.Controllers
                 return NotFound();
             }
 
+            if (!_currentUser.IsStaff && notification.UserId != _currentUser.UserId)
+            {
+                return Forbid();
+            }
+
             return Ok(notification);
         }
 
@@ -74,6 +81,11 @@ namespace AppIt.Api.Controllers
             if (existing == null)
             {
                 return NotFound();
+            }
+
+            if (!_currentUser.IsStaff && existing.UserId != _currentUser.UserId)
+            {
+                return Forbid();
             }
 
             await _notificationService.MarkAsReadAsync(id);

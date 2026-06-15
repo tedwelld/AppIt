@@ -1,5 +1,6 @@
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
+using AppIt.Core.Interfaces;
 using AppIt.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,13 +13,21 @@ namespace AppIt.Api.Controllers
     public class PaymentsController : ControllerBase
     {
         private readonly IPaymentService _service;
+        private readonly ICurrentUserService _currentUser;
+        private readonly IResourceAuthorizationService _resourceAuth;
 
-        public PaymentsController(IPaymentService service)
+        public PaymentsController(
+            IPaymentService service,
+            ICurrentUserService currentUser,
+            IResourceAuthorizationService resourceAuth)
         {
             _service = service;
+            _currentUser = currentUser;
+            _resourceAuth = resourceAuth;
         }
 
         [HttpGet]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> GetAll([FromQuery] ListQueryOptions query)
         {
             var items = await _service.GetAllAsync();
@@ -34,8 +43,14 @@ namespace AppIt.Api.Controllers
         [HttpGet("mine")]
         public async Task<IActionResult> GetMine([FromQuery] int? accountId, [FromQuery] ListQueryOptions query)
         {
-            var items = accountId.HasValue && accountId.Value > 0
-                ? await _service.GetByAccountIdAsync(accountId.Value)
+            if (!_currentUser.IsStaff && accountId is > 0 && accountId != _currentUser.UserId)
+            {
+                return Forbid();
+            }
+
+            var resolvedAccountId = _currentUser.ResolveMineAccountId(accountId);
+            var items = resolvedAccountId is > 0
+                ? await _service.GetByAccountIdAsync(resolvedAccountId.Value)
                 : Enumerable.Empty<PaymentReadDto>();
 
             return Ok(items.ApplyQuery(query,
@@ -50,11 +65,17 @@ namespace AppIt.Api.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
+            if (!await _resourceAuth.CanAccessPaymentAsync(id))
+            {
+                return Forbid();
+            }
+
             var item = await _service.GetByIdAsync(id);
             return item == null ? NotFound() : Ok(item);
         }
 
         [HttpPost]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> Create([FromBody] CreatePaymentDto dto)
         {
             var item = await _service.CreateAsync(dto);
@@ -64,6 +85,11 @@ namespace AppIt.Api.Controllers
         [HttpPost("process")]
         public async Task<IActionResult> Process([FromBody] ProcessPaymentDto dto)
         {
+            if (!await _resourceAuth.CanAccessInvoiceAsync(dto.InvoiceId))
+            {
+                return Forbid();
+            }
+
             var headerKey = Request.Headers["Idempotency-Key"].FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(headerKey) && string.IsNullOrWhiteSpace(dto.IdempotencyKey))
             {
@@ -75,6 +101,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdatePaymentDto dto)
         {
             if (id != dto.Id)
@@ -87,6 +114,7 @@ namespace AppIt.Api.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> Delete(int id)
         {
             var deleted = await _service.DeleteAsync(id);

@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AvatarModule } from 'primeng/avatar';
 import { ButtonModule } from 'primeng/button';
@@ -7,18 +8,19 @@ import { MenuModule } from 'primeng/menu';
 import { MenuItem } from 'primeng/api';
 import { LayoutService } from '../service/layout.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { GlobalSearchService } from '../../core/search/global-search.service';
 
 @Component({
     selector: 'app-topbar',
     standalone: true,
-    imports: [CommonModule, RouterLink, AvatarModule, ButtonModule, MenuModule],
+    imports: [CommonModule, RouterLink, FormsModule, AvatarModule, ButtonModule, MenuModule],
     template: `
         <header class="layout-topbar">
             <div class="layout-topbar-logo-container">
                 <button class="layout-menu-button layout-topbar-action" type="button" (click)="layoutService.onMenuToggle()">
                     <i class="pi pi-bars"></i>
                 </button>
-                <a class="layout-topbar-logo" routerLink="/">
+                <a class="layout-topbar-logo" [routerLink]="homeRoute()">
                     <div class="flex items-center gap-3">
                         <div class="w-11 h-11 rounded-2xl bg-primary text-primary-contrast flex items-center justify-center font-bold text-xl">AI</div>
                         <div class="flex flex-col">
@@ -30,11 +32,19 @@ import { AuthService } from '../../core/auth/auth.service';
             </div>
 
             <div class="layout-topbar-actions">
+                <div class="hidden lg:flex items-center gap-2 px-3 py-2 rounded-full bg-surface-0/60 dark:bg-surface-900/50 border border-surface-200 dark:border-surface-700">
+                    <i class="pi pi-search text-muted-color"></i>
+                    <input class="bg-transparent border-0 outline-none text-sm w-48" [(ngModel)]="searchTerm" (keyup.enter)="runSearch()" placeholder="Search reservations..." />
+                </div>
+
                 <div class="hidden xl:flex items-center gap-2 px-4 py-2 rounded-full bg-surface-0/60 dark:bg-surface-900/50 border border-surface-200 dark:border-surface-700">
                     <span class="text-xs uppercase tracking-[0.25em] text-muted-color font-semibold">Signed in</span>
                     <span class="text-sm font-semibold">{{ auth.displayName() }}</span>
                 </div>
 
+                <button type="button" class="layout-topbar-action" (click)="goNotifications()" title="Notifications">
+                    <i class="pi pi-bell"></i>
+                </button>
                 <button type="button" class="layout-topbar-action" (click)="toggleDarkMode()">
                     <i [ngClass]="{ 'pi ': true, 'pi-moon': layoutService.isDarkTheme(), 'pi-sun': !layoutService.isDarkTheme() }"></i>
                 </button>
@@ -53,7 +63,9 @@ import { AuthService } from '../../core/auth/auth.service';
 })
 export class AppTopbar {
     private readonly router = inject(Router);
+    private readonly searchService = inject(GlobalSearchService);
     readonly auth = inject(AuthService);
+    searchTerm = '';
     profileItems: MenuItem[] = [
         { label: 'Dashboard', icon: 'pi pi-fw pi-home', command: () => void this.router.navigateByUrl(this.homeRoute()) },
         { label: 'Settings', icon: 'pi pi-fw pi-cog', command: () => void this.router.navigateByUrl(this.settingsRoute()) },
@@ -78,6 +90,21 @@ export class AppTopbar {
 
     goHome(): void {
         void this.router.navigateByUrl(this.homeRoute());
+    }
+
+    goNotifications(): void {
+        void this.router.navigateByUrl(this.auth.isAdmin() ? '/admin/notifications' : '/user/notifications');
+    }
+
+    runSearch(): void {
+        this.searchService.search(this.searchTerm).subscribe({
+            next: (results) => {
+                const first = results[0];
+                if (first) {
+                    void this.router.navigate(first.route);
+                }
+            }
+        });
     }
 
     homeRoute(): string {
