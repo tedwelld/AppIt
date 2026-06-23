@@ -62,5 +62,13 @@ namespace AppIt.Api.Controllers
             var item = await _service.CloseAsync(dto, closedBy);
             return item == null ? NotFound() : Ok(item);
         }
+
+        [HttpGet("run-journal-transactions")]
+        public async Task<IActionResult> RunJournals([FromQuery] DateTime? date) =>
+            Ok(await _service.RunJournalTransactionsAsync(date));
+
+        [HttpGet("delete-existing-journal-entries")]
+        public async Task<IActionResult> DeleteJournals([FromQuery] DateTime? date) =>
+            Ok(new { deleted = await _service.DeleteExistingJournalEntriesAsync(date) });
     }
 }

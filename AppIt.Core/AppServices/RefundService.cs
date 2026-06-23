@@ -70,6 +70,10 @@ namespace AppIt.Core.AppServices
             entity.Reason = dto.Reason; entity.Amount = dto.Amount;
             entity.CurrencyCode = dto.CurrencyCode; entity.Status = dto.Status;
             entity.ProcessedAt = dto.ProcessedAt; entity.ProcessedBy = dto.ProcessedBy;
+            if (dto.Status.Equals("Processed", StringComparison.OrdinalIgnoreCase) && entity.PaymentId.HasValue)
+            {
+                entity.PaymentProviderRefundId ??= $"refund-{entity.Id}-{DateTime.UtcNow:yyyyMMddHHmmss}";
+            }
             entity.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
             return Map(entity);

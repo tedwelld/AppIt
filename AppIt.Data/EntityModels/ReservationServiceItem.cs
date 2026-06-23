@@ -43,5 +43,18 @@ namespace AppIt.Data.EntityModels
 
         [MaxLength(200)]
         public string? Notes { get; set; }
+
+        [MaxLength(30)]
+        public string ProductKind { get; set; } = "Standard";
+
+        public int? ComboId { get; set; }
+        public Combo? Combo { get; set; }
+
+        [MaxLength(20)]
+        public string? MiscCode { get; set; }
+
+        public bool IsPostedToJournal { get; set; }
+
+        public ICollection<ReservationServiceItemSplit> Splits { get; set; } = new List<ReservationServiceItemSplit>();
     }
 }

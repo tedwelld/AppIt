@@ -16,7 +16,8 @@ public class TestApiFactory : WebApplicationFactory<AppIt.Api.Program>
             {
                 ["Database:UseInMemory"] = "true",
                 ["Database:InMemoryName"] = _databaseName,
-                ["ConnectionStrings:DefaultConnection"] = string.Empty
+                ["ConnectionStrings:DefaultConnection"] = string.Empty,
+                ["Bookings:PurgeOnStartup"] = "false"
             });
         });
     }

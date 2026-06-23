@@ -14,6 +14,12 @@ namespace AppIt.Data.EntityModels
         [MaxLength(500)]
         public string? Description { get; set; }
 
+        public int? ProductCategoryId { get; set; }
+
+        public ProductCategory? ProductCategory { get; set; }
+
+        public int? MaxPax { get; set; }
+
         public decimal BasePriceUsd { get; set; }
 
         public bool IsActive { get; set; } = true;

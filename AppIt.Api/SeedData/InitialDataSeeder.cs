@@ -34,6 +34,27 @@ namespace AppIt.Api.SeedData
 
             await SeedRolesAsync(dbContext);
             await SeedAdminAccountAsync(dbContext, configuration);
+
+            var purgeBookings = string.Equals(
+                Environment.GetEnvironmentVariable("APPIT_PURGE_BOOKINGS")
+                    ?? configuration?["Bookings:PurgeOnStartup"],
+                "true",
+                StringComparison.OrdinalIgnoreCase);
+            if (purgeBookings)
+            {
+                await BookingDataCleaner.PurgeAllAsync(dbContext, logger);
+            }
+
+            var purgeOperational = string.Equals(
+                Environment.GetEnvironmentVariable("APPIT_PURGE_OPERATIONAL_DATA")
+                    ?? configuration?["Data:PurgeOperationalOnStartup"],
+                "true",
+                StringComparison.OrdinalIgnoreCase);
+            if (purgeOperational)
+            {
+                await OperationalDataCleaner.PurgeAllAsync(dbContext, logger);
+            }
+
             await SeedDemoDataAsync(dbContext, configuration, logger);
             await BackfillCatalogPricingAsync(dbContext, logger);
         }

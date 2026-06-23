@@ -10,10 +10,12 @@ namespace AppIt.Core.Services
     public class ReservationService : IReservationService
     {
         private readonly AppItDbContext _context;
+        private readonly ICommissionService _commissionService;
 
-        public ReservationService(AppItDbContext context)
+        public ReservationService(AppItDbContext context, ICommissionService commissionService)
         {
             _context = context;
+            _commissionService = commissionService;
         }
 
         private DbSet<Reservation> Reservations => _context.Set<Reservation>();
@@ -36,6 +38,7 @@ namespace AppIt.Core.Services
                 Vat = dto.Vat,
                 CurrencyExchangeRate = dto.CurrencyExchangeRate is > 0 ? dto.CurrencyExchangeRate.Value : 1m,
                 Status = string.IsNullOrWhiteSpace(dto.Status) ? "Pending" : dto.Status,
+                PaymentStatus = string.IsNullOrWhiteSpace(dto.PaymentStatus) ? "NotPaid" : dto.PaymentStatus,
                 CreatedDate = DateTime.UtcNow,
                 AccountId = dto.AccountId,
                 AgencyId = dto.AgencyId,
@@ -337,9 +340,32 @@ namespace AppIt.Core.Services
             }
 
             await UpdateVoucherStatusAsync(id, "Redeemed");
+            await AccrueCommissionAsync(reservation);
             await _context.SaveChangesAsync();
             await WriteSnapshotAsync(id, "Closed", closedBy);
             return await GetByIdAsync(id);
+        }
+
+        private async Task AccrueCommissionAsync(Reservation reservation)
+        {
+            if (!reservation.AgencyConsultantId.HasValue) return;
+            var exists = await _context.Commissions.AnyAsync(c => c.ReservationId == reservation.ReservationId);
+            if (exists) return;
+
+            var consultant = await _context.Consultants.AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == reservation.AgencyConsultantId);
+            if (consultant == null || consultant.CommissionRate <= 0) return;
+
+            await _commissionService.CreateAsync(new CreateCommissionDto
+            {
+                ReservationId = reservation.ReservationId,
+                ConsultantId = consultant.Id,
+                Percentage = consultant.CommissionRate,
+                Amount = decimal.Round(reservation.TotalAmount * consultant.CommissionRate / 100m, 2),
+                CurrencyCode = reservation.CurrencyCode,
+                Status = "Accrued",
+                Notes = "Auto-accrued on close"
+            });
         }
 
         public async Task<ReservationReadDto?> CancelBookingAsync(int id, string? reason = null)

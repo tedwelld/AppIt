@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AppIt.Report</RootNamespace>
+    <Description>RDLC report templates and server-side PDF generation (GoldenDusk parity stub).</Description>
+  </PropertyGroup>
+</Project>

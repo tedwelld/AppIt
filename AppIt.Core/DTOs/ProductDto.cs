@@ -11,6 +11,9 @@ namespace AppIt.Core.DTOs
         public string Name { get; set; } = null!;
         public string? Description { get; set; }
         public string Category { get; set; } = "Product";
+        public int? ProductCategoryId { get; set; }
+        public string? CategoryName { get; set; }
+        public int? MaxPax { get; set; }
         public decimal BasePriceUsd { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedDate { get; set; }
@@ -25,6 +28,10 @@ namespace AppIt.Core.DTOs
 
         [MaxLength(120)]
         public string Category { get; set; } = "Product";
+
+        public int? ProductCategoryId { get; set; }
+
+        public int? MaxPax { get; set; }
 
         [MaxLength(500)]
         public string? Description { get; set; }
@@ -47,6 +54,10 @@ namespace AppIt.Core.DTOs
 
         [MaxLength(120)]
         public string Category { get; set; } = "Product";
+
+        public int? ProductCategoryId { get; set; }
+
+        public int? MaxPax { get; set; }
 
         [MaxLength(500)]
         public string? Description { get; set; }

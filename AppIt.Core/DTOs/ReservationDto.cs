@@ -51,6 +51,7 @@ namespace AppIt.Core.DTOs
         public decimal? Vat { get; set; }
         public decimal? CurrencyExchangeRate { get; set; }
         public string Status { get; set; } = "Pending";
+        public string? PaymentStatus { get; set; }
         public string? CustomerEmail { get; set; }
         public string? Country { get; set; }
         public string? Notes { get; set; }

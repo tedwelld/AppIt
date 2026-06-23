@@ -17,7 +17,7 @@ import { AuthService } from '../../core/auth/auth.service';
                 <div class="workspace-card layout-sidebar__card">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-2xl bg-primary text-primary-contrast flex items-center justify-center font-bold">AI</div>
+                            <img class="app-brand-logo app-brand-logo--sm" src="assets/images/tdz-logo.png" alt="TDZ" />
                             <div>
                                 <p class="text-xs uppercase tracking-[0.22em] text-muted-color font-semibold">Workspace</p>
                                 <div class="text-xl font-display font-bold mt-1">AppIt</div>

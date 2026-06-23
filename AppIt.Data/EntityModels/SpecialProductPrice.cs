@@ -32,5 +32,16 @@ namespace AppIt.Data.EntityModels
         public bool IsActive { get; set; } = true;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public bool IsVerified { get; set; }
+        public bool IsApproved { get; set; }
+        public bool IsAgentApproved { get; set; }
+        public bool Sent { get; set; }
+
+        [MaxLength(100)]
+        public string? ApprovalKey { get; set; }
+
+        public DateTime? VerifiedOn { get; set; }
+        public DateTime? ApprovedOn { get; set; }
     }
 }

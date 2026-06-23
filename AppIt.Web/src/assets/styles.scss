@@ -43,19 +43,27 @@ html.app-dark .glass-panel {
 }
 
 html.app-dark .auth-login-page {
-    background:
-        radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 26%),
-        radial-gradient(circle at bottom right, rgba(168, 85, 247, 0.12), transparent 28%),
-        linear-gradient(180deg, #0b1220 0%, #111a2a 100%);
+    background: url('images/login-background.jpg') center / cover no-repeat fixed;
+}
+
+html.app-dark .auth-login-page::before {
+    display: block;
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.12);
+    pointer-events: none;
 }
 
 html.app-dark .auth-login-page::after {
-    opacity: 0.6;
+    display: none;
 }
 
 html.app-dark .auth-login-card {
-    background: color-mix(in srgb, var(--surface-card), #101827 18%);
-    border-color: color-mix(in srgb, var(--surface-border), transparent 10%);
+    background:
+        linear-gradient(180deg, rgba(20, 27, 41, 0.94), rgba(17, 27, 42, 0.9)),
+        rgba(18, 26, 39, 0.92);
+    border-color: rgba(148, 163, 184, 0.12);
 }
 
 html.app-dark .auth-login-badge {
@@ -185,31 +193,19 @@ textarea.p-inputtextarea {
     justify-content: center;
     padding: clamp(0.75rem, 2vw, 1.5rem);
     overflow: hidden;
-    background:
-        radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 26%),
-        radial-gradient(circle at bottom right, rgba(168, 85, 247, 0.08), transparent 28%),
-        linear-gradient(180deg, #eef4fa 0%, #e6edf6 100%);
+    background: url('images/login-background.jpg') center / cover no-repeat fixed;
 }
 
 .auth-login-page::before {
     content: '';
     position: absolute;
     inset: 0;
-    background:
-        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.55), transparent 28%),
-        radial-gradient(circle at 80% 30%, rgba(59, 130, 246, 0.08), transparent 22%),
-        radial-gradient(circle at 50% 80%, rgba(236, 72, 153, 0.05), transparent 24%);
-    opacity: 0.45;
+    background: rgba(255, 255, 255, 0.06);
     pointer-events: none;
 }
 
 .auth-login-page::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(248, 250, 252, 0.15), rgba(226, 232, 240, 0.32));
-    opacity: 0.72;
-    pointer-events: none;
+    display: none;
 }
 
 .auth-login-letters {
@@ -302,15 +298,12 @@ textarea.p-inputtextarea {
 }
 
 .auth-login-mark {
-    width: 3.25rem;
-    height: 3.25rem;
-    border-radius: 1rem;
-    background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.15)),
-        radial-gradient(circle at 30% 30%, rgba(59, 130, 246, 0.95), rgba(124, 58, 237, 0.95));
-    box-shadow: 0 16px 30px rgba(15, 23, 42, 0.18);
-    position: relative;
-    overflow: hidden;
+    width: 4.5rem;
+    height: 4.5rem;
+    object-fit: contain;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
 .auth-login-mark::before,
@@ -599,21 +592,20 @@ textarea.p-inputtextarea {
 .auth-login-page {
     align-items: center;
     padding: 1rem;
-    background:
-        linear-gradient(180deg, rgba(18, 28, 40, 0.78), rgba(9, 15, 25, 0.88)),
-        url('images/login-background.webp') center / cover no-repeat;
+    background: url('images/login-background.jpg') center / cover no-repeat fixed;
 }
 
 .auth-login-page::before {
-    background:
-        linear-gradient(115deg, rgba(10, 18, 30, 0.58), rgba(30, 47, 68, 0.34)),
-        radial-gradient(circle at 50% 55%, rgba(70, 114, 255, 0.16), transparent 28%);
-    opacity: 1;
+    display: block;
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.06);
+    pointer-events: none;
 }
 
 .auth-login-page::after {
-    background: rgba(6, 12, 22, 0.28);
-    opacity: 1;
+    display: none;
 }
 
 .auth-login-shell {
@@ -653,8 +645,8 @@ textarea.p-inputtextarea {
 }
 
 .auth-login-mark {
-    width: 3.25rem;
-    height: 3.25rem;
+    width: 4.5rem;
+    height: 4.5rem;
     object-fit: contain;
     border-radius: 0;
     background: transparent;
@@ -928,9 +920,20 @@ textarea.p-inputtextarea {
 }
 
 html.app-dark .auth-login-page {
-    background:
-        linear-gradient(180deg, rgba(18, 28, 40, 0.78), rgba(9, 15, 25, 0.88)),
-        url('images/login-background.webp') center / cover no-repeat;
+    background: url('images/login-background.jpg') center / cover no-repeat fixed;
+}
+
+html.app-dark .auth-login-page::before {
+    display: block;
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.12);
+    pointer-events: none;
+}
+
+html.app-dark .auth-login-page::after {
+    display: none;
 }
 
 html.app-dark .auth-login-card,
@@ -1055,4 +1058,21 @@ html.app-dark .auth-login-control .p-password-input {
     100% {
         background-position: 220px 0;
     }
+}
+
+body:has(.auth-login-page),
+html:has(.auth-login-page) {
+    background: url('images/login-background.jpg') center / cover no-repeat fixed #f8fafc !important;
+}
+
+.app-brand-logo {
+    width: 2.75rem;
+    height: 2.75rem;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.app-brand-logo--sm {
+    width: 2.5rem;
+    height: 2.5rem;
 }

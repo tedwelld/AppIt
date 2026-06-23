@@ -16,20 +16,28 @@ namespace AppIt.Core.Services
             _exchangeRates = exchangeRates;
         }
 
-        public async Task<decimal> ResolveUnitPriceAsync(string serviceType, int serviceId, string currency, DateTime? date = null, int? consultantId = null)
+        public async Task<decimal> ResolveUnitPriceAsync(string serviceType, int serviceId, string currency, DateTime? date = null, int? consultantId = null, int? companyId = null)
         {
             var type = ServicePriceService.NormalizeServiceType(serviceType);
             var targetCurrency = ServicePriceService.NormalizeCurrency(currency);
             var effectiveDate = (date ?? DateTime.UtcNow).Date;
 
-            // 1) Special product price (date window; consultant-specific preferred over general).
+            // 1) Special product price (must be verified + approved when flags set)
             var special = await ResolveSpecialPriceAsync(type, serviceId, consultantId, effectiveDate);
             if (special != null)
             {
                 return await ConvertAsync(special.Value.amount, special.Value.currency, targetCurrency, effectiveDate);
             }
 
-            // 2) Active service price in the requested currency.
+            // 2) Agent product price (approved agent schedule)
+            if (companyId.HasValue)
+            {
+                var agentPrice = await ResolveAgentPriceAsync(type, serviceId, companyId.Value, effectiveDate);
+                if (agentPrice.HasValue)
+                {
+                    return await ConvertAsync(agentPrice.Value.amount, agentPrice.Value.currency, targetCurrency, effectiveDate);
+                }
+            }
             var direct = await _context.ServicePrices
                 .AsNoTracking()
                 .Where(p => p.IsActive && p.ServiceType == type && p.ServiceId == serviceId && p.CurrencyCode == targetCurrency)
@@ -85,6 +93,7 @@ namespace AppIt.Core.Services
             var matching = candidates
                 .Where(s => string.IsNullOrWhiteSpace(s.ProductType)
                     || string.Equals(ServicePriceService.NormalizeServiceType(s.ProductType), type, StringComparison.OrdinalIgnoreCase))
+                .Where(s => !s.IsVerified || s.IsApproved)
                 .ToList();
 
             if (matching.Count == 0) return null;
@@ -102,6 +111,24 @@ namespace AppIt.Core.Services
                     .FirstOrDefault();
 
             return pick == null ? null : (pick.SpecialPrice, ServicePriceService.NormalizeCurrency(pick.CurrencyCode));
+        }
+
+        private async Task<(decimal amount, string currency)?> ResolveAgentPriceAsync(string type, int serviceId, int companyId, DateTime effectiveDate)
+        {
+            var year = effectiveDate.Year;
+            var row = await _context.AgentProductPrices.AsNoTracking()
+                .Where(a => a.CompanyId == companyId
+                    && a.IsApproved && a.IsAgentApproved
+                    && a.ProductId == serviceId
+                    && (a.YearEffected == null || a.YearEffected == year)
+                    && (a.StartDate == null || a.StartDate <= DateOnly.FromDateTime(effectiveDate))
+                    && (a.EndDate == null || a.EndDate >= DateOnly.FromDateTime(effectiveDate)))
+                .Where(a => a.ProductType == null || a.ProductType == type)
+                .OrderByDescending(a => a.Id)
+                .FirstOrDefaultAsync();
+
+            if (row?.NetRate is not > 0) return null;
+            return (row.NetRate.Value, "USD");
         }
 
         private async Task<decimal?> GetBasePriceUsdAsync(string type, int serviceId)
@@ -127,6 +154,12 @@ namespace AppIt.Core.Services
                 "Tour" => await _context.Tours
                     .Where(t => t.Id == serviceId && t.IsActive)
                     .Select(t => (decimal?)t.BasePriceUsd)
+                    .FirstOrDefaultAsync(),
+                "Combo" => await _context.ComboPrices
+                    .Where(cp => cp.ComboId == serviceId && cp.IsActive
+                        && cp.EffectiveFrom <= DateTime.UtcNow
+                        && (cp.EffectiveTo == null || cp.EffectiveTo >= DateTime.UtcNow))
+                    .Select(cp => (decimal?)cp.UnitPrice)
                     .FirstOrDefaultAsync(),
                 _ => null
             };

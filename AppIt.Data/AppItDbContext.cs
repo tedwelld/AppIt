@@ -50,6 +50,20 @@ public class AppItDbContext : DbContext
     public DbSet<Transfer> Transfers { get; set; }
     public DbSet<Tour> Tours { get; set; }
     public DbSet<ReservationSnapshot> ReservationSnapshots { get; set; }
+    public DbSet<Combo> Combos { get; set; }
+    public DbSet<ComboProduct> ComboProducts { get; set; }
+    public DbSet<ComboPrice> ComboPrices { get; set; }
+    public DbSet<ReservationServiceItemSplit> ReservationServiceItemSplits { get; set; }
+    public DbSet<AgentProductPrice> AgentProductPrices { get; set; }
+    public DbSet<FinancialAccount> FinancialAccounts { get; set; }
+    public DbSet<JournalEntry> JournalEntries { get; set; }
+    public DbSet<JournalEntryLine> JournalEntryLines { get; set; }
+    public DbSet<HConnectBooking> HConnectBookings { get; set; }
+    public DbSet<HConnectProductMapping> HConnectProductMappings { get; set; }
+    public DbSet<CreditMemo> CreditMemos { get; set; }
+    public DbSet<VsdcDeviceInfo> VsdcDeviceInfos { get; set; }
+    public DbSet<VsdcCodeEntry> VsdcCodeEntries { get; set; }
+    public DbSet<BankNoteDetail> BankNoteDetails { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -71,6 +85,7 @@ public class AppItDbContext : DbContext
         modelBuilder.Entity<Company>(b =>
         {
             b.HasKey(e => e.CompanyId);
+            b.Property(e => e.CreditLimit).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<Customer>(b =>
@@ -384,6 +399,8 @@ public class AppItDbContext : DbContext
             b.HasKey(e => e.Id);
         });
 
+        ConfigureCatalogCategories(modelBuilder);
+
         modelBuilder.Entity<ProductSubCategory>(b =>
         {
             b.HasKey(e => e.Id);
@@ -409,5 +426,74 @@ public class AppItDbContext : DbContext
                 .HasForeignKey(e => e.ReservationId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+        modelBuilder.Entity<Combo>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasIndex(e => e.Code).IsUnique();
+            b.HasOne(e => e.Supplier).WithMany().HasForeignKey(e => e.SupplierId).OnDelete(DeleteBehavior.SetNull);
+            b.HasOne(e => e.ProductCategory).WithMany().HasForeignKey(e => e.ProductCategoryId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<ComboProduct>(b => b.HasKey(e => e.Id));
+        modelBuilder.Entity<ComboPrice>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.UnitPrice).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<ReservationServiceItemSplit>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.UnitPrice).HasPrecision(18, 2);
+            b.Property(e => e.TotalPrice).HasPrecision(18, 2);
+            b.HasOne(e => e.ReservationServiceItem).WithMany(i => i.Splits).HasForeignKey(e => e.ReservationServiceItemId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AgentProductPrice>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.NetRate).HasPrecision(18, 2);
+            b.Property(e => e.RackRate).HasPrecision(18, 2);
+            b.HasOne(e => e.Agent).WithMany().HasForeignKey(e => e.CompanyId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<FinancialAccount>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Balance).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<JournalEntry>(b => b.HasKey(e => e.Id));
+        modelBuilder.Entity<JournalEntryLine>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Amount).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<HConnectBooking>(b => b.HasKey(e => e.Id));
+        modelBuilder.Entity<HConnectProductMapping>(b => b.HasKey(e => e.Id));
+        modelBuilder.Entity<CreditMemo>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.TotalAmount).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<VsdcDeviceInfo>(b => b.HasKey(e => e.Id));
+        modelBuilder.Entity<VsdcCodeEntry>(b => b.HasKey(e => e.Id));
+        modelBuilder.Entity<BankNoteDetail>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.TotalAmount).HasPrecision(18, 2);
+        });
+    }
+
+    private static void ConfigureCatalogCategories(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Product>().HasOne(p => p.ProductCategory).WithMany().HasForeignKey(p => p.ProductCategoryId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Activity>().HasOne(a => a.ProductCategory).WithMany().HasForeignKey(a => a.ProductCategoryId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Tour>().HasOne(t => t.ProductCategory).WithMany().HasForeignKey(t => t.ProductCategoryId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Transfer>().HasOne(t => t.ProductCategory).WithMany().HasForeignKey(t => t.ProductCategoryId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Accommodation>().HasOne(a => a.ProductCategory).WithMany().HasForeignKey(a => a.ProductCategoryId).OnDelete(DeleteBehavior.SetNull);
     }
 }

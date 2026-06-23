@@ -22,7 +22,7 @@ import { GlobalSearchService } from '../../core/search/global-search.service';
                 </button>
                 <a class="layout-topbar-logo" [routerLink]="homeRoute()">
                     <div class="flex items-center gap-3">
-                        <div class="w-11 h-11 rounded-2xl bg-primary text-primary-contrast flex items-center justify-center font-bold text-xl">AI</div>
+                        <img class="app-brand-logo" src="assets/images/tdz-logo.png" alt="TDZ" />
                         <div class="flex flex-col">
                             <span class="font-display font-bold text-xl leading-none">AppIt</span>
                             <span class="text-xs text-muted-color uppercase tracking-[0.24em]">{{ workspaceLabel() }}</span>

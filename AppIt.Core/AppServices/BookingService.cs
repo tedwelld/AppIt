@@ -1,3 +1,4 @@
+using AppIt.Core.AppServices;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces;
 using AppIt.Core.Interfaces.Services;
@@ -15,6 +16,8 @@ namespace AppIt.Core.Services
         private readonly IPaymentService _paymentService;
         private readonly IVoucherService _voucherService;
         private readonly IPricingService _pricingService;
+        private readonly ICreditAgentService _creditAgentService;
+        private readonly IComboService _comboService;
 
         public BookingService(
             AppItDbContext context,
@@ -22,7 +25,9 @@ namespace AppIt.Core.Services
             IInvoiceService invoiceService,
             IPaymentService paymentService,
             IVoucherService voucherService,
-            IPricingService pricingService)
+            IPricingService pricingService,
+            ICreditAgentService creditAgentService,
+            IComboService comboService)
         {
             _context = context;
             _reservationService = reservationService;
@@ -30,6 +35,8 @@ namespace AppIt.Core.Services
             _paymentService = paymentService;
             _voucherService = voucherService;
             _pricingService = pricingService;
+            _creditAgentService = creditAgentService;
+            _comboService = comboService;
         }
 
         public async Task<BookingCheckoutResultDto> CheckoutAsync(BookingCheckoutRequestDto request, int accountId)
@@ -45,10 +52,14 @@ namespace AppIt.Core.Services
                 request.Reservation.AgencyId = request.TripAccountId ?? customer.AgentCompanyId;
 
                 var serviceItems = NormalizeServiceItems(request.ServiceItems);
+                var companyId = request.Reservation.AgencyId ?? request.TripAccountId;
                 foreach (var item in serviceItems)
                 {
+                    var serviceType = string.Equals(item.ProductKind, "Combo", StringComparison.OrdinalIgnoreCase) ? "Combo" : item.ServiceType;
+                    var serviceId = item.ComboId ?? item.ServiceId;
                     item.UnitPrice = await _pricingService.ResolveUnitPriceAsync(
-                        item.ServiceType, item.ServiceId, item.Currency, item.ActivityDate, request.Reservation.AgencyConsultantId);
+                        serviceType, serviceId, item.Currency, item.ActivityDate,
+                        request.Reservation.AgencyConsultantId, companyId);
                     item.TotalPrice = CalculateLineTotal(item.Quantity, item.UnitPrice, item.DiscountPercent);
                 }
 
@@ -60,37 +71,77 @@ namespace AppIt.Core.Services
                     throw new InvalidOperationException("At least one service item with a valid total is required.");
                 }
 
+                var company = companyId.HasValue
+                    ? await _context.Companies.AsNoTracking().FirstOrDefaultAsync(c => c.CompanyId == companyId)
+                    : null;
+                var isCreditAgent = company != null && (company.IsCreditAgent || _creditAgentService.IsCreditAgent(companyId, company.AgentType));
+                await _creditAgentService.ValidateCreditLimitAsync(companyId, totalAmount);
+
+                var paymentAmount = request.Payment.Amount <= 0 ? 0 : request.Payment.Amount;
+                var (resolvedStatus, paymentStatus) = BookingStatusResolver.Resolve(
+                    isCreditAgent, paymentAmount, totalAmount, request.Reservation.Status);
+                request.Reservation.Status = resolvedStatus;
+                request.Reservation.PaymentStatus = paymentStatus;
+
                 var reservationCurrency = serviceItems.First().Currency;
                 request.Reservation.TotalAmount = totalAmount;
                 request.Reservation.Currency = reservationCurrency;
                 request.Reservation.Vat = vatTotal > 0 ? vatTotal : null;
                 request.Reservation.CurrencyExchangeRate = await _pricingService.GetEffectiveRateAsync(reservationCurrency, DateTime.UtcNow);
                 var reservation = await _reservationService.CreateAsync(request.Reservation);
-                var savedItems = serviceItems.Select(item => new ReservationServiceItem
+                var savedItems = new List<ReservationServiceItem>();
+                foreach (var item in serviceItems)
                 {
-                    ReservationId = reservation.ReservationId,
-                    ServiceType = item.ServiceType,
-                    ServiceId = item.ServiceId,
-                    ServiceName = item.ServiceName,
-                    Quantity = item.Quantity,
-                    UnitPrice = item.UnitPrice,
-                    TotalPrice = item.TotalPrice,
-                    Currency = item.Currency,
-                    SupplierId = item.SupplierId,
-                    AdultPax = item.AdultPax,
-                    ChildPax = item.ChildPax,
-                    CompPax = item.CompPax,
-                    Rooms = item.Rooms,
-                    Nights = item.Nights,
-                    PickupLocation = item.PickupLocation,
-                    DropoffLocation = item.DropoffLocation,
-                    ActivityDate = item.ActivityDate,
-                    DiscountPercent = item.DiscountPercent,
-                    VatPercent = item.VatPercent,
-                    CostOfSale = item.CostOfSale,
-                    Notes = item.Notes
-                }).ToList();
-                _context.ReservationServiceItems.AddRange(savedItems);
+                    var entity = new ReservationServiceItem
+                    {
+                        ReservationId = reservation.ReservationId,
+                        ServiceType = item.ServiceType,
+                        ServiceId = item.ServiceId,
+                        ServiceName = item.ServiceName,
+                        Quantity = item.Quantity,
+                        UnitPrice = item.UnitPrice,
+                        TotalPrice = item.TotalPrice,
+                        Currency = item.Currency,
+                        SupplierId = item.SupplierId,
+                        AdultPax = item.AdultPax,
+                        ChildPax = item.ChildPax,
+                        CompPax = item.CompPax,
+                        Rooms = item.Rooms,
+                        Nights = item.Nights,
+                        PickupLocation = item.PickupLocation,
+                        DropoffLocation = item.DropoffLocation,
+                        ActivityDate = item.ActivityDate,
+                        DiscountPercent = item.DiscountPercent,
+                        VatPercent = item.VatPercent,
+                        CostOfSale = item.CostOfSale,
+                        Notes = item.Notes,
+                        ProductKind = item.ProductKind,
+                        ComboId = item.ComboId,
+                        MiscCode = item.MiscCode
+                    };
+                    savedItems.Add(entity);
+                    _context.ReservationServiceItems.Add(entity);
+                    await _context.SaveChangesAsync();
+
+                    if (string.Equals(item.ProductKind, "Combo", StringComparison.OrdinalIgnoreCase) && item.ComboId.HasValue)
+                    {
+                        var splits = await _comboService.ExpandComboSplitsAsync(item.ComboId.Value, item.TotalPrice, item.Quantity);
+                        foreach (var split in splits)
+                        {
+                            _context.ReservationServiceItemSplits.Add(new ReservationServiceItemSplit
+                            {
+                                ReservationServiceItemId = entity.Id,
+                                ServiceType = split.ServiceType,
+                                ServiceId = split.ServiceId,
+                                ServiceName = split.ServiceName,
+                                UnitPrice = split.UnitPrice,
+                                TotalPrice = split.TotalPrice,
+                                Quantity = split.Quantity,
+                                IsMandatory = split.IsMandatory
+                            });
+                        }
+                    }
+                }
                 await _context.SaveChangesAsync();
 
                 var invoiceRequest = new CreateInvoiceDto
@@ -262,7 +313,10 @@ namespace AppIt.Core.Services
                         DiscountPercent = item.DiscountPercent,
                         VatPercent = item.VatPercent,
                         CostOfSale = item.CostOfSale,
-                        Notes = item.Notes
+                        Notes = item.Notes,
+                        ProductKind = item.ProductKind,
+                        ComboId = item.ComboId,
+                        MiscCode = item.MiscCode
                     };
                 })
                 .ToList();
@@ -325,10 +379,13 @@ namespace AppIt.Core.Services
                 DropoffLocation = item.DropoffLocation,
                 ActivityDate = item.ActivityDate,
                 DiscountPercent = item.DiscountPercent,
-                VatPercent = item.VatPercent,
-                CostOfSale = item.CostOfSale,
-                Notes = item.Notes
-            };
+                        VatPercent = item.VatPercent,
+                        CostOfSale = item.CostOfSale,
+                        Notes = item.Notes,
+                        ProductKind = string.IsNullOrWhiteSpace(item.ProductKind) ? "Standard" : item.ProductKind,
+                        ComboId = item.ComboId,
+                        MiscCode = item.MiscCode
+                    };
         }
 
         private static CustomerReadDto ToCustomerReadDto(Customer customer)

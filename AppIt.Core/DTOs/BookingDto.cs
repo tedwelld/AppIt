@@ -67,6 +67,9 @@ namespace AppIt.Core.DTOs
         public decimal? VatPercent { get; set; }
         public decimal? CostOfSale { get; set; }
         public string? Notes { get; set; }
+        public string ProductKind { get; set; } = "Standard";
+        public int? ComboId { get; set; }
+        public string? MiscCode { get; set; }
     }
 
     public class CloseBookingDto

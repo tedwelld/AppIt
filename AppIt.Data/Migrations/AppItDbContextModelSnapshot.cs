@@ -119,12 +119,17 @@ namespace AppIt.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<int?>("ProductCategoryId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("nvarchar(40)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ProductCategoryId");
 
                     b.ToTable("Accommodations");
                 });
@@ -219,14 +224,97 @@ namespace AppIt.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<int?>("MaxPax")
+                        .HasColumnType("int");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<int?>("ProductCategoryId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("ProductCategoryId");
+
                     b.ToTable("Activities");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.AgentProductPrice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ApprovalKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("CompanyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsAgentApproved")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("NetRate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.Property<int?>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProductName")
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.Property<string>("ProductType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("Query")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("QueryNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal?>("RackRate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.Property<bool>("Sent")
+                        .HasColumnType("bit");
+
+                    b.Property<DateOnly?>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("YearEffected")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.ToTable("AgentProductPrices");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.AuditLog", b =>
@@ -261,6 +349,182 @@ namespace AppIt.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("AuditLogs");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.BankNoteDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CashUpDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Denomination")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("EnteredBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("BankNoteDetails");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.Combo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MaxProducts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int?>("ProductCategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SupplierId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("ProductCategoryId");
+
+                    b.HasIndex("SupplierId");
+
+                    b.ToTable("Combos");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.ComboPrice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ComboId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComboId");
+
+                    b.ToTable("ComboPrices");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.ComboProduct", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("ComboId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsMandatory")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsTaxable")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.Property<string>("ServiceType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int?>("SupplierId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComboId");
+
+                    b.ToTable("ComboProducts");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Commission", b =>
@@ -356,6 +620,13 @@ namespace AppIt.Data.Migrations
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<decimal>("CreditLimit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.Property<bool>("IsCreditAgent")
+                        .HasColumnType("bit");
+
                     b.Property<string>("RegNumber")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -418,6 +689,50 @@ namespace AppIt.Data.Migrations
                     b.HasIndex("CompanyId");
 
                     b.ToTable("Consultants");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.CreditMemo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreditNoteId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("InvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("ReservationId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreditNoteId");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("ReservationId");
+
+                    b.ToTable("CreditMemos");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.CreditNote", b =>
@@ -786,6 +1101,153 @@ namespace AppIt.Data.Migrations
                     b.ToTable("FeaturePermissions");
                 });
 
+            modelBuilder.Entity("AppIt.Data.EntityModels.FinancialAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccountType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<decimal>("Balance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PastelRef")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("FinancialAccounts");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.HConnectBooking", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateOnly>("ArrivalDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateOnly>("DepartureDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("GuestFirstName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("GuestLastName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("HConnectConfirmationNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("HConnectPropertyCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("HConnectRoomCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("LastSyncAttempt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ReservationId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SyncStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReservationId");
+
+                    b.ToTable("HConnectBookings");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.HConnectProductMapping", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccommodationId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("HConnectPropertyCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("HConnectRoomCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccommodationId");
+
+                    b.ToTable("HConnectProductMappings");
+                });
+
             modelBuilder.Entity("AppIt.Data.EntityModels.IdempotencyRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -844,14 +1306,46 @@ namespace AppIt.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime?>("DateFiscalized")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FiscalCisInvoiceNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("FiscalQrCodeUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<long?>("FiscalReceiptNo")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FiscalSdcId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsFiscalized")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsPaid")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsReadyToRefiscalize")
                         .HasColumnType("bit");
 
                     b.Property<DateTime>("IssuedDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("RefiscalizeReservationSnapShot")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("ReservationId")
                         .HasColumnType("int");
+
+                    b.Property<string>("ReservationSnapShot")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -866,6 +1360,71 @@ namespace AppIt.Data.Migrations
                     b.HasIndex("ReservationId");
 
                     b.ToTable("Invoices");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.JournalEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("JournalType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("ReservationId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("VoucherReference")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReservationId");
+
+                    b.ToTable("JournalEntries");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.JournalEntryLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.Property<string>("EntryType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int>("FinancialAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("JournalEntryId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinancialAccountId");
+
+                    b.HasIndex("JournalEntryId");
+
+                    b.ToTable("JournalEntryLines");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.PasswordResetToken", b =>
@@ -1005,12 +1564,20 @@ namespace AppIt.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<int?>("MaxPax")
+                        .HasColumnType("int");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<int?>("ProductCategoryId")
+                        .HasColumnType("int");
+
                     b.HasKey("ProductId");
+
+                    b.HasIndex("ProductCategoryId");
 
                     b.ToTable("Products");
                 });
@@ -1190,11 +1757,32 @@ namespace AppIt.Data.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
+                    b.Property<DateTime?>("DateFiscalized")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FiscalOriginalReceiptNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("FiscalQrCodeUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<long?>("FiscalReceiptNo")
+                        .HasColumnType("bigint");
+
                     b.Property<int?>("InvoiceId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsFiscalized")
+                        .HasColumnType("bit");
+
                     b.Property<int?>("PaymentId")
                         .HasColumnType("int");
+
+                    b.Property<string>("PaymentProviderRefundId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTime?>("ProcessedAt")
                         .HasColumnType("datetime2");
@@ -1363,6 +1951,9 @@ namespace AppIt.Data.Migrations
                     b.Property<int?>("ChildPax")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ComboId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("CompPax")
                         .HasColumnType("int");
 
@@ -1383,6 +1974,13 @@ namespace AppIt.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<bool>("IsPostedToJournal")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("MiscCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<int?>("Nights")
                         .HasColumnType("int");
 
@@ -1393,6 +1991,11 @@ namespace AppIt.Data.Migrations
                     b.Property<string>("PickupLocation")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ProductKind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
@@ -1433,9 +2036,56 @@ namespace AppIt.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ComboId");
+
                     b.HasIndex("ReservationId");
 
                     b.ToTable("ReservationServiceItems");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.ReservationServiceItemSplit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsMandatory")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReservationServiceItemId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.Property<string>("ServiceType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<decimal>("TotalPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReservationServiceItemId");
+
+                    b.ToTable("ReservationServiceItemSplits");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.ReservationSnapshot", b =>
@@ -1596,6 +2246,13 @@ namespace AppIt.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ApprovalKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("ApprovedOn")
+                        .HasColumnType("datetime2");
+
                     b.Property<int?>("ConsultantId")
                         .HasColumnType("int");
 
@@ -1613,6 +2270,15 @@ namespace AppIt.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsAgentApproved")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -1624,11 +2290,17 @@ namespace AppIt.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<bool>("Sent")
+                        .HasColumnType("bit");
+
                     b.Property<decimal>("SpecialPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("VerifiedOn")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
@@ -1732,12 +2404,20 @@ namespace AppIt.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<int?>("MaxPax")
+                        .HasColumnType("int");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<int?>("ProductCategoryId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("ProductCategoryId");
 
                     b.ToTable("Tours");
                 });
@@ -1764,12 +2444,20 @@ namespace AppIt.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<int?>("MaxPax")
+                        .HasColumnType("int");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<int?>("ProductCategoryId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("ProductCategoryId");
 
                     b.ToTable("Transfers");
                 });
@@ -1845,6 +2533,71 @@ namespace AppIt.Data.Migrations
                     b.ToTable("Vouchers");
                 });
 
+            modelBuilder.Entity("AppIt.Data.EntityModels.VsdcCodeEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("CodeType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("SyncedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("VsdcCodeEntries");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.VsdcDeviceInfo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("InitializedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsInitialized")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("MrcNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SdcId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("VsdcDeviceInfos");
+                });
+
             modelBuilder.Entity("AppIt.Data.Entities.Notification", b =>
                 {
                     b.HasOne("AppIt.Data.EntityModels.Account", "User")
@@ -1867,6 +2620,16 @@ namespace AppIt.Data.Migrations
                     b.Navigation("GeneratedByUser");
                 });
 
+            modelBuilder.Entity("AppIt.Data.EntityModels.Accommodation", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.ProductCategory", "ProductCategory")
+                        .WithMany()
+                        .HasForeignKey("ProductCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ProductCategory");
+                });
+
             modelBuilder.Entity("AppIt.Data.EntityModels.Account", b =>
                 {
                     b.HasOne("AppIt.Data.EntityModels.Role", "Role")
@@ -1876,6 +2639,65 @@ namespace AppIt.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.Activity", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.ProductCategory", "ProductCategory")
+                        .WithMany()
+                        .HasForeignKey("ProductCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ProductCategory");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.AgentProductPrice", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.Company", "Agent")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Agent");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.Combo", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.ProductCategory", "ProductCategory")
+                        .WithMany()
+                        .HasForeignKey("ProductCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("AppIt.Data.EntityModels.Supplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ProductCategory");
+
+                    b.Navigation("Supplier");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.ComboPrice", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.Combo", "Combo")
+                        .WithMany("ComboPrices")
+                        .HasForeignKey("ComboId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Combo");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.ComboProduct", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.Combo", "Combo")
+                        .WithMany("ComboProducts")
+                        .HasForeignKey("ComboId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Combo");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Commission", b =>
@@ -1903,6 +2725,29 @@ namespace AppIt.Data.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.CreditMemo", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.CreditNote", "CreditNote")
+                        .WithMany()
+                        .HasForeignKey("CreditNoteId");
+
+                    b.HasOne("AppIt.Data.EntityModels.Invoice", "Invoice")
+                        .WithMany("CreditMemos")
+                        .HasForeignKey("InvoiceId");
+
+                    b.HasOne("AppIt.Data.EntityModels.Reservation", "Reservation")
+                        .WithMany()
+                        .HasForeignKey("ReservationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreditNote");
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("Reservation");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.CreditNote", b =>
@@ -1972,6 +2817,28 @@ namespace AppIt.Data.Migrations
                     b.Navigation("Permission");
                 });
 
+            modelBuilder.Entity("AppIt.Data.EntityModels.HConnectBooking", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.Reservation", "Reservation")
+                        .WithMany()
+                        .HasForeignKey("ReservationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Reservation");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.HConnectProductMapping", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.Accommodation", "Accommodation")
+                        .WithMany()
+                        .HasForeignKey("AccommodationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Accommodation");
+                });
+
             modelBuilder.Entity("AppIt.Data.EntityModels.Invoice", b =>
                 {
                     b.HasOne("AppIt.Data.EntityModels.Reservation", "Reservation")
@@ -1981,6 +2848,36 @@ namespace AppIt.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Reservation");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.JournalEntry", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.Reservation", "Reservation")
+                        .WithMany()
+                        .HasForeignKey("ReservationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Reservation");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.JournalEntryLine", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.FinancialAccount", "Account")
+                        .WithMany("JournalEntryLines")
+                        .HasForeignKey("FinancialAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AppIt.Data.EntityModels.JournalEntry", "JournalEntry")
+                        .WithMany("JournalEntryLines")
+                        .HasForeignKey("JournalEntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Account");
+
+                    b.Navigation("JournalEntry");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.PasswordResetToken", b =>
@@ -2007,6 +2904,16 @@ namespace AppIt.Data.Migrations
                         .HasForeignKey("InvoiceId1");
 
                     b.Navigation("Invoice");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.Product", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.ProductCategory", "ProductCategory")
+                        .WithMany()
+                        .HasForeignKey("ProductCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ProductCategory");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.ProductSubCategory", b =>
@@ -2091,13 +2998,30 @@ namespace AppIt.Data.Migrations
 
             modelBuilder.Entity("AppIt.Data.EntityModels.ReservationServiceItem", b =>
                 {
+                    b.HasOne("AppIt.Data.EntityModels.Combo", "Combo")
+                        .WithMany()
+                        .HasForeignKey("ComboId");
+
                     b.HasOne("AppIt.Data.EntityModels.Reservation", "Reservation")
                         .WithMany("ServiceItems")
                         .HasForeignKey("ReservationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Combo");
+
                     b.Navigation("Reservation");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.ReservationServiceItemSplit", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.ReservationServiceItem", "ReservationServiceItem")
+                        .WithMany("Splits")
+                        .HasForeignKey("ReservationServiceItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ReservationServiceItem");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.ReservationSnapshot", b =>
@@ -2174,6 +3098,26 @@ namespace AppIt.Data.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("AppIt.Data.EntityModels.Tour", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.ProductCategory", "ProductCategory")
+                        .WithMany()
+                        .HasForeignKey("ProductCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ProductCategory");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.Transfer", b =>
+                {
+                    b.HasOne("AppIt.Data.EntityModels.ProductCategory", "ProductCategory")
+                        .WithMany()
+                        .HasForeignKey("ProductCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ProductCategory");
+                });
+
             modelBuilder.Entity("AppIt.Data.EntityModels.Voucher", b =>
                 {
                     b.HasOne("AppIt.Data.EntityModels.Reservation", "Reservation")
@@ -2182,6 +3126,13 @@ namespace AppIt.Data.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Reservation");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.Combo", b =>
+                {
+                    b.Navigation("ComboPrices");
+
+                    b.Navigation("ComboProducts");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Company", b =>
@@ -2215,9 +3166,21 @@ namespace AppIt.Data.Migrations
                     b.Navigation("RoleFeatures");
                 });
 
+            modelBuilder.Entity("AppIt.Data.EntityModels.FinancialAccount", b =>
+                {
+                    b.Navigation("JournalEntryLines");
+                });
+
             modelBuilder.Entity("AppIt.Data.EntityModels.Invoice", b =>
                 {
+                    b.Navigation("CreditMemos");
+
                     b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.JournalEntry", b =>
+                {
+                    b.Navigation("JournalEntryLines");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Permission", b =>
@@ -2239,6 +3202,11 @@ namespace AppIt.Data.Migrations
                     b.Navigation("Invoices");
 
                     b.Navigation("ServiceItems");
+                });
+
+            modelBuilder.Entity("AppIt.Data.EntityModels.ReservationServiceItem", b =>
+                {
+                    b.Navigation("Splits");
                 });
 
             modelBuilder.Entity("AppIt.Data.EntityModels.Role", b =>

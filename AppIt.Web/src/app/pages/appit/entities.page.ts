@@ -81,15 +81,23 @@ import { APPIT_ENTITIES } from '../../core/navigation/workspace-navigation';
                 <form class="grid grid-cols-1 md:grid-cols-2 gap-4" (ngSubmit)="save()">
                     <label class="grid gap-2" *ngFor="let field of formFields()">
                         <span class="font-semibold">{{ label(field) }}</span>
-                        <select *ngIf="selectOptions(field)" class="p-inputtext p-component" [(ngModel)]="draft[field]" [name]="field" [disabled]="isLockedServiceCategoryField(field)" (ngModelChange)="onDraftFieldChange(field)">
+                        <select *ngIf="isProductCategoryField(field)" class="p-inputtext p-component" [(ngModel)]="draft[field]" [name]="field" (ngModelChange)="onDraftFieldChange(field)">
+                            <option [ngValue]="null">Uncategorized</option>
+                            <option *ngFor="let cat of productCategories()" [ngValue]="cat.id">{{ cat.name }}</option>
+                        </select>
+                        <select *ngIf="isCatalogServiceField(field)" class="p-inputtext p-component" [(ngModel)]="draft[field]" [name]="field" (ngModelChange)="onDraftFieldChange(field)">
+                            <option [ngValue]="null">Select service</option>
+                            <option *ngFor="let item of catalogServiceOptions()" [ngValue]="item.id">{{ item.label }}</option>
+                        </select>
+                        <select *ngIf="!isProductCategoryField(field) && !isCatalogServiceField(field) && selectOptions(field)" class="p-inputtext p-component" [(ngModel)]="draft[field]" [name]="field" [disabled]="isLockedServiceCategoryField(field)" (ngModelChange)="onDraftFieldChange(field)">
                             <option *ngFor="let opt of selectOptions(field)!" [value]="opt">{{ opt }}</option>
                         </select>
-                        <select *ngIf="!selectOptions(field) && fieldType(field) === 'boolean'" class="p-inputtext p-component" [(ngModel)]="draft[field]" [name]="field">
+                        <select *ngIf="!isProductCategoryField(field) && !isCatalogServiceField(field) && !selectOptions(field) && fieldType(field) === 'boolean'" class="p-inputtext p-component" [(ngModel)]="draft[field]" [name]="field">
                             <option [ngValue]="true">Yes</option>
                             <option [ngValue]="false">No</option>
                         </select>
                         <input
-                            *ngIf="!selectOptions(field) && fieldType(field) !== 'boolean'"
+                            *ngIf="!isProductCategoryField(field) && !isCatalogServiceField(field) && !selectOptions(field) && fieldType(field) !== 'boolean'"
                             pInputText
                             [type]="fieldType(field)"
                             [(ngModel)]="draft[field]"
@@ -122,6 +130,8 @@ export class EntitiesPage {
     readonly resource = signal('');
     readonly dialogMode = signal<'create' | 'edit'>('create');
     readonly roleNames = signal<string[]>([]);
+    readonly productCategories = signal<Array<{ id: number; name: string }>>([]);
+    readonly catalogServiceOptions = signal<Array<{ id: number; label: string }>>([]);
     readonly pageSize = SYSTEM_PAGE_SIZE;
     query = '';
     dialogVisible = false;
@@ -131,7 +141,7 @@ export class EntitiesPage {
     readonly tableDataKey = computed(() => this.config()?.idFields?.[0] ?? 'id');
     readonly columns = computed(() => {
         if (this.resource() === 'products') {
-            return ['serviceTypeCategory', 'name', 'description', 'capacity', 'guestCapacity', 'basePriceUsd', 'isActive'];
+            return ['serviceTypeCategory', 'categoryName', 'name', 'maxPax', 'description', 'basePriceUsd', 'isActive'];
         }
         const firstRow = this.rows()[0];
         const keys = firstRow ? Object.keys(firstRow) : this.defaultFields();
@@ -160,6 +170,41 @@ export class EntitiesPage {
             if (this.resource() === 'accounts') {
                 this.loadRoleNames();
             }
+            if (['products', 'product-sub-categories', 'special-product-prices', 'accommodations', 'activities', 'transfers', 'tours'].includes(this.resource())) {
+                this.loadProductCategories();
+            }
+            if (this.resource() === 'special-product-prices') {
+                this.loadCatalogServiceOptions(String(this.draft['productType'] ?? 'Activity'));
+            }
+        });
+    }
+
+    private loadProductCategories(): void {
+        this.api.listAll<any>('/api/product-categories').subscribe({
+            next: (rows) => this.productCategories.set(
+                (rows ?? [])
+                    .filter((row: any) => row.isActive !== false)
+                    .map((row: any) => ({ id: Number(row.id), name: String(row.name ?? '') }))
+                    .filter((row) => row.name)
+            ),
+            error: () => this.productCategories.set([])
+        });
+    }
+
+    private loadCatalogServiceOptions(productType: string): void {
+        const endpoint = this.endpointForServiceType(productType);
+        this.api.listAll<any>(endpoint).subscribe({
+            next: (rows) => {
+                const options = (rows ?? [])
+                    .filter((row: any) => row.isActive !== false)
+                    .map((row: any) => ({
+                        id: Number(row.productId ?? row.id),
+                        label: `${row.name ?? row.type ?? productType}${row.categoryName ? ` (${row.categoryName})` : ''}`
+                    }))
+                    .filter((row: { id: number }) => row.id > 0);
+                this.catalogServiceOptions.set(options);
+            },
+            error: () => this.catalogServiceOptions.set([])
         });
     }
 
@@ -221,12 +266,19 @@ export class EntitiesPage {
             this.draft['serviceTypeCategory'] = 'Product';
             this.syncProductDraftFields();
         }
+        if (this.resource() === 'special-product-prices') {
+            this.draft['productType'] ??= 'Activity';
+            this.loadCatalogServiceOptions(String(this.draft['productType']));
+        }
         this.dialogVisible = true;
     }
 
     openEdit(row: any): void {
         this.dialogMode.set('edit');
         this.draft = { ...row };
+        if (this.resource() === 'special-product-prices') {
+            this.loadCatalogServiceOptions(String(this.draft['productType'] ?? 'Activity'));
+        }
         this.dialogVisible = true;
     }
 
@@ -315,8 +367,21 @@ export class EntitiesPage {
     }
 
     label(value: string): string {
+        if (value === 'productCategoryId') return 'Product Category';
+        if (value === 'maxPax' || value === 'capacity') return 'Max Pax';
+        if (value === 'guestCapacity') return 'Guests Per Room';
+        if (value === 'categoryName') return 'Category';
         if (['category', 'serviceType', 'serviceTypeCategory', 'productType'].includes(value)) return 'Service Type / Category';
+        if (value === 'productId') return 'Catalog Service';
         return value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (char) => char.toUpperCase());
+    }
+
+    isProductCategoryField(field: string): boolean {
+        return field === 'productCategoryId' || field === 'categoryId';
+    }
+
+    isCatalogServiceField(field: string): boolean {
+        return this.resource() === 'special-product-prices' && field === 'productId';
     }
 
     isLockedServiceCategoryField(field: string): boolean {
@@ -349,7 +414,6 @@ export class EntitiesPage {
         if (f === 'producttype' || f === 'servicetype') return ['Product', 'Accommodation', 'Activity', 'Transfer', 'Tour'];
         if (f === 'type') {
             if (this.resource() === 'vouchers') return ['Reservation', 'Standard', 'Group'];
-            if (this.resource() === 'special-product-prices') return ['Product', 'Accommodation', 'Activity', 'Transfer', 'Tour'];
             return ['Reservation', 'Standard', 'Group', 'Corporate'];
         }
         if (f === 'status') return this.statusOptionsForResource();
@@ -382,7 +446,10 @@ export class EntitiesPage {
                 .map(([key, value]) => [key, value === '' ? null : value])
         );
         if (this.resource() === 'products') {
-            payload['category'] = 'Product';
+            payload['productCategoryId'] = row['productCategoryId'] ?? null;
+        }
+        if (this.resource() === 'special-product-prices') {
+            payload['productType'] = row['productType'] ?? row['type'] ?? 'Activity';
         }
         return payload;
     }
@@ -466,6 +533,10 @@ export class EntitiesPage {
         if (this.resource() === 'products' && field === 'serviceTypeCategory') {
             this.syncProductDraftFields();
         }
+        if (this.resource() === 'special-product-prices' && field === 'productType') {
+            this.draft['productId'] = null;
+            this.loadCatalogServiceOptions(String(this.draft['productType'] ?? 'Activity'));
+        }
     }
 
     private loadUnifiedProducts(page = 1): void {
@@ -484,7 +555,12 @@ export class EntitiesPage {
                     ...rows.activities.map((item) => this.toUnifiedProductRow('Activity', item)),
                     ...rows.transfers.map((item) => this.toUnifiedProductRow('Transfer', item)),
                     ...rows.tours.map((item) => this.toUnifiedProductRow('Tour', item))
-                ].filter((item) => this.matchesUnifiedProductSearch(item));
+                ].filter((item) => this.matchesUnifiedProductSearch(item))
+                    .sort((a, b) => {
+                        const byCategory = String(a['categoryName'] ?? '').localeCompare(String(b['categoryName'] ?? ''));
+                        if (byCategory !== 0) return byCategory;
+                        return String(a['name'] ?? '').localeCompare(String(b['name'] ?? ''));
+                    });
                 const start = (page - 1) * this.pageSize;
                 this.rows.set(all.slice(start, start + this.pageSize));
                 this.totalRecords.set(all.length);
@@ -504,8 +580,11 @@ export class EntitiesPage {
         return {
             sourceId,
             serviceTypeCategory: serviceType,
+            productCategoryId: item.productCategoryId ?? null,
+            categoryName: item.categoryName ?? item.category ?? 'Uncategorized',
             name: item.name ?? item.type ?? serviceType,
             description: item.description ?? '',
+            maxPax: item.maxPax ?? item.capacity ?? item.guestCapacity ?? null,
             capacity: item.capacity ?? null,
             guestCapacity: item.guestCapacity ?? null,
             basePriceUsd: item.basePriceUsd ?? this.firstUsdPrice(item.prices),
@@ -525,6 +604,7 @@ export class EntitiesPage {
         const q = this.query.trim().toLowerCase();
         if (!q) return true;
         return ['serviceTypeCategory', 'name', 'description']
+            .concat(['categoryName', 'maxPax'])
             .some((field) => String(item[field] ?? '').toLowerCase().includes(q));
     }
 
@@ -559,6 +639,7 @@ export class EntitiesPage {
         const base = {
             name,
             description: this.draft['description'] ?? null,
+            productCategoryId: this.draft['productCategoryId'] ?? null,
             basePriceUsd: Number(this.draft['basePriceUsd'] ?? 0),
             isActive: this.draft['isActive'] !== false
         };
@@ -567,6 +648,7 @@ export class EntitiesPage {
             return {
                 type: name,
                 description: base.description,
+                productCategoryId: base.productCategoryId,
                 capacity: Number(this.draft['capacity'] ?? 1),
                 guestCapacity: Number(this.draft['guestCapacity'] ?? 1),
                 basePriceUsd: base.basePriceUsd,
@@ -578,13 +660,15 @@ export class EntitiesPage {
             return {
                 name,
                 description: base.description,
+                productCategoryId: base.productCategoryId,
+                maxPax: this.draft['maxPax'] != null ? Number(this.draft['maxPax']) : null,
                 isActive: base.isActive
             };
         }
 
         return serviceType === 'Product'
-            ? { ...base, category: 'Product' }
-            : base;
+            ? { ...base, maxPax: this.draft['maxPax'] != null ? Number(this.draft['maxPax']) : null, category: 'Product' }
+            : { ...base, maxPax: this.draft['maxPax'] != null ? Number(this.draft['maxPax']) : null };
     }
 
     private ensureUsdServicePrice(serviceType: string, saved: any, unitPrice: number): void {
@@ -616,9 +700,10 @@ export class EntitiesPage {
 
     private productFieldsForDraft(): string[] {
         const serviceType = String(this.draft['serviceTypeCategory'] ?? 'Product');
-        const base = ['serviceTypeCategory', 'name', 'description', 'basePriceUsd', 'isActive'];
+        const shared = ['serviceTypeCategory', 'productCategoryId', 'name', 'description', 'basePriceUsd', 'isActive'];
+        const base = [...shared.slice(0, 3), 'maxPax', ...shared.slice(3)];
         return serviceType === 'Accommodation'
-            ? ['serviceTypeCategory', 'name', 'description', 'capacity', 'guestCapacity', 'basePriceUsd', 'isActive']
+            ? ['serviceTypeCategory', 'productCategoryId', 'name', 'description', 'capacity', 'guestCapacity', 'basePriceUsd', 'isActive']
             : base;
     }
 
@@ -627,10 +712,13 @@ export class EntitiesPage {
         if (serviceType === 'Accommodation') {
             this.draft['capacity'] ??= 1;
             this.draft['guestCapacity'] ??= 1;
+            delete this.draft['maxPax'];
         } else {
             delete this.draft['capacity'];
             delete this.draft['guestCapacity'];
+            this.draft['maxPax'] ??= null;
         }
+        this.draft['productCategoryId'] ??= null;
         this.draft['basePriceUsd'] ??= null;
         this.draft['isActive'] ??= true;
     }

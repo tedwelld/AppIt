@@ -12,5 +12,9 @@ namespace AppIt.Core.Interfaces.Services
         Task<SpecialProductPriceReadDto> CreateAsync(CreateSpecialProductPriceDto dto);
         Task<SpecialProductPriceReadDto?> UpdateAsync(UpdateSpecialProductPriceDto dto);
         Task<bool> DeleteAsync(int id);
+        Task<SpecialProductPriceReadDto?> VerifyAsync(int id);
+        Task<SpecialProductPriceReadDto?> ApproveAsync(int id);
+        Task<SpecialProductPriceReadDto?> SendToAgentAsync(int id);
+        Task<SpecialProductPriceReadDto?> AgentApprovalAsync(string approvalKey);
     }
 }

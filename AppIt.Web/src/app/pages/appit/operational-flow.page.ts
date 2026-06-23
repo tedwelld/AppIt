@@ -109,6 +109,60 @@ const FLOW_CONFIGS: Record<string, OperationalFlowConfig> = {
         icon: 'pi pi-dollar',
         columns: ['currencyCode', 'rate', 'effectiveDate']
     },
+    'occupancy-details': {
+        key: 'occupancy-details',
+        group: 'Reservations',
+        title: 'Occupancy Details',
+        subtitle: 'Detailed occupancy rows per reservation.',
+        endpoint: '/api/reservations',
+        icon: 'pi pi-list',
+        columns: ['reference', 'customerEmail', 'totalAmount', 'status', 'travelStatus']
+    },
+    'my-cashup': {
+        key: 'my-cashup',
+        group: 'Reservations',
+        title: 'My Cashup',
+        subtitle: 'Daily cashier cash-up reconciliation.',
+        endpoint: '/api/payments',
+        icon: 'pi pi-wallet',
+        columns: ['method', 'amount', 'currencyCode', 'status', 'processedAt']
+    },
+    debtors: {
+        key: 'debtors',
+        group: 'Accounts',
+        title: 'Debtors',
+        subtitle: 'Credit agent outstanding balances.',
+        endpoint: '/api/debtor-reports/aging',
+        icon: 'pi pi-book',
+        columns: ['companyName', 'outstanding', 'creditLimit']
+    },
+    'hconnect-management': {
+        key: 'hconnect-management',
+        group: 'Operations',
+        title: 'H-Connect Management',
+        subtitle: 'PMS sync queue and retries.',
+        endpoint: '/api/hconnect/bookings',
+        icon: 'pi pi-sync',
+        columns: ['reservationId', 'syncStatus', 'errorMessage']
+    },
+    'verify-special-rates': {
+        key: 'verify-special-rates',
+        group: 'Setup',
+        title: 'Verify Special Rates',
+        subtitle: 'Internal verification of promotional prices.',
+        endpoint: '/api/special-product-prices',
+        icon: 'pi pi-check',
+        columns: ['productId', 'specialPrice', 'currencyCode', 'startDate', 'endDate', 'isActive']
+    },
+    'approve-special-rates': {
+        key: 'approve-special-rates',
+        group: 'Setup',
+        title: 'Approve Special Rates',
+        subtitle: 'GM approval for special product prices.',
+        endpoint: '/api/special-product-prices',
+        icon: 'pi pi-check-circle',
+        columns: ['productId', 'specialPrice', 'currencyCode', 'startDate', 'isActive']
+    },
     'bank-note-details': {
         key: 'bank-note-details',
         group: 'Cashier',

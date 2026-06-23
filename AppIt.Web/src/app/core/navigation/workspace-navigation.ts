@@ -25,7 +25,9 @@ export const APPIT_ENTITIES: EntityConfig[] = [
     { key: 'consultants', title: 'Consultants', endpoint: '/api/consultants', icon: 'pi pi-user-plus', group: 'Setup', idFields: ['id'] },
     { key: 'product-categories', title: 'Product Categories', endpoint: '/api/product-categories', icon: 'pi pi-tag', group: 'Catalog', idFields: ['id'] },
     { key: 'product-sub-categories', title: 'Product Sub-Categories', endpoint: '/api/product-sub-categories', icon: 'pi pi-tags', group: 'Catalog', idFields: ['id'] },
-    { key: 'special-product-prices', title: 'Special Prices', endpoint: '/api/special-product-prices', icon: 'pi pi-star', group: 'Catalog', idFields: ['id'] }
+    { key: 'special-product-prices', title: 'Special Prices', endpoint: '/api/special-product-prices', icon: 'pi pi-star', group: 'Catalog', idFields: ['id'] },
+    { key: 'combos', title: 'Combos', endpoint: '/api/combos', icon: 'pi pi-objects-column', group: 'Catalog', idFields: ['id'] },
+    { key: 'agent-product-prices', title: 'Agent Rates', endpoint: '/api/product-price-agent', icon: 'pi pi-percentage', group: 'Catalog', idFields: ['id'] }
 ];
 
 export interface WorkspaceMenuModel {
@@ -115,6 +117,8 @@ export function buildWorkspaceMenu(role: AppItRole | null, roleName?: string | n
                     action('Reports', 'pi pi-fw pi-file', ['/admin/reservations/reports'], 'Reservations', ['View Trip Accounts']),
                     action('Availability Calendar', 'pi pi-fw pi-calendar', ['/admin/reservations/availability-calendar'], 'Reservations', ['New Booking', 'Edit or Confirm']),
                     action('Occupancy Calendar', 'pi pi-fw pi-calendar-clock', ['/admin/reservations/occupancy-calendar'], 'Reservations', ['New Booking', 'Edit or Confirm']),
+                    action('Occupancy Details', 'pi pi-fw pi-list', ['/admin/reservations/occupancy-details'], 'Reservations', ['New Booking']),
+                    action('My Cashup', 'pi pi-fw pi-wallet', ['/admin/reservations/my-cashup'], 'Reservations', ['Cashier Reports']),
                     action('Flow Charts', 'pi pi-fw pi-chart-line', ['/admin/reservations/flow-charts'], 'Reservations', ['Print or View Charts'])
                 ]
             },
@@ -138,6 +142,7 @@ export function buildWorkspaceMenu(role: AppItRole | null, roleName?: string | n
                     action('Refunds', 'pi pi-fw pi-refresh', ['/admin/accounts/refunds'], 'Accounts', ['Process Refund']),
                     action('Commissions', 'pi pi-fw pi-percentage', ['/admin/accounts/commissions'], 'Accounts', ['View Commissions']),
                     action('Deposit Reports', 'pi pi-fw pi-file-check', ['/admin/accounts/deposit-reports'], 'Accounts', ['Deposit Reports']),
+                    action('Debtors', 'pi pi-fw pi-book', ['/admin/accounts/debtors'], 'Accounts', ['Search for Invoice (USD)']),
                     action('Proof Of Payment', 'pi pi-fw pi-credit-card', ['/admin/accounts/proof-of-payments'], 'Accounts', ['Proof Of Payment'])
                 ]
             },
@@ -156,6 +161,7 @@ export function buildWorkspaceMenu(role: AppItRole | null, roleName?: string | n
                 feature: 'Operations',
                 items: [
                     action('Check In', 'pi pi-fw pi-check-circle', ['/admin/operations/check-in'], 'Operations', ['Print or View Travelled PAX']),
+                    action('H-Connect', 'pi pi-fw pi-sync', ['/admin/operations/hconnect-management'], 'Operations', ['Print or View Travelled PAX']),
                     action('Day-End Audit', 'pi pi-fw pi-sun', ['/admin/operations/day-end'], 'Operations', ['Open Day', 'Close Day'])
                 ]
             },
@@ -174,6 +180,9 @@ export function buildWorkspaceMenu(role: AppItRole | null, roleName?: string | n
                     action('Product Categories', 'pi pi-fw pi-tag', ['/admin/setup/manage-product-categories'], 'Setup', ['Add Category', 'Edit Category']),
                     action('Product Sub-Categories', 'pi pi-fw pi-tags', ['/admin/setup/manage-product-sub-categories'], 'Setup', ['Add Sub-Category', 'Edit Sub-Category']),
                     action('Special Prices', 'pi pi-fw pi-star', ['/admin/setup/manage-special-prices'], 'Setup', ['Add Special Price', 'Edit Special Price']),
+                    action('Agent Rates', 'pi pi-fw pi-percentage', ['/admin/setup/manage-agent-rates'], 'Setup', ['Add Product', 'Edit Product']),
+                    action('Combos', 'pi pi-fw pi-objects-column', ['/admin/setup/manage-combos'], 'Setup', ['Add Product', 'Edit Product']),
+                    action('Verify Special Rates', 'pi pi-fw pi-check', ['/special-rates/verify-special-rates'], 'Setup', ['Add Special Price']),
                     action('Manage Features', 'pi pi-fw pi-sitemap', ['/admin/setup/manage-features'], 'Setup', ['Edit Features']),
                     action('Manage Permissions', 'pi pi-fw pi-key', ['/admin/setup/manage-permissions'], 'Setup', ['Edit Permissions'])
                 ]

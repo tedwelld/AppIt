@@ -9,6 +9,8 @@ namespace AppIt.Core.DTOs
         public int Id { get; set; }
         public string Type { get; set; } = "Standard";
         public string? Description { get; set; }
+        public int? ProductCategoryId { get; set; }
+        public string? CategoryName { get; set; }
         public int Capacity { get; set; }
         public int GuestCapacity { get; set; }
         public decimal BasePriceUsd { get; set; }
@@ -22,7 +24,8 @@ namespace AppIt.Core.DTOs
         [Required]
         public string Type { get; set; } = "Standard";
         public string? Description { get; set; }
-        [Range(0, int.MaxValue)]
+        public int? ProductCategoryId { get; set; }
+        [Range(1, int.MaxValue)]
         public int Capacity { get; set; }
         [Range(1, int.MaxValue)]
         public int GuestCapacity { get; set; } = 1;

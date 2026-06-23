@@ -1,3 +1,4 @@
+using AppIt.Core.AppServices;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using AppIt.Data;
@@ -18,10 +19,13 @@ namespace AppIt.Core.Services
         public async Task<TourReadDto> CreateAsync(CreateTourDto dto)
         {
             await EnsureUniqueNameAsync(dto.Name, null);
+            await CatalogConstraints.ValidateCategoryAsync(_context, dto.ProductCategoryId);
             var tour = new Tour
             {
                 Name = dto.Name.Trim(),
                 Description = dto.Description,
+                ProductCategoryId = dto.ProductCategoryId,
+                MaxPax = dto.MaxPax,
                 IsActive = dto.IsActive,
                 CreatedDate = DateTime.UtcNow
             };
@@ -37,8 +41,11 @@ namespace AppIt.Core.Services
             if (tour == null) return null;
 
             await EnsureUniqueNameAsync(dto.Name, dto.Id);
+            await CatalogConstraints.ValidateCategoryAsync(_context, dto.ProductCategoryId);
             tour.Name = dto.Name.Trim();
             tour.Description = dto.Description;
+            tour.ProductCategoryId = dto.ProductCategoryId;
+            tour.MaxPax = dto.MaxPax;
             tour.IsActive = dto.IsActive;
 
             await _context.SaveChangesAsync();
@@ -65,22 +72,29 @@ namespace AppIt.Core.Services
         {
             var tours = await _context.Tours.AsNoTracking().ToListAsync();
             var prices = await PricesForAsync("Tour", tours.Select(t => t.Id));
-            return tours.Select(t => ToReadDto(t, prices));
+            var categoryNames = await CategoryNamesForAsync(tours.Select(t => t.ProductCategoryId));
+            return tours.Select(t => ToReadDto(t, prices, categoryNames));
         }
 
         private async Task<TourReadDto> ToReadDtoAsync(Tour tour)
         {
             var prices = await PricesForAsync("Tour", new[] { tour.Id });
-            return ToReadDto(tour, prices);
+            var categoryNames = await CategoryNamesForAsync(new[] { tour.ProductCategoryId });
+            return ToReadDto(tour, prices, categoryNames);
         }
 
-        private static TourReadDto ToReadDto(Tour tour, ILookup<int, ServicePriceReadDto> prices)
+        private static TourReadDto ToReadDto(Tour tour, ILookup<int, ServicePriceReadDto> prices, IReadOnlyDictionary<int, string> categoryNames)
         {
             return new TourReadDto
             {
                 Id = tour.Id,
                 Name = tour.Name,
                 Description = tour.Description,
+                ProductCategoryId = tour.ProductCategoryId,
+                CategoryName = tour.ProductCategoryId.HasValue && categoryNames.TryGetValue(tour.ProductCategoryId.Value, out var name)
+                    ? name
+                    : null,
+                MaxPax = tour.MaxPax,
                 IsActive = tour.IsActive,
                 CreatedDate = tour.CreatedDate,
                 Prices = prices[tour.Id].ToList()
@@ -107,6 +121,17 @@ namespace AppIt.Core.Services
                 .ToListAsync();
 
             return prices.ToLookup(p => p.ServiceId);
+        }
+
+        private async Task<IReadOnlyDictionary<int, string>> CategoryNamesForAsync(IEnumerable<int?> categoryIds)
+        {
+            var ids = categoryIds.Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+            if (ids.Count == 0) return new Dictionary<int, string>();
+
+            return await _context.ProductCategories
+                .AsNoTracking()
+                .Where(c => ids.Contains(c.Id))
+                .ToDictionaryAsync(c => c.Id, c => c.Name);
         }
 
         private async Task EnsureUniqueNameAsync(string name, int? currentId)

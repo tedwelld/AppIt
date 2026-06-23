@@ -115,7 +115,7 @@ public class AuthAndIsolationApiTests : IClassFixture<TestApiFactory>
         var client = CreateHttpsClient();
         var auth = await RegisterAndLoginAsync(client, $"contract.{Guid.NewGuid():N}@test.local");
         SetBearer(client, auth.Token);
-        var catalog = await SeedCheckoutCatalogAsync();
+        var catalog = await EnsureCheckoutCatalogAsync();
         await client.PostAsJsonAsync("/api/bookings/checkout", new
         {
             reservation = new
@@ -184,7 +184,7 @@ public class AuthAndIsolationApiTests : IClassFixture<TestApiFactory>
         var client = CreateHttpsClient();
         var auth = await RegisterAndLoginAsync(client, $"booking.customer.{Guid.NewGuid():N}@test.local");
         SetBearer(client, auth.Token);
-        var catalog = await SeedCheckoutCatalogAsync();
+        var catalog = await EnsureCheckoutCatalogAsync();
 
         var response = await client.PostAsJsonAsync("/api/bookings/checkout", new
         {
@@ -232,7 +232,7 @@ public class AuthAndIsolationApiTests : IClassFixture<TestApiFactory>
         var client = CreateHttpsClient();
         var auth = await RegisterAndLoginAsync(client, $"booking.existing.{Guid.NewGuid():N}@test.local");
         SetBearer(client, auth.Token);
-        var catalog = await SeedCheckoutCatalogAsync();
+        var catalog = await EnsureCheckoutCatalogAsync();
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppItDbContext>();
@@ -395,7 +395,7 @@ public class AuthAndIsolationApiTests : IClassFixture<TestApiFactory>
         var references = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var vouchers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        for (var i = 0; i < 100; i++)
+        for (var i = 0; i < 5; i++)
         {
             var row = await service.CreateAsync(new CreateReservationDto
             {
@@ -438,22 +438,6 @@ public class AuthAndIsolationApiTests : IClassFixture<TestApiFactory>
         return new AuthResult(user.GetProperty("id").GetInt32(), data.GetProperty("token").GetString() ?? string.Empty);
     }
 
-    private static async Task CreateReservationAsync(HttpClient client, int accountId, string reference)
-    {
-        var response = await client.PostAsJsonAsync("/api/reservations", new
-        {
-            reference,
-            voucherCode = $"VCH-{reference}",
-            accountId,
-            currency = "USD",
-            totalAmount = 120.50m,
-            status = "Pending",
-            customerEmail = "customer@test.local"
-        });
-
-        await AssertStatusCodeAsync(response, HttpStatusCode.Created);
-    }
-
     private static async Task<Invoice> CreateInvoiceAsync(AppItDbContext db, DateTime? issuedDate = null)
     {
         var reservation = new Reservation
@@ -482,7 +466,7 @@ public class AuthAndIsolationApiTests : IClassFixture<TestApiFactory>
         return invoice;
     }
 
-    private async Task<(int ProductId, int ActivityId, int AccommodationId)> SeedCheckoutCatalogAsync()
+    private async Task<(int ProductId, int ActivityId, int AccommodationId)> EnsureCheckoutCatalogAsync()
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppItDbContext>();

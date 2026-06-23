@@ -14,7 +14,7 @@ import { AuthService } from '../../core/auth/auth.service';
                     <div class="auth-login-card-content">
                         <div class="auth-login-brand-row">
                             <div class="auth-login-brand">
-                                <div class="auth-login-mark grid place-items-center text-white font-bold">AI</div>
+                                <img class="auth-login-mark" src="assets/images/tdz-logo.png" alt="TDZ" />
                                 <div>
                                     <h1 class="auth-login-brand-name">AppIt</h1>
                                     <p class="auth-login-brand-subtitle">Adventure & Hospitality Suite</p>

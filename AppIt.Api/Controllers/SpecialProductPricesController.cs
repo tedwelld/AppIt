@@ -56,5 +56,25 @@ namespace AppIt.Api.Controllers
         [Authorize(Roles = "super,admin")]
         public async Task<IActionResult> Delete(int id)
             => await _service.DeleteAsync(id) ? NoContent() : NotFound();
+
+        [HttpPut("{id:int}/verify")]
+        [Authorize(Roles = "super,admin")]
+        public async Task<IActionResult> Verify(int id) =>
+            Ok(await _service.VerifyAsync(id));
+
+        [HttpPut("{id:int}/approve")]
+        [Authorize(Roles = "super,admin")]
+        public async Task<IActionResult> Approve(int id) =>
+            Ok(await _service.ApproveAsync(id));
+
+        [HttpPut("{id:int}/send")]
+        [Authorize(Roles = "super,admin")]
+        public async Task<IActionResult> Send(int id) =>
+            Ok(await _service.SendToAgentAsync(id));
+
+        [HttpPut("agent-approval/{key}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> AgentApproval(string key) =>
+            Ok(await _service.AgentApprovalAsync(key));
     }
 }

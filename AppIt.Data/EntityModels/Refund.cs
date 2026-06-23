@@ -32,5 +32,18 @@ namespace AppIt.Data.EntityModels
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+        public bool IsFiscalized { get; set; }
+        public DateTime? DateFiscalized { get; set; }
+        public long? FiscalReceiptNo { get; set; }
+
+        [MaxLength(500)]
+        public string? FiscalQrCodeUrl { get; set; }
+
+        [MaxLength(100)]
+        public string? FiscalOriginalReceiptNo { get; set; }
+
+        [MaxLength(100)]
+        public string? PaymentProviderRefundId { get; set; }
     }
 }

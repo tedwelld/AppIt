@@ -1,0 +1,88 @@
+.layout-wrapper {
+    background-color: var(--surface-ground);
+}
+
+.layout-topbar {
+    background-color: var(--surface-card) !important;
+    border-bottom: 1px solid var(--surface-border);
+}
+
+.layout-sidebar {
+    background-color: var(--surface-card);
+}
+
+.layout-footer {
+    background-color: var(--surface-100);
+    border-top: 1px solid var(--surface-border);
+}
+
+.layout-menu {
+    background-color: transparent;
+}
+
+.layout-topbar {
+    .layout-topbar-menu {
+        margin: 0 0 0 auto;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .layout-topbar-button {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        color: var(--text-color-secondary);
+        border-radius: 50%;
+        width: 2.5rem;
+        height: 2.5rem;
+        cursor: pointer;
+        transition: background-color var(--element-transition-duration, 0.2s);
+        border: 0;
+        background: transparent;
+
+        &:hover {
+            color: var(--text-color);
+            background-color: var(--surface-hover);
+        }
+
+        i {
+            font-size: 1.25rem;
+        }
+
+        span {
+            display: none;
+        }
+    }
+}
+
+@media (max-width: 991px) {
+    .layout-topbar .layout-topbar-menu.layout-topbar-menu-mobile-active {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        right: 2rem;
+        top: 4rem;
+        min-width: 15rem;
+        padding: 1rem;
+        background: var(--surface-overlay);
+        border: 1px solid var(--surface-border);
+        border-radius: var(--content-border-radius, 12px);
+        box-shadow: 0 3px 5px rgba(0, 0, 0, 0.08);
+
+        .layout-topbar-button {
+            width: 100%;
+            height: auto;
+            border-radius: var(--content-border-radius, 12px);
+            justify-content: flex-start;
+            padding: 0.75rem 1rem;
+
+            span {
+                display: inline;
+                margin-left: 0.5rem;
+            }
+        }
+    }
+}

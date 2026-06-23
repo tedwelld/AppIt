@@ -1,4 +1,5 @@
-﻿using AppIt.Core.DTOs;
+﻿using AppIt.Core.AppServices;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using AppIt.Data;
 using AppIt.Data.EntityModels;
@@ -17,10 +18,13 @@ namespace AppIt.Core.Services
 
         public async Task<AccommodationReadDto> CreateAsync(CreateAccommodationDto dto)
         {
+            await EnsureUniqueTypeAsync(dto.Type, null);
+            await CatalogConstraints.ValidateCategoryAsync(_context, dto.ProductCategoryId);
             var accommodation = new Accommodation
             {
-                Type = dto.Type,
+                Type = dto.Type.Trim(),
                 Description = dto.Description,
+                ProductCategoryId = dto.ProductCategoryId,
                 Capacity = dto.Capacity,
                 GuestCapacity = dto.GuestCapacity,
                 BasePriceUsd = dto.BasePriceUsd,
@@ -40,8 +44,11 @@ namespace AppIt.Core.Services
             var accommodation = await _context.Accommodations.FindAsync(dto.Id);
             if (accommodation == null) return null;
 
-            accommodation.Type = dto.Type;
+            await EnsureUniqueTypeAsync(dto.Type, dto.Id);
+            await CatalogConstraints.ValidateCategoryAsync(_context, dto.ProductCategoryId);
+            accommodation.Type = dto.Type.Trim();
             accommodation.Description = dto.Description;
+            accommodation.ProductCategoryId = dto.ProductCategoryId;
             accommodation.Capacity = dto.Capacity;
             accommodation.GuestCapacity = dto.GuestCapacity;
             accommodation.BasePriceUsd = dto.BasePriceUsd;
@@ -72,7 +79,8 @@ namespace AppIt.Core.Services
         {
             var accommodations = await _context.Accommodations.AsNoTracking().ToListAsync();
             var prices = await PricesForAsync(accommodations.Select(a => a.Id));
-            return accommodations.Select(a => ToReadDto(a, prices));
+            var categoryNames = await CategoryNamesForAsync(accommodations.Select(a => a.ProductCategoryId));
+            return accommodations.Select(a => ToReadDto(a, prices, categoryNames));
         }
 
         public async Task<AccommodationAvailabilityDto> GetAvailabilityAsync(int year, int month)
@@ -231,16 +239,24 @@ namespace AppIt.Core.Services
         private async Task<AccommodationReadDto> ToReadDtoAsync(Accommodation accommodation)
         {
             var prices = await PricesForAsync(new[] { accommodation.Id });
-            return ToReadDto(accommodation, prices);
+            var categoryNames = await CategoryNamesForAsync(new[] { accommodation.ProductCategoryId });
+            return ToReadDto(accommodation, prices, categoryNames);
         }
 
-        private static AccommodationReadDto ToReadDto(Accommodation accommodation, ILookup<int, ServicePriceReadDto> prices)
+        private static AccommodationReadDto ToReadDto(
+            Accommodation accommodation,
+            ILookup<int, ServicePriceReadDto> prices,
+            IReadOnlyDictionary<int, string> categoryNames)
         {
             return new AccommodationReadDto
             {
                 Id = accommodation.Id,
                 Type = accommodation.Type,
                 Description = accommodation.Description,
+                ProductCategoryId = accommodation.ProductCategoryId,
+                CategoryName = accommodation.ProductCategoryId.HasValue && categoryNames.TryGetValue(accommodation.ProductCategoryId.Value, out var name)
+                    ? name
+                    : null,
                 Capacity = accommodation.Capacity,
                 GuestCapacity = accommodation.GuestCapacity,
                 BasePriceUsd = accommodation.BasePriceUsd,
@@ -269,6 +285,34 @@ namespace AppIt.Core.Services
                 })
                 .ToListAsync();
             return prices.ToLookup(p => p.ServiceId);
+        }
+
+        private async Task<IReadOnlyDictionary<int, string>> CategoryNamesForAsync(IEnumerable<int?> categoryIds)
+        {
+            var ids = categoryIds.Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+            if (ids.Count == 0) return new Dictionary<int, string>();
+
+            return await _context.ProductCategories
+                .AsNoTracking()
+                .Where(c => ids.Contains(c.Id))
+                .ToDictionaryAsync(c => c.Id, c => c.Name);
+        }
+
+        private async Task EnsureUniqueTypeAsync(string type, int? currentId)
+        {
+            var normalized = (type ?? string.Empty).Trim().ToLower();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                throw new InvalidOperationException("Accommodation name is required.");
+            }
+
+            var exists = await _context.Accommodations.AnyAsync(a =>
+                a.Id != currentId
+                && (a.Type ?? string.Empty).ToLower() == normalized);
+            if (exists)
+            {
+                throw new InvalidOperationException($"An accommodation named '{type.Trim()}' already exists.");
+            }
         }
     }
 }

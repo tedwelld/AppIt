@@ -11,5 +11,7 @@ namespace AppIt.Core.Interfaces.Services
         Task<DayEndReadDto?> GetTodayAsync();
         Task<DayEndReadDto> OpenAsync(OpenDayEndDto dto, string openedBy);
         Task<DayEndReadDto?> CloseAsync(CloseDayEndDto dto, string closedBy);
+        Task<JournalRunResultDto> RunJournalTransactionsAsync(DateTime? processingDate = null);
+        Task<int> DeleteExistingJournalEntriesAsync(DateTime? processingDate = null);
     }
 }

@@ -9,6 +9,9 @@ namespace AppIt.Core.DTOs
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
+        public int? ProductCategoryId { get; set; }
+        public string? CategoryName { get; set; }
+        public int? MaxPax { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedDate { get; set; }
         public List<ServicePriceReadDto> Prices { get; set; } = new();
@@ -19,6 +22,8 @@ namespace AppIt.Core.DTOs
         [Required]
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
+        public int? ProductCategoryId { get; set; }
+        public int? MaxPax { get; set; }
         public bool IsActive { get; set; } = true;
     }
 

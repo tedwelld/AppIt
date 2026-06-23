@@ -1,3 +1,4 @@
+using AppIt.Core.AppServices;
 using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using AppIt.Data;
@@ -17,10 +18,16 @@ namespace AppIt.Core.Services
 
         public async Task<ProductReadDto> CreateAsync(CreateProductDto dto)
         {
+            await EnsureUniqueNameAsync(dto.Name, null);
+            await CatalogConstraints.ValidateCategoryAsync(_context, dto.ProductCategoryId);
+            var categoryName = await CatalogConstraints.ResolveCategoryNameAsync(_context, dto.ProductCategoryId);
+
             var product = new Product
             {
-                Name = dto.Name,
-                Category = NormalizeCategory(dto.Category),
+                Name = dto.Name.Trim(),
+                Category = categoryName,
+                ProductCategoryId = dto.ProductCategoryId,
+                MaxPax = dto.MaxPax,
                 Description = dto.Description,
                 BasePriceUsd = dto.BasePriceUsd,
                 IsActive = dto.IsActive,
@@ -39,12 +46,17 @@ namespace AppIt.Core.Services
             var product = await _context.Products.FindAsync(dto.ProductId);
             if (product == null) return null;
 
-            product.Name = dto.Name;
-            product.Category = NormalizeCategory(dto.Category);
+            await EnsureUniqueNameAsync(dto.Name, dto.ProductId);
+            await CatalogConstraints.ValidateCategoryAsync(_context, dto.ProductCategoryId);
+            var categoryName = await CatalogConstraints.ResolveCategoryNameAsync(_context, dto.ProductCategoryId);
+
+            product.Name = dto.Name.Trim();
+            product.Category = categoryName;
+            product.ProductCategoryId = dto.ProductCategoryId;
+            product.MaxPax = dto.MaxPax;
             product.Description = dto.Description;
             product.BasePriceUsd = dto.BasePriceUsd;
             product.IsActive = dto.IsActive;
-            
 
             await _context.SaveChangesAsync();
 
@@ -74,7 +86,8 @@ namespace AppIt.Core.Services
         {
             var products = await _context.Products.AsNoTracking().ToListAsync();
             var prices = await PricesForAsync(products.Select(p => p.ProductId));
-            return products.Select(p => ToReadDto(p, prices));
+            var categoryNames = await CategoryNamesForAsync(products.Select(p => p.ProductCategoryId));
+            return products.Select(p => ToReadDto(p, prices, categoryNames));
         }
 
         private async Task EnsureUsdPriceAsync(int productId, decimal basePriceUsd)
@@ -104,14 +117,23 @@ namespace AppIt.Core.Services
         private async Task<ProductReadDto> ToReadDtoAsync(Product product)
         {
             var prices = await PricesForAsync(new[] { product.ProductId });
-            return ToReadDto(product, prices);
+            var categoryNames = await CategoryNamesForAsync(new[] { product.ProductCategoryId });
+            return ToReadDto(product, prices, categoryNames);
         }
 
-        private static ProductReadDto ToReadDto(Product product, ILookup<int, ServicePriceReadDto> prices) => new()
+        private static ProductReadDto ToReadDto(
+            Product product,
+            ILookup<int, ServicePriceReadDto> prices,
+            IReadOnlyDictionary<int, string> categoryNames) => new()
         {
             ProductId = product.ProductId,
             Name = product.Name,
-            Category = NormalizeCategory(product.Category),
+            Category = product.Category,
+            ProductCategoryId = product.ProductCategoryId,
+            CategoryName = product.ProductCategoryId.HasValue && categoryNames.TryGetValue(product.ProductCategoryId.Value, out var name)
+                ? name
+                : product.Category,
+            MaxPax = product.MaxPax,
             Description = product.Description,
             BasePriceUsd = product.BasePriceUsd,
             IsActive = product.IsActive,
@@ -140,9 +162,32 @@ namespace AppIt.Core.Services
             return prices.ToLookup(p => p.ServiceId);
         }
 
-        private static string NormalizeCategory(string? category)
+        private async Task<IReadOnlyDictionary<int, string>> CategoryNamesForAsync(IEnumerable<int?> categoryIds)
         {
-            return string.IsNullOrWhiteSpace(category) ? "Product" : "Product";
+            var ids = categoryIds.Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+            if (ids.Count == 0) return new Dictionary<int, string>();
+
+            return await _context.ProductCategories
+                .AsNoTracking()
+                .Where(c => ids.Contains(c.Id))
+                .ToDictionaryAsync(c => c.Id, c => c.Name);
+        }
+
+        private async Task EnsureUniqueNameAsync(string name, int? currentId)
+        {
+            var normalized = (name ?? string.Empty).Trim().ToLower();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                throw new InvalidOperationException("Product name is required.");
+            }
+
+            var exists = await _context.Products.AnyAsync(p =>
+                p.ProductId != currentId
+                && (p.Name ?? string.Empty).ToLower() == normalized);
+            if (exists)
+            {
+                throw new InvalidOperationException($"A product named '{name.Trim()}' already exists.");
+            }
         }
     }
 }

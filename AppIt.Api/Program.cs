@@ -142,7 +142,20 @@ namespace AppIt.Api
                 builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
                 builder.Services.AddScoped<IProductSubCategoryService, ProductSubCategoryService>();
                 builder.Services.AddScoped<ISpecialProductPriceService, SpecialProductPriceService>();
+                builder.Services.AddScoped<IComboService, ComboService>();
+                builder.Services.AddScoped<ICreditAgentService, CreditAgentService>();
+                builder.Services.AddScoped<IProductPriceAgentService, ProductPriceAgentService>();
+                builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
+                builder.Services.AddScoped<INightAuditService, NightAuditService>();
+                builder.Services.AddScoped<ITrialBalanceService, TrialBalanceService>();
+                builder.Services.AddScoped<IDebtorReportService, DebtorReportService>();
+                builder.Services.AddScoped<ICreditMemoService, CreditMemoService>();
+                builder.Services.AddScoped<IFiscalService, AppIt.Core.AppServices.Fiscalization.FiscalService>();
+                builder.Services.AddScoped<IHConnectService, AppIt.Core.AppServices.Integrations.HConnectService>();
+                builder.Services.AddScoped<IBeds24Service, AppIt.Core.AppServices.Integrations.Beds24Service>();
+                builder.Services.AddScoped<ISimunyeService, AppIt.Core.AppServices.Integrations.SimunyeService>();
                 builder.Services.AddHostedService<PendingPaymentCleanupHostedService>();
+                builder.Services.AddAppItQuartz(builder.Configuration);
                 builder.Services.ConfigureHttpJsonOptions(options =>
                 {
                     // Ensure a runtime TypeInfoResolver is available so source-generation is not required

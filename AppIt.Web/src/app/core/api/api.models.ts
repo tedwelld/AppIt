@@ -93,9 +93,12 @@ export interface Customer {
 
 export interface BookingServiceItem {
     id?: number;
-    serviceType: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour';
+    serviceType: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour' | 'Combo';
     serviceId: number;
     serviceName: string;
+    productKind?: string;
+    comboId?: number;
+    miscCode?: string;
     quantity: number;
     unitPrice: number;
     totalPrice?: number;

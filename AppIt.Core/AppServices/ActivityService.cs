@@ -1,4 +1,5 @@
-﻿using AppIt.Core.DTOs;
+﻿using AppIt.Core.AppServices;
+using AppIt.Core.DTOs;
 using AppIt.Core.Interfaces.Services;
 using AppIt.Data;
 using AppIt.Data.EntityModels;
@@ -18,10 +19,13 @@ namespace AppIt.Core.Services
         public async Task<ActivityReadDto> CreateAsync(CreateActivityDto dto)
         {
             await EnsureUniqueNameAsync(dto.Name, null);
+            await CatalogConstraints.ValidateCategoryAsync(_context, dto.ProductCategoryId);
             var activity = new Activity
             {
                 Name = dto.Name.Trim(),
                 Description = dto.Description,
+                ProductCategoryId = dto.ProductCategoryId,
+                MaxPax = dto.MaxPax,
                 BasePriceUsd = dto.BasePriceUsd,
                 IsActive = dto.IsActive,
                 CreatedDate = DateTime.UtcNow
@@ -40,8 +44,11 @@ namespace AppIt.Core.Services
             if (activity == null) return null;
 
             await EnsureUniqueNameAsync(dto.Name, dto.Id);
+            await CatalogConstraints.ValidateCategoryAsync(_context, dto.ProductCategoryId);
             activity.Name = dto.Name.Trim();
             activity.Description = dto.Description;
+            activity.ProductCategoryId = dto.ProductCategoryId;
+            activity.MaxPax = dto.MaxPax;
             activity.BasePriceUsd = dto.BasePriceUsd;
             activity.IsActive = dto.IsActive;
 
@@ -70,7 +77,8 @@ namespace AppIt.Core.Services
         {
             var activities = await _context.Activities.AsNoTracking().ToListAsync();
             var prices = await PricesForAsync(activities.Select(a => a.Id));
-            return activities.Select(a => ToReadDto(a, prices));
+            var categoryNames = await CategoryNamesForAsync(activities.Select(a => a.ProductCategoryId));
+            return activities.Select(a => ToReadDto(a, prices, categoryNames));
         }
 
         private async Task EnsureUsdPriceAsync(int activityId, decimal basePriceUsd)
@@ -100,16 +108,25 @@ namespace AppIt.Core.Services
         private async Task<ActivityReadDto> ToReadDtoAsync(Activity activity)
         {
             var prices = await PricesForAsync(new[] { activity.Id });
-            return ToReadDto(activity, prices);
+            var categoryNames = await CategoryNamesForAsync(new[] { activity.ProductCategoryId });
+            return ToReadDto(activity, prices, categoryNames);
         }
 
-        private static ActivityReadDto ToReadDto(Activity activity, ILookup<int, ServicePriceReadDto> prices)
+        private static ActivityReadDto ToReadDto(
+            Activity activity,
+            ILookup<int, ServicePriceReadDto> prices,
+            IReadOnlyDictionary<int, string> categoryNames)
         {
             return new ActivityReadDto
             {
                 Id = activity.Id,
                 Name = activity.Name,
                 Description = activity.Description,
+                ProductCategoryId = activity.ProductCategoryId,
+                CategoryName = activity.ProductCategoryId.HasValue && categoryNames.TryGetValue(activity.ProductCategoryId.Value, out var name)
+                    ? name
+                    : null,
+                MaxPax = activity.MaxPax,
                 BasePriceUsd = activity.BasePriceUsd,
                 IsActive = activity.IsActive,
                 CreatedDate = activity.CreatedDate,
@@ -136,6 +153,17 @@ namespace AppIt.Core.Services
                 })
                 .ToListAsync();
             return prices.ToLookup(p => p.ServiceId);
+        }
+
+        private async Task<IReadOnlyDictionary<int, string>> CategoryNamesForAsync(IEnumerable<int?> categoryIds)
+        {
+            var ids = categoryIds.Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+            if (ids.Count == 0) return new Dictionary<int, string>();
+
+            return await _context.ProductCategories
+                .AsNoTracking()
+                .Where(c => ids.Contains(c.Id))
+                .ToDictionaryAsync(c => c.Id, c => c.Name);
         }
 
         private async Task EnsureUniqueNameAsync(string name, int? currentId)

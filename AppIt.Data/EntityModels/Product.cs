@@ -23,6 +23,13 @@ namespace AppIt.Data.EntityModels
         [MaxLength(120)]
         public string Category { get; set; } = "Product";
 
+        public int? ProductCategoryId { get; set; }
+
+        public ProductCategory? ProductCategory { get; set; }
+
+        /// <summary>Maximum guests (pax) this product can accommodate per booking line.</summary>
+        public int? MaxPax { get; set; }
+
         public decimal BasePriceUsd { get; set; }
 
         public bool IsActive { get; set; } = true;

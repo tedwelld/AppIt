@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AppIt.Data.EntityModels
 {
@@ -13,6 +14,11 @@ namespace AppIt.Data.EntityModels
 
         [MaxLength(40)]
         public string AgentType { get; set; } = "Company";
+
+        public bool IsCreditAgent { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal CreditLimit { get; set; }
 
         [MaxLength(500)]
         public string CompanyAddress { get; set; } = null!;

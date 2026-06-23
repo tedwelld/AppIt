@@ -1,5 +1,6 @@
 using AppIt.Api.Infrastructure;
 using AppIt.Core.DTOs;
+using AppIt.Data.EntityModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -92,7 +93,31 @@ namespace AppIt.Api.Controllers
                 nameof(CashierBankNoteRow.Method),
                 nameof(CashierBankNoteRow.Status)));
         }
+
+        [HttpPost("bank-note-details")]
+        public async Task<IActionResult> SaveBankNoteDetails([FromBody] SaveBankNoteDetailDto dto)
+        {
+            var entity = new BankNoteDetail
+            {
+                CashUpDate = dto.CashUpDate.Date,
+                CurrencyCode = dto.CurrencyCode,
+                Denomination = dto.Denomination,
+                Quantity = dto.Quantity,
+                TotalAmount = dto.TotalAmount,
+                EnteredBy = User.Identity?.Name
+            };
+            _context.BankNoteDetails.Add(entity);
+            await _context.SaveChangesAsync();
+            return Ok(entity);
+        }
     }
+
+    public record SaveBankNoteDetailDto(
+        DateTime CashUpDate,
+        string CurrencyCode,
+        string Denomination,
+        int Quantity,
+        decimal TotalAmount);
 
     public record CashierExchangeRateRow(
         string Currency,

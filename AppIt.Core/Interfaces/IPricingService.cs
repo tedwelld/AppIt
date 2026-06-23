@@ -15,7 +15,7 @@ namespace AppIt.Core.Interfaces.Services
         /// priority chain: SpecialProductPrice -> ServicePrice -> FX-converted USD price/base.
         /// Throws <see cref="InvalidOperationException"/> when no rate can be resolved.
         /// </summary>
-        Task<decimal> ResolveUnitPriceAsync(string serviceType, int serviceId, string currency, DateTime? date = null, int? consultantId = null);
+        Task<decimal> ResolveUnitPriceAsync(string serviceType, int serviceId, string currency, DateTime? date = null, int? consultantId = null, int? companyId = null);
 
         /// <summary>
         /// Returns the effective exchange rate (foreign units per 1 USD) for a currency on a date.

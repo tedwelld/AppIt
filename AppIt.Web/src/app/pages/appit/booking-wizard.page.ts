@@ -17,11 +17,15 @@ import { BookingCheckoutRequest, BookingCheckoutResult, BookingServiceItem, Cust
 import { AuthService } from '../../core/auth/auth.service';
 
 interface ServiceOption {
-    serviceType: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour';
+    serviceType: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour' | 'Combo';
     serviceId: number;
     serviceName: string;
     description: string;
+    categoryName: string;
+    maxPax: number | null;
     unitPrice: number;
+    productKind?: string;
+    comboId?: number;
     // Stable USD base price; never mutated, so currency re-mapping never double-converts.
     basePriceUsd: number;
     currency: string;
@@ -32,7 +36,7 @@ interface ServiceOption {
 
 interface ServiceTypeOption {
     label: string;
-    value: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour';
+    value: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour' | 'Combo';
     endpoint: string;
 }
 
@@ -174,8 +178,8 @@ interface BookingForm {
                 header="New Booking"
                 [(visible)]="bookingModalVisible"
                 [modal]="true"
-                [style]="{ width: 'min(1500px, 99vw)' }"
-                [contentStyle]="{ overflow: 'visible', padding: '0' }"
+                [style]="{ width: 'min(1180px, 96vw)' }"
+                [contentStyle]="{ overflow: 'auto', padding: '0', maxHeight: '88vh' }"
                 [draggable]="false"
                 styleClass="booking-modal"
             >
@@ -183,7 +187,7 @@ interface BookingForm {
                     <div class="booking-modal-intro">
                         <div>
                             <p class="text-primary font-bold uppercase tracking-[0.25em] m-0">SWA VCH N#{{ previewVoucherNumber() }}</p>
-                            <h2 class="font-display text-3xl mt-2 mb-1">Capture Client Booking</h2>
+                            <h2 class="font-display text-2xl mt-2 mb-1">Capture Client Booking</h2>
                             <p class="text-muted-color m-0">Booking Details, Product Details, and Payment Details follow the same capture structure.</p>
                         </div>
                         <div class="booking-total-chip">
@@ -192,10 +196,21 @@ interface BookingForm {
                         </div>
                     </div>
 
-                    <div class="booking-step-strip">
-                        <button pButton class="booking-step-button" type="button" *ngFor="let step of steps; let i = index" [label]="step" [severity]="activeStep() === i ? 'primary' : 'secondary'" (click)="activeStep.set(i)"></button>
-                    </div>
+                    <div class="booking-modal-body">
+                        <nav class="booking-modal-steps" aria-label="Booking steps">
+                            <button
+                                pButton
+                                type="button"
+                                class="booking-step-nav"
+                                *ngFor="let step of steps; let i = index"
+                                [label]="step"
+                                [icon]="i === 0 ? 'pi pi-user' : i === 1 ? 'pi pi-box' : 'pi pi-wallet'"
+                                [severity]="activeStep() === i ? 'primary' : 'contrast'"
+                                (click)="activeStep.set(i)"
+                            ></button>
+                        </nav>
 
+                        <div class="booking-modal-main">
                     <article class="booking-modal-panel" *ngIf="activeStep() === 0">
                         <h2 class="font-display text-2xl mt-0">Client Details</h2>
                         <div class="grid grid-cols-1 xl:grid-cols-[1.3fr_1fr] gap-5">
@@ -222,7 +237,7 @@ interface BookingForm {
                             </div>
 
                             <form class="booking-client-form">
-                                <label class="booking-inline-field booking-inline-field-wide">
+                                <label class="booking-stack-field booking-stack-field-wide">
                                     <span class="font-semibold">Trip Account Agent</span>
                                     <p-select
                                         [options]="tripAccounts()"
@@ -236,11 +251,11 @@ interface BookingForm {
                                         appendTo="body"
                                     ></p-select>
                                 </label>
-                                <label class="booking-inline-field">
+                                <label class="booking-stack-field">
                                     <span class="font-semibold">Agency Voucher Ref</span>
                                     <input pInputText [(ngModel)]="agencyVoucherRef" name="agencyVoucherRef" placeholder="Agent's own voucher number" />
                                 </label>
-                                <label class="booking-inline-field">
+                                <label class="booking-stack-field">
                                     <span class="font-semibold">Consultant</span>
                                     <p-select
                                         [options]="consultants()"
@@ -254,35 +269,35 @@ interface BookingForm {
                                         appendTo="body"
                                     ></p-select>
                                 </label>
-                                <label class="booking-inline-field">
+                                <label class="booking-stack-field">
                                     <span class="font-semibold">First Name</span>
                                     <input pInputText [(ngModel)]="client.firstName" name="firstName" />
                                 </label>
-                                <label class="booking-inline-field">
+                                <label class="booking-stack-field">
                                     <span class="font-semibold">Surname</span>
                                     <input pInputText [(ngModel)]="client.surname" name="surname" />
                                 </label>
-                                <label class="booking-inline-field">
+                                <label class="booking-stack-field">
                                     <span class="font-semibold">Email</span>
                                     <input pInputText type="email" [(ngModel)]="client.email" name="email" />
                                 </label>
-                                <label class="booking-inline-field">
+                                <label class="booking-stack-field">
                                     <span class="font-semibold">Phone</span>
                                     <input pInputText [(ngModel)]="client.phoneNumber" name="phoneNumber" />
                                 </label>
-                                <label class="booking-inline-field">
+                                <label class="booking-stack-field">
                                     <span class="font-semibold">Country</span>
                                     <input pInputText [(ngModel)]="clientCountry" name="country" placeholder="Country of origin" />
                                 </label>
-                                <label class="booking-inline-field">
+                                <label class="booking-stack-field">
                                     <span class="font-semibold">Nationality</span>
                                     <input pInputText [(ngModel)]="client.nationality" name="nationality" />
                                 </label>
-                                <label class="booking-inline-field">
+                                <label class="booking-stack-field">
                                     <span class="font-semibold">Duration Of Stay</span>
                                     <input pInputText type="number" min="0" [(ngModel)]="client.durationOfStayDays" name="durationOfStayDays" />
                                 </label>
-                                <label class="booking-inline-field booking-inline-field-wide">
+                                <label class="booking-stack-field booking-stack-field-wide">
                                     <span class="font-semibold">Booking Notes</span>
                                     <input pInputText [(ngModel)]="bookingNotes" name="bookingNotes" placeholder="Special instructions or notes" />
                                 </label>
@@ -291,42 +306,61 @@ interface BookingForm {
                     </article>
 
                     <article class="booking-modal-panel" *ngIf="activeStep() === 1">
-                        <div class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+                        <div class="booking-services-header">
                             <div>
                                 <h2 class="font-display text-2xl mt-0">Services</h2>
-                                <p class="text-muted-color m-0">Choose from the services created under each setup page, grouped by service type/category.</p>
+                                <p class="text-muted-color m-0">Choose catalog services grouped by the categories you created under Setup.</p>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-6 gap-3 w-full xl:w-auto">
-                                <label class="grid gap-1 text-sm"><span class="font-semibold">Currency</span>
-                                    <p-select [options]="currencyOptions()" [(ngModel)]="currency" optionLabel="code" optionValue="code" (onChange)="onCurrencyChange(currency)" appendTo="body"></p-select>
-                                </label>
-                                <label class="grid gap-1 text-sm"><span class="font-semibold">Service Type / Category</span>
-                                    <p-select [options]="serviceTypeOptions()" [(ngModel)]="selectedType" optionLabel="label" optionValue="value" (onChange)="onServiceTypeChange()" appendTo="body"></p-select>
-                                </label>
-                                <label class="grid gap-1 text-sm"><span class="font-semibold">Service ({{ filteredServices().length }})</span>
-                                    <p-multiSelect [options]="filteredServices()" [(ngModel)]="selectedServices" optionLabel="serviceLabel" placeholder="Select one or more" [filter]="true" display="chip" appendTo="body"></p-multiSelect>
-                                </label>
-                                <label class="grid gap-1 text-sm"><span class="font-semibold">Supplier</span>
-                                    <p-select [options]="suppliers()" [(ngModel)]="lineSupplierId" optionLabel="name" optionValue="supplierId" placeholder="Optional" [showClear]="true" [filter]="true" appendTo="body"></p-select>
-                                </label>
-                                <label class="grid gap-1 text-sm"><span class="font-semibold">Quantity</span>
-                                    <input pInputText type="number" min="1" [(ngModel)]="selectedQuantity" placeholder="Qty" />
-                                </label>
-                                <label class="grid gap-1 text-sm"><span class="font-semibold">&nbsp;</span>
-                                    <button pButton type="button" icon="pi pi-plus" label="Add" (click)="addService()"></button>
-                                </label>
+                        </div>
+
+                        <div class="booking-services-toolbar">
+                            <label class="booking-stack-field">
+                                <span class="font-semibold">Currency</span>
+                                <p-select [options]="currencyOptions()" [(ngModel)]="currency" optionLabel="code" optionValue="code" (onChange)="onCurrencyChange(currency)" appendTo="body"></p-select>
+                            </label>
+                            <label class="booking-stack-field">
+                                <span class="font-semibold">Service Type</span>
+                                <p-select [options]="serviceTypeOptions()" [(ngModel)]="selectedType" optionLabel="label" optionValue="value" (onChange)="onServiceTypeChange()" appendTo="body"></p-select>
+                            </label>
+                            <label class="booking-stack-field booking-stack-field-span">
+                                <span class="font-semibold">Service ({{ filteredServices().length }})</span>
+                                <p-multiSelect
+                                    [group]="true"
+                                    [options]="groupedFilteredServices()"
+                                    [(ngModel)]="selectedServices"
+                                    optionLabel="serviceLabel"
+                                    optionGroupLabel="label"
+                                    optionGroupChildren="items"
+                                    placeholder="Select one or more services"
+                                    [filter]="true"
+                                    display="chip"
+                                    appendTo="body"
+                                ></p-multiSelect>
+                            </label>
+                            <label class="booking-stack-field">
+                                <span class="font-semibold">Supplier</span>
+                                <p-select [options]="suppliers()" [(ngModel)]="lineSupplierId" optionLabel="name" optionValue="supplierId" placeholder="Optional" [showClear]="true" [filter]="true" appendTo="body"></p-select>
+                            </label>
+                            <label class="booking-stack-field">
+                                <span class="font-semibold">Quantity</span>
+                                <input pInputText type="number" min="1" [(ngModel)]="selectedQuantity" placeholder="Qty" />
+                            </label>
+                            <div class="booking-stack-field booking-services-add">
+                                <span class="font-semibold">&nbsp;</span>
+                                <button pButton type="button" icon="pi pi-plus" label="Add to booking" (click)="addService()"></button>
                             </div>
-                            <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mt-2" *ngIf="selectedServices.length">
-                                <label class="grid gap-1 text-sm"><span>Adults</span><input pInputText type="number" min="0" [(ngModel)]="lineAdultPax" placeholder="0" /></label>
-                                <label class="grid gap-1 text-sm"><span>Children</span><input pInputText type="number" min="0" [(ngModel)]="lineChildPax" placeholder="0" /></label>
-                                <label class="grid gap-1 text-sm"><span>Comps</span><input pInputText type="number" min="0" [(ngModel)]="lineCompPax" placeholder="0" /></label>
-                                <label class="grid gap-1 text-sm" *ngIf="selectedType === 'Accommodation'"><span>Rooms</span><input pInputText type="number" min="1" [(ngModel)]="lineRooms" placeholder="1" /></label>
-                                <label class="grid gap-1 text-sm" *ngIf="selectedType === 'Accommodation'"><span>Nights</span><input pInputText type="number" min="1" [(ngModel)]="lineNights" placeholder="1" /></label>
-                                <label class="grid gap-1 text-sm" *ngIf="selectedType === 'Activity' || selectedType === 'Transfer' || selectedType === 'Tour'"><span>Pickup</span><input pInputText [(ngModel)]="linePickup" placeholder="Pickup location" /></label>
-                                <label class="grid gap-1 text-sm" *ngIf="selectedType === 'Activity' || selectedType === 'Transfer' || selectedType === 'Tour'"><span>Dropoff</span><input pInputText [(ngModel)]="lineDropoff" placeholder="Dropoff location" /></label>
-                                <label class="grid gap-1 text-sm" *ngIf="selectedType !== 'Product'"><span>Date</span><input pInputText type="date" [(ngModel)]="lineActivityDate" /></label>
-                                <label class="grid gap-1 text-sm"><span>Discount %</span><input pInputText type="number" min="0" max="100" step="0.01" [(ngModel)]="lineDiscountPercent" placeholder="0" /></label>
-                            </div>
+                        </div>
+
+                        <div class="booking-line-details" *ngIf="selectedServices.length">
+                                <label class="booking-stack-field"><span>Adults</span><input pInputText type="number" min="0" [(ngModel)]="lineAdultPax" placeholder="0" /></label>
+                                <label class="booking-stack-field"><span>Children</span><input pInputText type="number" min="0" [(ngModel)]="lineChildPax" placeholder="0" /></label>
+                                <label class="booking-stack-field"><span>Comps</span><input pInputText type="number" min="0" [(ngModel)]="lineCompPax" placeholder="0" /></label>
+                                <label class="booking-stack-field" *ngIf="selectedType === 'Accommodation'"><span>Rooms</span><input pInputText type="number" min="1" [(ngModel)]="lineRooms" placeholder="1" /></label>
+                                <label class="booking-stack-field" *ngIf="selectedType === 'Accommodation'"><span>Nights</span><input pInputText type="number" min="1" [(ngModel)]="lineNights" placeholder="1" /></label>
+                                <label class="booking-stack-field" *ngIf="selectedType === 'Activity' || selectedType === 'Transfer' || selectedType === 'Tour'"><span>Pickup</span><input pInputText [(ngModel)]="linePickup" placeholder="Pickup location" /></label>
+                                <label class="booking-stack-field" *ngIf="selectedType === 'Activity' || selectedType === 'Transfer' || selectedType === 'Tour'"><span>Dropoff</span><input pInputText [(ngModel)]="lineDropoff" placeholder="Dropoff location" /></label>
+                                <label class="booking-stack-field" *ngIf="selectedType !== 'Product'"><span>Activity Date</span><input pInputText type="date" [(ngModel)]="lineActivityDate" /></label>
+                                <label class="booking-stack-field"><span>Discount %</span><input pInputText type="number" min="0" max="100" step="0.01" [(ngModel)]="lineDiscountPercent" placeholder="0" /></label>
                         </div>
 
                         <p-table [value]="serviceItems()" styleClass="p-datatable-sm mt-4 booking-display-table" [tableStyle]="{ 'min-width': '100%' }" [rows]="10" [paginator]="serviceItems().length > 10">
@@ -421,6 +455,8 @@ interface BookingForm {
                             <button pButton type="button" label="Confirm Booking" icon="pi pi-check" [loading]="submitting()" (click)="submitWithStatus('Confirmed')" *ngIf="activeStep() === 2"></button>
                         </div>
                     </div>
+                        </div>
+                    </div>
                 </div>
             </p-dialog>
 
@@ -465,39 +501,39 @@ interface BookingForm {
                             </div>
                         </div>
                         <form class="booking-invoice-form">
-                            <label class="booking-inline-field">
+                            <label class="booking-stack-field">
                                 <span class="font-semibold">Booking ID</span>
                                 <input pInputText [ngModel]="bookingForm.reservationId ?? 'New'" name="bookingId" readonly />
                             </label>
-                            <label class="booking-inline-field">
+                            <label class="booking-stack-field">
                                 <span class="font-semibold">Reference</span>
                                 <input pInputText [(ngModel)]="bookingForm.reference" name="bookingReference" />
                             </label>
-                            <label class="booking-inline-field">
+                            <label class="booking-stack-field">
                                 <span class="font-semibold">Voucher Code</span>
                                 <input pInputText [(ngModel)]="bookingForm.voucherCode" name="bookingVoucherCode" />
                             </label>
-                            <label class="booking-inline-field">
+                            <label class="booking-stack-field">
                                 <span class="font-semibold">Customer ID</span>
                                 <input pInputText type="number" [(ngModel)]="bookingForm.customerId" name="bookingCustomerId" />
                             </label>
-                            <label class="booking-inline-field">
+                            <label class="booking-stack-field">
                                 <span class="font-semibold">Account ID</span>
                                 <input pInputText type="number" [(ngModel)]="bookingForm.accountId" name="bookingAccountId" />
                             </label>
-                            <label class="booking-inline-field">
+                            <label class="booking-stack-field">
                                 <span class="font-semibold">Client Email</span>
                                 <input pInputText type="email" [(ngModel)]="bookingForm.customerEmail" name="bookingCustomerEmail" />
                             </label>
-                            <label class="booking-inline-field">
+                            <label class="booking-stack-field">
                                 <span class="font-semibold">Currency</span>
                                 <input pInputText [(ngModel)]="bookingForm.currency" name="bookingCurrency" />
                             </label>
-                            <label class="booking-inline-field">
+                            <label class="booking-stack-field">
                                 <span class="font-semibold">Total Amount</span>
                                 <input pInputText type="number" min="0" step="0.01" [(ngModel)]="bookingForm.totalAmount" name="bookingTotalAmount" />
                             </label>
-                            <label class="booking-inline-field">
+                            <label class="booking-stack-field">
                                 <span class="font-semibold">Status</span>
                                 <p-select [options]="bookingStatusOptions" [(ngModel)]="bookingForm.status" name="bookingStatus" optionLabel="label" optionValue="value" appendTo="body"></p-select>
                             </label>
@@ -635,27 +671,27 @@ interface BookingForm {
                     </div>
 
                     <form class="booking-invoice-form">
-                        <label class="booking-inline-field">
+                        <label class="booking-stack-field">
                             <span class="font-semibold">Invoice ID</span>
                             <input pInputText [ngModel]="invoiceForm.id ?? 'New'" name="invoiceId" readonly />
                         </label>
-                        <label class="booking-inline-field">
+                        <label class="booking-stack-field">
                             <span class="font-semibold">Reservation ID</span>
                             <input pInputText type="number" [(ngModel)]="invoiceForm.reservationId" name="invoiceReservationId" />
                         </label>
-                        <label class="booking-inline-field">
+                        <label class="booking-stack-field">
                             <span class="font-semibold">Total Amount</span>
                             <input pInputText type="number" min="0" step="0.01" [(ngModel)]="invoiceForm.totalAmount" name="invoiceTotalAmount" />
                         </label>
-                        <label class="booking-inline-field">
+                        <label class="booking-stack-field">
                             <span class="font-semibold">Currency</span>
                             <input pInputText [(ngModel)]="invoiceForm.currency" name="invoiceCurrency" />
                         </label>
-                        <label class="booking-inline-field">
+                        <label class="booking-stack-field">
                             <span class="font-semibold">Status</span>
                             <p-select [options]="invoiceStatusOptions" [(ngModel)]="invoiceForm.status" name="invoiceStatus" optionLabel="label" optionValue="value" appendTo="body"></p-select>
                         </label>
-                        <label class="booking-inline-field">
+                        <label class="booking-stack-field">
                             <span class="font-semibold">Issued At</span>
                             <input pInputText [ngModel]="display(invoiceForm.issuedAt)" name="invoiceIssuedAt" readonly />
                         </label>
@@ -749,15 +785,40 @@ interface BookingForm {
         .booking-modal-shell {
             display: grid;
             gap: 1rem;
-            padding: 1.25rem;
+            padding: 1rem 1.15rem 1.15rem;
+        }
+
+        .booking-modal-body {
+            display: grid;
+            grid-template-columns: minmax(9.5rem, 11rem) minmax(0, 1fr);
+            gap: 1rem;
+            align-items: start;
+        }
+
+        .booking-modal-steps {
+            display: grid;
+            gap: 0.75rem;
+            position: sticky;
+            top: 0;
+        }
+
+        :host ::ng-deep .booking-step-nav.p-button {
+            justify-content: flex-start;
+            width: 100%;
+        }
+
+        .booking-modal-main {
+            display: grid;
+            gap: 1rem;
+            min-width: 0;
         }
 
         .booking-modal-intro {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 1rem;
-            padding: 1rem;
+            gap: 0.85rem;
+            padding: 0.85rem 1rem;
             border: 1px solid var(--surface-border);
             border-radius: 0.75rem;
             background: color-mix(in srgb, var(--surface-card), var(--surface-ground) 28%);
@@ -778,18 +839,45 @@ interface BookingForm {
         }
 
         .booking-total-chip strong {
-            font-size: 1.5rem;
+            font-size: 1.25rem;
         }
 
         .booking-step-strip {
+            display: none;
+        }
+
+        .booking-services-header {
+            margin-bottom: 1rem;
+        }
+
+        .booking-services-toolbar {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.75rem;
+            gap: 1rem 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .booking-stack-field-span {
+            grid-column: 1 / -1;
+        }
+
+        .booking-line-details {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem 1.25rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 1px dashed var(--surface-border);
+            border-radius: 0.75rem;
+            background: color-mix(in srgb, var(--surface-card), var(--surface-ground) 18%);
+        }
+
+        .booking-services-add {
+            align-self: end;
         }
 
         :host ::ng-deep .booking-step-button.p-button,
         .booking-modal-actions .p-button {
-            width: 100%;
             min-width: 10rem;
         }
 
@@ -814,33 +902,28 @@ interface BookingForm {
         .booking-client-form {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.6rem 1.25rem;
+            gap: 1rem 1.5rem;
             align-content: start;
         }
 
-        .booking-inline-field {
+        .booking-stack-field {
             display: grid;
-            grid-template-columns: 9rem minmax(0, 1fr);
-            gap: 0.75rem;
-            align-items: center;
+            gap: 0.5rem;
             min-width: 0;
         }
 
-        .booking-inline-field-wide {
+        .booking-stack-field-wide {
             grid-column: 1 / -1;
         }
 
-        .booking-inline-field span {
+        .booking-stack-field span {
             font-size: 0.9rem;
-            line-height: 1.2;
-            color: var(--text-color-secondary);
+            line-height: 1.3;
         }
 
-        .booking-inline-field .p-inputtext {
-            width: 100%;
-        }
-
-        .booking-inline-field p-select {
+        .booking-stack-field .p-inputtext,
+        .booking-stack-field p-select,
+        .booking-stack-field p-multiselect {
             width: 100%;
         }
 
@@ -964,6 +1047,25 @@ interface BookingForm {
                 flex-direction: column;
             }
 
+            .booking-modal-intro,
+            .booking-modal-footer {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .booking-modal-body {
+                grid-template-columns: 1fr;
+            }
+
+            .booking-modal-steps {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .booking-services-toolbar,
+            .booking-line-details {
+                grid-template-columns: 1fr;
+            }
+
             .booking-total-chip {
                 text-align: left;
             }
@@ -976,7 +1078,7 @@ interface BookingForm {
 
             .booking-customer-search,
             .booking-client-form,
-            .booking-inline-field,
+            .booking-stack-field,
             .booking-invoice-form {
                 grid-template-columns: 1fr;
             }
@@ -1027,6 +1129,17 @@ export class BookingWizardPage {
     readonly netTotal = computed(() => this.grossTotal() - this.totalDiscount());
     readonly total = computed(() => this.netTotal());
     readonly filteredServices = computed(() => this.services().filter((item) => item.serviceType === this.selectedType));
+    readonly groupedFilteredServices = computed(() => {
+        const groups = new Map<string, ServiceOption[]>();
+        for (const item of this.filteredServices()) {
+            const label = item.categoryName || 'Uncategorized';
+            if (!groups.has(label)) groups.set(label, []);
+            groups.get(label)!.push(item);
+        }
+        return Array.from(groups.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([label, items]) => ({ label, items }));
+    });
     readonly groupedServiceOptions = computed(() => this.serviceTypeOptions().map((type) => ({
         label: type.label,
         value: type.value,
@@ -1051,7 +1164,7 @@ export class BookingWizardPage {
     customerSearch = '';
     selectedCustomer: Customer | null = null;
     client: Customer = { durationOfStayDays: 0 };
-    selectedType: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour' = 'Product';
+    selectedType: 'Product' | 'Accommodation' | 'Activity' | 'Transfer' | 'Tour' | 'Combo' = 'Product';
     // Effective FX rates (foreign units per 1 USD) used to preview converted prices in the wizard.
     private ratesMap: Record<string, number> = { USD: 1 };
     selectedServices: ServiceOption[] = [];
@@ -1422,6 +1535,18 @@ export class BookingWizardPage {
             return;
         }
 
+        const totalPax = Number(this.lineAdultPax ?? 0) + Number(this.lineChildPax ?? 0);
+        for (const service of this.selectedServices) {
+            if (service.maxPax && totalPax > service.maxPax) {
+                this.status.set(`${service.serviceName} accommodates at most ${service.maxPax} guests.`);
+                return;
+            }
+            if ((service.serviceType === 'Activity' || service.serviceType === 'Transfer' || service.serviceType === 'Tour') && !this.lineActivityDate) {
+                this.status.set(`Set an activity date for ${service.serviceName} so special pricing applies for that period.`);
+                return;
+            }
+        }
+
         const quantity = Number(this.selectedQuantity);
         const disc = Number(this.lineDiscountPercent ?? 0);
 
@@ -1432,9 +1557,11 @@ export class BookingWizardPage {
             const grossTotal = quantity * unitPrice;
             const discountAmount = grossTotal * disc / 100;
             const item: BookingServiceItem = {
-                serviceType: service.serviceType,
+                serviceType: service.serviceType === 'Combo' ? 'Combo' : service.serviceType,
                 serviceId: service.serviceId,
                 serviceName: service.serviceName,
+                productKind: service.productKind ?? (service.serviceType === 'Combo' ? 'Combo' : 'Standard'),
+                comboId: service.comboId ?? (service.serviceType === 'Combo' ? service.serviceId : undefined),
                 quantity,
                 unitPrice,
                 totalPrice: grossTotal - discountAmount,
@@ -2017,7 +2144,8 @@ export class BookingWizardPage {
             accommodations: this.api.listAll<any>('/api/accommodations'),
             activities: this.api.listAll<any>('/api/activities'),
             transfers: this.api.listAll<any>('/api/transfers'),
-            tours: this.api.listAll<any>('/api/tours')
+            tours: this.api.listAll<any>('/api/tours'),
+            combos: this.api.listAll<any>('/api/combos')
         }).subscribe({
             next: (rows) => {
                 this.serviceTypeOptions.set(rows.serviceTypes);
@@ -2037,7 +2165,8 @@ export class BookingWizardPage {
                     ...rows.accommodations.map((item) => this.toServiceOption('Accommodation', item)),
                     ...rows.activities.map((item) => this.toServiceOption('Activity', item)),
                     ...rows.transfers.map((item) => this.toServiceOption('Transfer', item)),
-                    ...rows.tours.map((item) => this.toServiceOption('Tour', item))
+                    ...rows.tours.map((item) => this.toServiceOption('Tour', item)),
+                    ...(rows.combos ?? []).map((item: any) => this.toComboOption(item))
                 ]);
             },
             error: (err) => {
@@ -2058,6 +2187,8 @@ export class BookingWizardPage {
             serviceId: Number(item.productId ?? item.id),
             serviceName: item.name ?? item.type ?? item.productName ?? serviceType,
             description: item.description ?? item.category ?? '',
+            categoryName: item.categoryName ?? item.category ?? 'Uncategorized',
+            maxPax: item.maxPax ?? item.capacity ?? item.guestCapacity ?? null,
             unitPrice: basePriceUsd,
             basePriceUsd,
             currency: 'USD',
@@ -2068,7 +2199,27 @@ export class BookingWizardPage {
         return this.withSelectedCurrencyPrice(option);
     }
 
-    // Mirrors the backend PricingService chain for the preview shown in the wizard:
+    private toComboOption(item: any): ServiceOption {
+        const option: ServiceOption = {
+            serviceType: 'Combo',
+            serviceId: Number(item.id),
+            comboId: Number(item.id),
+            productKind: 'Combo',
+            serviceName: item.name ?? `Combo #${item.id}`,
+            description: item.description ?? item.code ?? '',
+            categoryName: 'Combos',
+            maxPax: item.maxProducts ?? null,
+            unitPrice: 0,
+            basePriceUsd: 0,
+            currency: 'USD',
+            serviceLabel: `${item.name ?? 'Combo'} (package)`,
+            hasSelectedCurrencyPrice: true,
+            prices: []
+        };
+        return option;
+    }
+
+    // Mirrors the backend PricingService chain
     // explicit per-currency ServicePrice -> USD price/base converted via the effective FX rate.
     // The backend re-resolves authoritatively at checkout (incl. special prices).
     private withSelectedCurrencyPrice(item: ServiceOption): ServiceOption {

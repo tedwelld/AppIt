@@ -38,6 +38,8 @@ export const appRoutes: Routes = [
             { path: 'reservations/reports', loadComponent: () => import('./app/pages/appit/reports.page').then((m) => m.ReportsPage), data: { reportGroup: 'Reservations' } },
             { path: 'reservations/availability-calendar', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'availability-calendar' } },
             { path: 'reservations/occupancy-calendar', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'occupancy-calendar' } },
+            { path: 'reservations/occupancy-details', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'occupancy-details' } },
+            { path: 'reservations/my-cashup', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'my-cashup' } },
             { path: 'reservations/flow-charts', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'flow-charts' } },
             { path: 'cashier/exchange-rates', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'exchange-rates' } },
             { path: 'cashier/bank-note-details', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'bank-note-details' } },
@@ -45,6 +47,8 @@ export const appRoutes: Routes = [
             { path: 'accounts/invoicing', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'invoicing' } },
             { path: 'accounts/credit-notes', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'credit-notes' } },
             { path: 'accounts/deposit-reports', loadComponent: () => import('./app/pages/appit/reports.page').then((m) => m.ReportsPage), data: { reportGroup: 'Accounts' } },
+            { path: 'accounts/debtors', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'debtors' } },
+            { path: 'accounts/exception-reports', loadComponent: () => import('./app/pages/appit/reports.page').then((m) => m.ReportsPage), data: { reportGroup: 'Exception' } },
             { path: 'accounts/proof-of-payments', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'proof-of-payments' } },
             { path: 'statistics/all-reports', loadComponent: () => import('./app/pages/appit/reports.page').then((m) => m.ReportsPage) },
             { path: 'statistics/executive-stats', loadComponent: () => import('./app/pages/appit/executive-stats.page').then((m) => m.ExecutiveStatsPage) },
@@ -63,6 +67,10 @@ export const appRoutes: Routes = [
             { path: 'accounts/commissions', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'commissions' } },
             { path: 'accounts/refunds', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'refunds' } },
             { path: 'operations/day-end', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'day-end' } },
+            { path: 'operations/hconnect-management', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'hconnect-management' } },
+            { path: 'dashboards/stats-pack-dashboard', loadComponent: () => import('./app/pages/appit/executive-stats.page').then((m) => m.ExecutiveStatsPage) },
+            { path: 'setup/manage-agent-rates', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'agent-product-prices' } },
+            { path: 'setup/manage-combos', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'combos' } },
             { path: 'setup/manage-consultants', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'consultants' } },
             { path: 'setup/manage-product-categories', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'product-categories' } },
             { path: 'setup/manage-product-sub-categories', loadComponent: () => import('./app/pages/appit/entities.page').then((m) => m.EntitiesPage), data: { resource: 'product-sub-categories' } },
@@ -72,6 +80,11 @@ export const appRoutes: Routes = [
             { path: 'settings', loadComponent: () => import('./app/pages/appit/settings.page').then((m) => m.SettingsPage) }
         ]
     },
+    { path: 'special-rates/verify-special-rates', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'verify-special-rates' } },
+    { path: 'special-rates/approve-special-rates', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'approve-special-rates' } },
+    { path: 'special-rates/agent-approval/:key', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'agent-approval-public' } },
+    { path: 'agent-portal/manage-rates/:agentId/:year/:name', loadComponent: () => import('./app/pages/appit/operational-flow.page').then((m) => m.OperationalFlowPage), data: { flowKey: 'agent-portal-rates' } },
+    { path: 'secure-viewer', loadComponent: () => import('./app/pages/appit/reports.page').then((m) => m.ReportsPage), data: { reportGroup: 'Secure' } },
     { path: 'notfound', component: NotFoundPage },
     { path: '**', redirectTo: '/notfound' }
 ];
